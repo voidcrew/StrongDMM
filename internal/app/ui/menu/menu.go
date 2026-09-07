@@ -6,6 +6,7 @@ import (
 	"sdmm/internal/dmapi/dm"
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/dmapi/dmmclip"
+	"sdmm/internal/env"
 	"sdmm/internal/imguiext/icon"
 	"sdmm/internal/imguiext/style"
 	w "sdmm/internal/imguiext/widget"
@@ -20,6 +21,7 @@ type app interface {
 	// File
 	DoNewWorkspace()
 	DoNewMap()
+	DoOpenShipWorkspace()
 	DoOpen()
 	DoLoadResource(path string)
 	DoClearRecentMaps()
@@ -115,6 +117,9 @@ func (m *Menu) Process() {
 				Icon(icon.File).
 				Shortcut(platform.KeyModName(), "N"),
 			w.MenuItem("New Map", m.app.DoNewMap).
+				IconEmpty().
+				Enabled(m.app.HasLoadedEnvironment()),
+			w.MenuItem("Voidcrew Ship Workspace", m.app.DoOpenShipWorkspace).
 				IconEmpty().
 				Enabled(m.app.HasLoadedEnvironment()),
 			w.Separator(),
@@ -248,6 +253,7 @@ func (m *Menu) Process() {
 			w.MenuItem("Source Code", m.app.DoOpenSourceCode).
 				Icon(icon.GitHub),
 			w.MenuItem("Check for Updates", m.app.DoCheckForUpdates).
+				Enabled(env.Manifest != "").
 				Icon(icon.SystemUpdate),
 			w.Separator(),
 			w.MenuItem("Open Logs Folder", m.app.DoOpenLogs).

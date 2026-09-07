@@ -9,15 +9,14 @@ import (
 )
 
 type Tile struct {
-	Coord     util.Point
-	instances Instances
+	Coord                    util.Point
+	instances                Instances
+	DefaultTurf, DefaultArea *dmmprefab.Prefab
+	Reserved                 dmmdata.Prefabs
 }
 
 func (t Tile) Copy() Tile {
-	return Tile{
-		t.Coord,
-		t.instances.DeepCopy(),
-	}
+	return Tile{Coord: t.Coord, instances: t.instances.DeepCopy(), DefaultTurf: t.DefaultTurf, DefaultArea: t.DefaultArea, Reserved: t.Reserved}
 }
 
 func (t *Tile) Set(instances Instances) {
@@ -66,9 +65,29 @@ func (t *Tile) InstancesRegenerate() {
 		}
 	}
 	if !hasArea {
-		t.InstancesAdd(BaseArea)
+		area := t.DefaultArea
+		if area == nil {
+			area = BaseArea
+		}
+		t.InstancesAdd(area)
 	}
 	if !hasTurf {
-		t.InstancesAdd(BaseTurf)
+		turf := t.DefaultTurf
+		if turf == nil {
+			turf = BaseTurf
+		}
+		t.InstancesAdd(turf)
+	}
+	for _, prefab := range t.Reserved {
+		found := false
+		for _, instance := range t.instances {
+			if instance.Prefab().Id() == prefab.Id() {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.InstancesAdd(prefab)
+		}
 	}
 }

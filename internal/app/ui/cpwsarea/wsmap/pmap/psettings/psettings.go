@@ -20,6 +20,7 @@ type editor interface {
 
 	Dmm() *dmmap.Dmm
 	CommitMapSizeChange(oldMaxX, oldMaxY, oldMaxZ int)
+	CanResize() bool
 }
 
 type Panel struct {

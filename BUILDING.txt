@@ -1,0 +1,45 @@
+SHIP WORKSHOP SOURCE
+
+Modified StrongDMM sources for voidcrew-workshop.2-test.2 (2026-09-07).
+Upstream commit: 5241698aeca9e83fd61048d835e9318d3610c16a
+Upstream repository: https://github.com/SpaiR/StrongDMM
+
+The changes add Voidcrew ship authoring, source-aware assembled editing,
+cross-file history and saves, registration generation and a ship checker.
+The fork has its own application profile and disables upstream self-updates.
+GPL-3.0 terms are in LICENSE; existing source notices are retained.
+
+BUILD ON WINDOWS X64
+Install Go, Rust with the x86_64-pc-windows-gnu host toolchain, and a MinGW-w64
+POSIX/SEH x64 GCC toolchain. Put go, cargo, rustc, gcc and g++ on PATH.
+Do not substitute the Rust MSVC host toolchain for the GNU one.
+
+The tested toolchains are:
+  Go 1.27.1, Windows/amd64
+  Rust 1.98.1, stable-x86_64-pc-windows-gnu
+  MinGW-w64 GCC 16.2.0, x86_64 POSIX/SEH, MSVCRT
+
+From the extracted source directory:
+  powershell -NoProfile -ExecutionPolicy Bypass -File .\BUILD-WINDOWS.ps1 -Test
+
+In a release source archive, Go dependencies are in vendor/. Rust dependencies are in
+third_party/sdmmparser/src/vendor/, with an offline Cargo configuration in
+.cargo/config.toml. Their license files and copyright notices are retained.
+The parser static library is built first, then linked into both executables.
+Output is in dst/. No private toolchain paths are required by the script.
+In a Git checkout, the same script downloads dependencies using go.mod,
+go.sum and Cargo.lock instead. A first build requires network access.
+
+BUILD-WINDOWS.ps1 accepts -Version and -Revision. For the packaged build,
+use the version and source_revision values from BUILD-INFO.json alongside
+the distributed executables. Go builds use -trimpath and -buildvcs=false.
+
+OPTIONAL NATIVE UI TEST
+Set SHIP_RENDER_TEST_DME to an absolute path to a Voidcrew tgstation.dme,
+then run:
+  go test ./internal/app/ui/cpwsarea/wsship -count=1
+This test requires a working OpenGL 3.3 desktop session. It creates a hidden
+window and temporary ship fixtures. Without that variable it is skipped.
+
+The launchers and tester instructions are included under distribution/.
+They are for the binary distribution, not required for compilation.

@@ -71,6 +71,7 @@ var (
 	ed editor
 
 	active   bool
+	enabled  = true
 	oldCoord util.Point
 
 	tools = map[string]Tool{
@@ -102,7 +103,24 @@ func IsSelected(toolName string) bool {
 }
 
 func SetEditor(editor editor) {
+	FinishStroke()
 	ed = editor
+}
+
+func FinishStroke() {
+	if active {
+		startedTool.onStop(oldCoord)
+		active = false
+	}
+}
+
+// SetEnabled pauses tools while a read-only canvas owns focus.
+func SetEnabled(value bool) {
+	if !value && active {
+		startedTool.onStop(oldCoord)
+		active = false
+	}
+	enabled = value
 }
 
 func SetCanvasControl(canvasControl canvasControl) {
@@ -122,6 +140,9 @@ func Tools() map[string]Tool {
 }
 
 func process(altBehaviour bool) {
+	if !enabled {
+		return
+	}
 	if active && startedTool != Selected() {
 		startedTool.onStop(oldCoord)
 	}
@@ -133,6 +154,9 @@ func process(altBehaviour bool) {
 }
 
 func OnMouseMove() {
+	if !enabled {
+		return
+	}
 	processSelectedToolMove()
 }
 

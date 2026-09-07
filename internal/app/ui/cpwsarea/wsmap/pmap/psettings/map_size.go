@@ -31,6 +31,10 @@ func (p *Panel) DropSessionMapSize() {
 }
 
 func (p *Panel) showMapSize() {
+	if !p.editor.CanResize() {
+		imgui.TextDisabled("Resize in Ship settings.")
+		return
+	}
 	if imgui.CollapsingHeader("Map Size") {
 		if p.sessionMapSize == nil {
 			p.sessionMapSize = &sessionMapSize{

@@ -1,15 +1,9 @@
-# Strong Dream Map Maker &middot; [![GitHub release](https://img.shields.io/github/release/SpaiR/StrongDMM.svg?label=StrongDMM)](https://github.com/SpaiR/StrongDMM/releases/latest) [![Github All Releases](https://img.shields.io/github/downloads/SpaiR/StrongDMM/total.svg?logo=github)](https://github.com/SpaiR/StrongDMM/releases) ![CI](https://github.com/SpaiR/StrongDMM/workflows/CI/badge.svg)
+# StrongDMM - Voidcrew &middot; [![GitHub release](https://img.shields.io/github/v/release/voidcrew/StrongDMM?include_prereleases&label=Ship%20Workshop)](https://github.com/voidcrew/StrongDMM/releases) [![Github All Releases](https://img.shields.io/github/downloads/voidcrew/StrongDMM/total.svg?logo=github)](https://github.com/voidcrew/StrongDMM/releases)
 
-<p align="center"><b>Download StrongDMM</b></p>
+<p align="center"><b>Download Voidcrew Ship Workshop</b></p>
 <p align="center">
-  <a href="https://bit.ly/sdmm-windows">
+  <a href="https://github.com/voidcrew/StrongDMM/releases">
     <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows download link"/>
-  </a>
-  <a href="https://bit.ly/sdmm-linux">
-    <img src="https://img.shields.io/badge/Linux-FCC624?style=for-the-badge&logo=linux&logoColor=black" alt="Linux download link"/>
-  </a>
-  <a href="https://bit.ly/sdmm-macos">
-    <img src="https://img.shields.io/badge/mac%20os-000000?style=for-the-badge&logo=apple&logoColor=white" alt="macOS download ink"/>
   </a>
 </p>
 
@@ -17,10 +11,9 @@
 
 <img align="right" width="150" src="https://raw.githubusercontent.com/SpaiR/StrongDMM/master/docs/sdmm-logo.png" alt="StrongDMM Logo">
 
-StrongDMM is an alternative yet robust map editor for BYOND.
+Voidcrew's maintained fork of [StrongDMM](https://github.com/SpaiR/StrongDMM), a map editor for BYOND.
 
-It was built with the idea of creating a more flexible, fast, and extensible tool than the BYOND built-in map editor.
-The editor has the same features as DM, but provides much more and improves the general map editing experience.
+Ship Workshop lets mappers edit assembled modular ships and create new ships. Edits save back to the hull and module source files. The normal mapping tools, undo/redo, and visibility shortcuts remain available.
 
 ## Features
 
@@ -45,16 +38,13 @@ The editor offers a range of new features:
 
 ## How to Use
 
-StrongDMM is a single executable, which doesn't require any installation.
-You can download it from any of the provided links and start it right away.
+Extract the entire Windows x64 ZIP, run **START.cmd**, and select `tgstation.dme` in a test Voidcrew checkout. See the included `START-HERE.txt` for editing, new ship creation, and feedback instructions.
 
 **Download Links:**
 
-* [Windows](https://bit.ly/sdmm-windows)
-* [Linux](https://bit.ly/sdmm-linux)
-* [macOS](https://bit.ly/sdmm-macos)
+* [Windows](https://github.com/voidcrew/StrongDMM/releases)
 
-[Release](https://github.com/SpaiR/StrongDMM/releases/latest) page contains all distributed files. It also has `sha256` hashes info for every executable for validation purposes.
+[Release](https://github.com/voidcrew/StrongDMM/releases) page contains all distributed files. It also has `sha256` hashes info for every executable for validation purposes.
 
 ### CLI Usage
 
@@ -72,14 +62,14 @@ strongdmm.exe ./map1.dmm ../path/map2.dmm
 
 When providing `.dmm` files without `.dme`, a proper environment file will be found automatically.
 
-## Support
+## Support upstream StrongDMM
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/P5P5BF17Q)
 
 StrongDMM was developed without any monetization in mind. The main motivation is the enthusiasm for creating cool stuff.\
 Your support can demonstrate your appreciation and will motivate further development of the project.
 
 Additionally, if you have specific features in mind that you'd like implemented in the editor, we can focus on your needs.\
-Feel free to reach out to me through my public contact to discuss details: [E-Mail](mailto:despsolver@gmail.com)
+Report Voidcrew editor bugs in [this fork's issues](https://github.com/voidcrew/StrongDMM/issues).
 
 ## FAQ
 
@@ -87,7 +77,7 @@ Feel free to reach out to me through my public contact to discuss details: [E-Ma
 **A.** Yes, it's a false positive reaction to the way Golang, the development language, creates binaries. Read more: [Golang FAQ](https://go.dev/doc/faq#virus)
 
 **Q.** How do I verify my executables?\
-**A.** Verify them using `sha256` hashes, available on the [releases page](https://github.com/SpaiR/StrongDMM/releases/latest).
+**A.** Verify them using `sha256` hashes, available on the [releases page](https://github.com/voidcrew/StrongDMM/releases).
 
 **Q.** But how can I trust executables on the release page?\
 **A.** Executables are built with the [CI pipeline](https://github.com/SpaiR/StrongDMM/actions/workflows/ci.yml). You can verify the process yourself or build the executables manually from the source code.

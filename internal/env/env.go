@@ -3,10 +3,11 @@ package env
 const Undefined = "undefined"
 
 var (
-	Title    = "StrongDMM"
-	Version  = Undefined
+	Title    = "StrongDMM - Voidcrew"
+ Version  = "voidcrew-workshop.2"
 	Revision = Undefined
 	GitHub   = "https://github.com/SpaiR/StrongDMM"
-	Manifest = "https://spair.github.io/StrongDMM/manifest.json"
+	// A fork must not replace itself with an upstream release.
+	Manifest = ""
 	Support  = "https://ko-fi.com/spair"
 )

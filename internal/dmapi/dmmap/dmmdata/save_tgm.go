@@ -104,3 +104,27 @@ func toTGMStr(key Key, content Prefabs, lineBreak string) string {
 
 	return sb.String()
 }
+
+// EncodeTGM prepares a complete map before any destination file is touched.
+func (d DmmData) EncodeTGM() []byte {
+	lb := d.LineBreak
+	if lb == "" {
+		lb = "\n"
+	}
+	var out strings.Builder
+	out.WriteString("//MAP CONVERTED BY dmm2tgm.py THIS HEADER COMMENT PREVENTS RECONVERSION, DO NOT REMOVE" + lb)
+	for _, key := range d.Keys() {
+		out.WriteString(toTGMStr(key, d.Dictionary[key], lb) + lb)
+	}
+	for z := 1; z <= d.MaxZ; z++ {
+		out.WriteString(lb)
+		for x := 1; x <= d.MaxX; x++ {
+			fmt.Fprintf(&out, "(%d,1,%d) = {\"%s", x, z, lb)
+			for y := d.MaxY; y >= 1; y-- {
+				out.WriteString(string(d.Grid[util.Point{X: x, Y: y, Z: z}]) + lb)
+			}
+			out.WriteString("\"}" + lb)
+		}
+	}
+	return []byte(out.String())
+}

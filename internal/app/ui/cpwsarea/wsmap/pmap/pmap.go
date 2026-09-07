@@ -1,6 +1,7 @@
 package pmap
 
 import (
+	"math"
 	"sdmm/internal/app/command"
 	"sdmm/internal/app/prefs"
 	"sdmm/internal/app/render"
@@ -75,7 +76,8 @@ func ActiveCamera() *render.Camera {
 type PaneMap struct {
 	app App
 
-	dmm *dmmap.Dmm
+	dmm     *dmmap.Dmm
+	context *EditContext
 
 	shortcuts shortcut.Shortcuts
 
@@ -206,17 +208,34 @@ func (p *PaneMap) Process() {
 	// Update properties.
 	p.pos = imgui.WindowPos().Plus(imgui.WindowContentRegionMin())
 	p.size = imgui.WindowSize()
+	if p.context != nil {
+		p.pos = imgui.CursorScreenPos()
+		p.size = imgui.ContentRegionAvail()
+	}
+	if p.size.X < 1 || p.size.Y < 1 {
+		return
+	}
 	p.focused = imgui.IsWindowFocusedV(imgui.FocusedFlagsRootAndChildWindows)
 
 	if !p.centered {
 		// On first load, set the camera to the center of the map, taking UI size into account.
-		p.canvas.Render().Camera.Translate(float32((int(p.size.X)-p.dmm.MaxX*dmmap.WorldIconSize)/2), float32((int(p.size.Y)-p.dmm.MaxY*dmmap.WorldIconSize)/2))
+		view := p.ViewDmm()
+		camera := p.canvas.Render().Camera
+		if p.context != nil {
+			camera.Scale = float32(math.Min(float64(p.size.X)/float64(view.MaxX*dmmap.WorldIconSize), float64(p.size.Y)/float64(view.MaxY*dmmap.WorldIconSize))) * 0.9
+		}
+		camera.ShiftX = (p.size.X/camera.Scale - float32(view.MaxX*dmmap.WorldIconSize)) / 2
+		camera.ShiftY = (p.size.Y/camera.Scale - float32(view.MaxY*dmmap.WorldIconSize)) / 2
 		p.centered = true
 	}
 
-	p.canvas.Render().SetActiveLevel(p.dmm, p.activeLevel)
+	p.canvas.Render().SetActiveLevel(p.ViewDmm(), p.activeLevel)
 
 	p.canvasControl.Process(p.size)
+	if p.context != nil {
+		mouse := imgui.MousePos()
+		p.updateCanvasMousePosition(int(mouse.X), int(mouse.Y))
+	}
 	p.canvas.Process(p.size)
 
 	p.processCanvasCamera()
@@ -274,7 +293,9 @@ func (p *PaneMap) showCanvas() {
 
 func (p *PaneMap) mouseChangeCallback(x, y uint) {
 	p.updateCanvasMousePosition(int(x), int(y))
-	tools.OnMouseMove()
+	if activePane == p {
+		tools.OnMouseMove()
+	}
 }
 
 func (p *PaneMap) openTileMenu() {
@@ -296,6 +317,7 @@ func (p *PaneMap) updateShortcutsState() {
 }
 
 func (p *PaneMap) OnActivate() {
+	tools.SetEnabled(true)
 	log.Print("pane activated:", p.dmm.Name)
 	activeCamera = p.canvas.Render().Camera
 	activePane = p
@@ -332,6 +354,7 @@ func (p *PaneMap) syncActivePane() {
 // Needed when changing global parts of the map, like the map size etc.
 func (p *PaneMap) reloadCanvas() {
 	oldCamera := p.canvas.Render().Camera // To keep current camera position
+	oldCanvas := p.canvas
 	p.canvas = canvas.New()
 	p.canvas.Render().Camera = oldCamera
 	p.canvas.Render().SetOverlay(p.canvasOverlay)
@@ -339,6 +362,8 @@ func (p *PaneMap) reloadCanvas() {
 	p.canvas.Render().UpdateBucket(p.dmm, p.activeLevel)
 	p.canvasState.SetMaxX(p.dmm.MaxX)
 	p.canvasState.SetMaxY(p.dmm.MaxY)
+	p.Refresh(nil)
+	oldCanvas.Dispose()
 }
 
 func (p *PaneMap) OnMapSizeChange() {

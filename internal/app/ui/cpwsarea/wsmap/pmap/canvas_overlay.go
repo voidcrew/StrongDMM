@@ -15,6 +15,9 @@ import (
 const flickDurationSec = .5
 
 func (p *PaneMap) processCanvasOverlay() {
+	if p.context != nil {
+		p.PushAreaHover(util.Bounds{X2: float32(p.dmm.MaxX * dmmap.WorldIconSize), Y2: float32(p.dmm.MaxY * dmmap.WorldIconSize)}, overlay.ColorEmpty, util.MakeColor(0.3, 0.8, 0.9, 0.8))
+	}
 	p.processCanvasOverlayTools()
 	p.processCanvasOverlayFlick()
 	p.processCanvasOverlayAreasZones()
@@ -112,6 +115,10 @@ func (p *PaneMap) processCanvasOverlayAreasZones() {
 
 			x := float32(areaBorder.Coord.X-1) * iconSize
 			y := float32(areaBorder.Coord.Y-1) * iconSize
+			if p.context != nil {
+				x += float32(p.context.Offset.X) * iconSize
+				y += float32(p.context.Offset.Y) * iconSize
+			}
 
 			if areaBorder.Dirs&dm.DirNorth != 0 {
 				borders = append(borders, util.Bounds{X1: x, Y1: y + iconSize, X2: x + iconSize, Y2: y + iconSize})
@@ -144,6 +151,13 @@ func (p *PaneMap) PushUnitHighlight(instance *dmminstance.Instance, color util.C
 }
 
 func (p *PaneMap) PushAreaHover(bounds util.Bounds, fillColor, borderColor util.Color) {
+	if p.context != nil {
+		x, y := float32(p.context.Offset.X*dmmap.WorldIconSize), float32(p.context.Offset.Y*dmmap.WorldIconSize)
+		bounds.X1 += x
+		bounds.X2 += x
+		bounds.Y1 += y
+		bounds.Y2 += y
+	}
 	p.canvasOverlay.PushArea(canvas.OverlayArea{
 		Bounds_:      bounds,
 		FillColor_:   fillColor,

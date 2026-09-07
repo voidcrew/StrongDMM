@@ -51,12 +51,17 @@ func (s *Storage) DisposeStack(id string) {
 }
 
 func (s *Storage) Push(command Command) {
-	if s.currentStackId == NullSpaceStackId {
-		log.Print("skip pushing for:", s.currentStackId)
+	s.PushV(s.currentStackId, command)
+}
+
+// PushV records a command for its source workspace, even after focus changes.
+func (s *Storage) PushV(id string, command Command) {
+	if id == NullSpaceStackId {
+		log.Print("skip pushing for:", id)
 		return
 	}
 
-	if stack, ok := s.commandStacks[s.currentStackId]; ok {
+	if stack, ok := s.commandStacks[id]; ok {
 		logStackAction(stack, "push command: "+command.name)
 		stack.undo = append(stack.undo, command)
 		stack.redo = stack.redo[:0]
@@ -201,7 +206,7 @@ type commandStack struct {
 
 func (c commandStack) appliedCommandId() uint64 {
 	if len(c.undo) > 0 {
-		return c.undo[0].id
+		return c.undo[len(c.undo)-1].id
 	}
 	return 0
 }

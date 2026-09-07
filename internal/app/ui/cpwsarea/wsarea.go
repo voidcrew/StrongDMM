@@ -11,6 +11,7 @@ import (
 	"sdmm/internal/app/ui/cpwsarea/wsempty"
 	"sdmm/internal/app/ui/cpwsarea/wsmap"
 	"sdmm/internal/app/ui/cpwsarea/wsprefs"
+	"sdmm/internal/app/ui/cpwsarea/wsship"
 	"sdmm/internal/app/ui/dialog"
 	"sdmm/internal/rsc"
 	"sdmm/internal/util"
@@ -60,9 +61,34 @@ func (w *WsArea) Init(app App) {
 }
 
 func (w *WsArea) Free() {
+	for _, ws := range append([]*workspace.Workspace(nil), w.workspaces...) {
+		if _, ok := ws.Content().(*wsship.WsShip); ok {
+			w.closeWorkspace(ws)
+		}
+	}
 	w.closeWorkspaces(w.findMapWorkspaces())
 	w.closeWorkspaces(w.findCreateMapWorkspaces()) // close new map creation as well
 	log.Print("workspace area free")
+}
+
+func (w *WsArea) OpenShip() {
+	for _, ws := range w.workspaces {
+		if _, ok := ws.Content().(*wsship.WsShip); ok {
+			ws.SetTriggerFocus(true)
+			return
+		}
+	}
+	content := wsship.New(w.app, func(file string) bool {
+		for _, ws := range w.workspaces {
+			if m, ok := ws.Content().(*wsmap.WsMap); ok && m.Map().Dmm().Path.Absolute == file {
+				return true
+			}
+		}
+		return false
+	})
+	ws := workspace.New(content)
+	w.addWorkspace(ws)
+	ws.SetTriggerFocus(true)
 }
 
 func (w *WsArea) OpenPreferences(prefsView wsprefs.Prefs) {
@@ -191,7 +217,12 @@ func (w *WsArea) closeWorkspacesGentlyV(wsToClose []*workspace.Workspace, callba
 
 	dType.ActionYes = func() {
 		for _, ws := range unsavedWorkspaces {
-			ws.Save()
+			if !ws.Save() {
+				if callback != nil {
+					callback(false)
+				}
+				return
+			}
 		}
 		w.closeWorkspaces(wsToClose)
 		if callback != nil {
@@ -236,7 +267,12 @@ func (w *WsArea) closeWorkspaceGentlyV(ws *workspace.Workspace, callback func(cl
 
 	dType := makeSaveSingleWorkspaceDialogType(ws)
 	dType.ActionYes = func() {
-		ws.Save()
+		if !ws.Save() {
+			if callback != nil {
+				callback(false)
+			}
+			return
+		}
 		w.closeWorkspace(ws)
 		if callback != nil {
 			callback(true)
@@ -313,6 +349,10 @@ func (w *WsArea) findWorkspaceIdx(ws *workspace.Workspace) int {
 
 func (w *WsArea) findMapWorkspace(path dmmap.DmmPath) (*workspace.Workspace, bool) {
 	for _, ws := range w.workspaces {
+		if ship, ok := ws.Content().(*wsship.WsShip); ok && ship.Owns(path.Absolute) {
+			ship.FocusSource(path.Absolute)
+			return ws, true
+		}
 		if wsCnt, ok := ws.Content().(*wsmap.WsMap); ok {
 			if wsCnt.Map().Dmm().Path == path {
 				return ws, true
@@ -325,6 +365,10 @@ func (w *WsArea) findMapWorkspace(path dmmap.DmmPath) (*workspace.Workspace, boo
 func (w *WsArea) findMapWorkspaces() []*workspace.Workspace {
 	var workspaces []*workspace.Workspace
 	for _, ws := range w.workspaces {
+		if _, ok := ws.Content().(*wsship.WsShip); ok {
+			workspaces = append(workspaces, ws)
+			continue
+		}
 		if _, ok := ws.Content().(*wsmap.WsMap); ok {
 			workspaces = append(workspaces, ws)
 		}
@@ -398,6 +442,9 @@ func (w *WsArea) switchActiveWorkspace(activeWs *workspace.Workspace) {
 }
 
 func (w *WsArea) isWorkspaceUnsaved(ws *workspace.Workspace) bool {
+	if ship, ok := ws.Content().(*wsship.WsShip); ok {
+		return ship.IsModified()
+	}
 	return w.app.CommandStorage().IsModified(ws.CommandStackId())
 }
 

@@ -8,7 +8,6 @@ import (
 
 	"sdmm/internal/app/prefs"
 	"sdmm/internal/app/render"
-	"sdmm/internal/app/ui/cpwsarea/wsmap"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/pmap"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/pmap/editor"
 	"sdmm/internal/dmapi/dmmap/dmminstance"
@@ -241,10 +240,16 @@ func (a *app) FocusApplicationWindow() {
 	a.masterWindow.Handle().Focus()
 }
 
-func (a *app) activeWsMap() (*wsmap.WsMap, bool) {
+type editableWorkspace interface {
+	Map() *pmap.PaneMap
+	Save() bool
+	CommandStackId() string
+}
+
+func (a *app) activeWsMap() (editableWorkspace, bool) {
 	if wsMapActive := a.layout.WsArea.ActiveWorkspace(); wsMapActive != nil {
-		if activeWs, ok := wsMapActive.Content().(*wsmap.WsMap); ok {
-			return activeWs, ok
+		if activeWs, ok := wsMapActive.Content().(editableWorkspace); ok && activeWs.Map() != nil {
+			return activeWs, true
 		}
 	}
 	return nil, false

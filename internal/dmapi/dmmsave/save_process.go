@@ -26,15 +26,17 @@ type saveProcess struct {
 }
 
 func makeSaveProcess(cfg Config, dme *dmenv.Dme, dmm *dmmap.Dmm, path string) (*saveProcess, error) {
-	// Copy the dmm to avoid unneeded modifications.
-	dmmCopy := dmm.Copy()
-	dmm = &dmmCopy
-
 	initial, err := dmmdata.New(dmm.Backup)
 	if err != nil {
 		log.Print("unable to read map backup:", dmm.Backup)
 		return nil, err
 	}
+	return makeSaveProcessWithInitial(cfg, dme, dmm, path, initial), nil
+}
+
+func makeSaveProcessWithInitial(cfg Config, dme *dmenv.Dme, dmm *dmmap.Dmm, path string, initial *dmmdata.DmmData) *saveProcess {
+	dmmCopy := dmm.Copy()
+	dmm = &dmmCopy
 
 	output := &dmmdata.DmmData{
 		Filepath:   path,
@@ -63,7 +65,21 @@ func makeSaveProcess(cfg Config, dme *dmenv.Dme, dmm *dmmap.Dmm, path string) (*
 		output,
 		keygen.New(output),
 		unusedKeys,
-	}, nil
+	}
+}
+
+// Prepare preserves existing dictionary keys and explicit overrides while
+// returning data to a caller that can coordinate a multi-file save.
+func Prepare(dme *dmenv.Dme, dmm *dmmap.Dmm, initial *dmmdata.DmmData) (*dmmdata.DmmData, error) {
+	if initial == nil {
+		initial = &dmmdata.DmmData{KeyLength: 3, IsTgm: true, LineBreak: "\n", Dictionary: dmmdata.DataDictionary{}, Grid: dmmdata.DataGrid{}}
+	}
+	sp := makeSaveProcessWithInitial(Config{Format: FormatTGM}, dme, dmm, dmm.Path.Absolute, initial)
+	sp.handleReusedKeys()
+	if err := sp.handleLocationsWithoutKeys(); err != nil {
+		return nil, err
+	}
+	return sp.output, nil
 }
 
 func detectIsTgm(saveFormat Format, isInitialTGM bool) bool {

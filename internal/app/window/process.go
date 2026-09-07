@@ -44,10 +44,13 @@ func (w *Window) startFrame() {
 }
 
 func runLaterJobs() {
-	for _, job := range laterJobs {
+	laterJobsMu.Lock()
+	jobs := laterJobs
+	laterJobs = nil
+	laterJobsMu.Unlock()
+	for _, job := range jobs {
 		job()
 	}
-	laterJobs = nil
 }
 
 func runRepeatJobs() {

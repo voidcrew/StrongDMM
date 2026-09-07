@@ -65,7 +65,7 @@ func ParseEnvironment(environmentPath string) (*ObjectTreeType, error) {
 		return nil, &parserError{msg: str}
 	}
 	if strings.HasPrefix(str, "error") {
-		return nil, fmt.Errorf(str)
+		return nil, errors.New(str)
 	}
 
 	var data ObjectTreeType
@@ -95,7 +95,7 @@ func ParseIconMetadata(iconPath string) (*IconMetadata, error) {
 
 	str := C.GoString(nativeStr)
 	if strings.HasPrefix(str, "error") {
-		return nil, fmt.Errorf(str)
+		return nil, errors.New(str)
 	}
 
 	var data IconMetadata

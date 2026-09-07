@@ -6,8 +6,9 @@ import (
 )
 
 type Control struct {
-	posMin imgui.Vec2
-	posMax imgui.Vec2
+	AtCursor bool
+	posMin   imgui.Vec2
+	posMax   imgui.Vec2
 
 	active    bool
 	activated bool
@@ -79,7 +80,9 @@ func (c *Control) Process(size imgui.Vec2) {
 
 func (c *Control) showControlArea(size imgui.Vec2) {
 	cursor := imgui.CursorPos()
-	imgui.SetCursorPos(imgui.Vec2{})
+	if !c.AtCursor {
+		imgui.SetCursorPos(imgui.Vec2{})
+	}
 	imgui.Dummy(size)
 	imgui.SetCursorPos(cursor)
 
@@ -105,7 +108,7 @@ func (c *Control) processMouseDrag() {
 	}
 
 	isLmbDown := imgui.IsMouseDown(imgui.MouseButtonLeft)
-	if isLmbDown && !c.dragging {
+	if isLmbDown && c.active && !c.dragging {
 		c.dragging = true
 	} else if !isLmbDown && c.dragging {
 		c.dragging = false

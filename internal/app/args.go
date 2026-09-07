@@ -14,8 +14,12 @@ func (a *app) checkProgramArgs() {
 
 	var envPath string
 	var mapPaths []string
+	var shipWorkspace bool
 
 	for _, arg := range os.Args {
+		if arg == "--ship-workspace" {
+			shipWorkspace = true
+		}
 		switch filepath.Ext(arg) {
 		case ".dme":
 			envPath = arg
@@ -25,7 +29,11 @@ func (a *app) checkProgramArgs() {
 	}
 
 	if len(envPath) > 0 {
-		a.loadResource(envPath)
+		if shipWorkspace {
+			a.loadEnvironmentV(envPath, a.DoOpenShipWorkspace)
+		} else {
+			a.loadResource(envPath)
+		}
 	}
 
 	for _, mapPath := range mapPaths {

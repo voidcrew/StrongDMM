@@ -86,6 +86,11 @@ type attachedMap interface {
 	PushAreaHover(bounds util.Bounds, fillColor, borderColor util.Color)
 
 	OnMapSizeChange()
+	Refresh([]util.Point)
+	MapToView(util.Point) util.Point
+	CommandStackId() string
+	InContext() bool
+	BeforeHistory()
 }
 
 func New(app app, attachedMap attachedMap, dmm *dmmap.Dmm) *Editor {
@@ -110,7 +115,7 @@ func (e *Editor) HoveredInstance() *dmminstance.Instance {
 
 // UpdateCanvasByCoords updates the canvas for the provided coords.
 func (e *Editor) UpdateCanvasByCoords(coords []util.Point) {
-	e.pMap.Canvas().Render().UpdateBucketV(e.dmm, e.pMap.ActiveLevel(), coords)
+	e.pMap.Refresh(coords)
 }
 
 // UpdateCanvasByTiles updates the canvas for the provided tiles.
@@ -140,7 +145,7 @@ func (e *Editor) ReplacePrefab(oldPrefab, newPrefab *dmmprefab.Prefab) {
 
 // FocusCamera moves the camera in a way, so it will be centered on the instance.
 func (e *Editor) FocusCamera(i *dmminstance.Instance) {
-	relPos := i.Coord()
+	relPos := e.pMap.MapToView(i.Coord())
 	absPos := util.Point{X: (relPos.X - 1) * -dmmap.WorldIconSize, Y: (relPos.Y - 1) * -dmmap.WorldIconSize, Z: relPos.Z}
 
 	camera := e.pMap.Canvas().Render().Camera
@@ -152,6 +157,8 @@ func (e *Editor) FocusCamera(i *dmminstance.Instance) {
 
 // FocusCameraOnPosition centers the camera on given coordinates.
 func (e *Editor) FocusCameraOnPosition(coord util.Point) {
+	sourceCoord := coord
+	coord = e.pMap.MapToView(coord)
 	absPos := util.Point{X: (coord.X - 1) * -dmmap.WorldIconSize, Y: (coord.Y - 1) * -dmmap.WorldIconSize, Z: coord.Z}
 
 	camera := e.pMap.Canvas().Render().Camera
@@ -159,8 +166,10 @@ func (e *Editor) FocusCameraOnPosition(coord util.Point) {
 	camera.ShiftY = e.pMap.Size().Y/2/camera.Scale + float32(absPos.Y)
 
 	e.pMap.SetActiveLevel(coord.Z)
-	e.OverlaySetTileFlick(coord)
+	e.OverlaySetTileFlick(sourceCoord)
 }
+
+func (e *Editor) CanResize() bool { return !e.pMap.InContext() }
 
 func (e *Editor) ZoomLevel() float32 {
 	return e.pMap.Canvas().Render().Camera.Scale

@@ -18,6 +18,9 @@ func (a *app) checkForUpdates() {
 }
 
 func (a *app) checkForUpdatesV(forceAvailable bool) {
+	if env.Manifest == "" {
+		return
+	}
 	log.Print("checking for self updates...")
 
 	manifest, err := selfupdate.FetchRemoteManifest()
@@ -49,6 +52,9 @@ func (a *app) checkForUpdatesV(forceAvailable bool) {
 }
 
 func (a *app) selfUpdate() {
+	if env.Manifest == "" {
+		return
+	}
 	a.menu.SetUpdating()
 
 	var updateDownloadLink string

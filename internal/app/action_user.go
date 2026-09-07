@@ -101,6 +101,12 @@ func (a *app) DoNewMap() {
 	a.layout.WsArea.OpenCreateMap()
 }
 
+func (a *app) DoOpenShipWorkspace() {
+	if a.HasLoadedEnvironment() {
+		a.layout.WsArea.OpenShip()
+	}
+}
+
 // DoClearRecentMaps clears recently opened maps.
 func (a *app) DoClearRecentMaps() {
 	log.Print("clear recent maps")

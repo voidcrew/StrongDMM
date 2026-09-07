@@ -1,6 +1,9 @@
 package window
 
-import "github.com/rs/zerolog/log"
+import (
+	"github.com/rs/zerolog/log"
+	"sync"
+)
 
 func (w *Window) AddMouseChangeCallback(cb func(uint, uint)) (callbackId int) {
 	id := w.mouseChangeCallbackId
@@ -16,10 +19,13 @@ func (w *Window) RemoveMouseChangeCallback(id int) {
 }
 
 var laterJobs []func()
+var laterJobsMu sync.Mutex
 
 // RunLater queues provided a job to be run in the next frame.
 func RunLater(job func()) {
+	laterJobsMu.Lock()
 	laterJobs = append(laterJobs, job)
+	laterJobsMu.Unlock()
 }
 
 var repeatJobs []func()

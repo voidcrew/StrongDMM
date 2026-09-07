@@ -51,6 +51,12 @@ func (r *Render) UpdateBucket(dmm *dmmap.Dmm, level int) {
 	r.UpdateBucketV(dmm, level, nil)
 }
 
+// ReplaceBucket allows an editing pane to display a differently sized scene.
+func (r *Render) ReplaceBucket(dmm *dmmap.Dmm, level int) {
+	r.bucket = bucket.New()
+	r.UpdateBucket(dmm, level)
+}
+
 func (r *Render) Draw(width, height float32) {
 	r.prepare()
 	r.draw(width, height)

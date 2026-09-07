@@ -119,5 +119,5 @@ func (t *ToolMove) onStop(util.Point) {
 	}
 	t.instance = nil
 	t.lastTile = nil
-	go ed.CommitChanges("Moved Prefab")
+	ed.CommitChanges("Moved Prefab")
 }

@@ -25,6 +25,13 @@ func (i Instance) Copy() Instance {
 	}
 }
 
+// CopyAt projects a source instance without changing its identity or source position.
+func (i Instance) CopyAt(coord util.Point) *Instance {
+	copy := i.Copy()
+	copy.coord = coord
+	return &copy
+}
+
 func (i Instance) Id() uint64 {
 	return i.id
 }

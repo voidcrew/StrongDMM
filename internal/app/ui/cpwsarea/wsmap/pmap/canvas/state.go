@@ -16,6 +16,7 @@ type State struct {
 
 	iconSize   int
 	maxX, maxY int
+	Offset     util.Point
 }
 
 func (s *State) SetMaxX(maxX int) {
@@ -49,8 +50,8 @@ func (s *State) SetMousePosition(relMouseX, relMouseY, level int) {
 	}
 
 	// Mouse position coords, but local to the tiles.
-	localMouseX := relMouseX / s.iconSize
-	localMouseY := relMouseY / s.iconSize
+	localMouseX := relMouseX/s.iconSize - s.Offset.X
+	localMouseY := relMouseY/s.iconSize - s.Offset.Y
 
 	// Local coords, but adjusted to DMM coord system.
 	mapMouseX := localMouseX + 1

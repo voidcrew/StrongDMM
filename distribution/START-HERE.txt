@@ -1,0 +1,93 @@
+VOIDCREW SHIP WORKSHOP - WINDOWS X64 TEST BUILD
+Build: voidcrew-workshop.2-test.2
+
+START
+1. Extract the whole ZIP into a writable folder.
+2. Use a test branch or separate copy of your Voidcrew repository.
+3. Double-click START.cmd and select that checkout's tgstation.dme.
+   You can also drag the .dme file or repository folder onto START.cmd.
+4. Wait for the environment to load. Ship Workshop opens automatically.
+   Keep the command window open while using the editor; you can minimize it.
+
+The game repository and its icons/maps are required and are not included.
+No Go, Rust, BYOND or existing StrongDMM installation is needed to run the
+editor. Compiling and playing the game still require the game's usual tools.
+This build needs 64-bit Windows and a graphics driver supporting OpenGL 3.3.
+The launchers use the Windows PowerShell included with Windows.
+Alternatively, open StrongDMM-Voidcrew.exe, load tgstation.dme, then choose
+File > Voidcrew Ship Workspace.
+
+TRY AN EXISTING SHIP
+- Pick a hull, theme and module loadout.
+- Use View or Ctrl+1/2/3/4 to toggle areas, turfs, objects and mobs.
+  Ctrl+2 hides floors to reveal piping underneath. Pipes and cables follow
+  normal object visibility; there is no separate Utilities checkbox.
+- Under Editing, choose Hull or a module, then use the normal mapping tools
+  directly on the assembled canvas. Only that source is editable.
+- Make a small edit, switch modules/themes and return: the edit should remain.
+- Try undo/redo after switching sources. The correct source should activate.
+- Save all ships, close/reopen, and inspect the source files in Git.
+  A module-only edit should not rewrite the hull.
+- Source alone shows the active map without the assembled context.
+
+CREATE A SHIP
+- Click New ship..., enter a unique lowercase ID, a name and canvas dimensions.
+  A new ship begins with an empty canvas and a docking port.
+- Select Hull, expand Build, set Left/Bottom/Right/Top and click
+  Lay permanent deck. This creates flooring with the ship's own area.
+- Map a room. Use the Grab selection tool and Use selection bounds, or enter
+  room bounds directly. Enter a slot ID/name and click Extract upgrade slot.
+- Select the resulting module under Editing and try changing its contents.
+  Clone module / New empty alternative create choices for that slot.
+- Enter a new ID/name and Clone theme to create separate hull/module maps.
+- Try undo/redo across extraction, painting and theme creation.
+- Review Ship settings and Save preview, then Save all ships.
+  New ships default to Development only and stay off the player purchase list.
+
+SAVE BEHAVIOR
+Saving writes into the checkout you selected. A new ship creates .dmm maps,
+its hull/module/theme registrations, a .ship.json project file and .dme
+includes. Save all ships saves every ship opened in this workshop session.
+Files edited elsewhere after opening are checked before replacement.
+Close ordinary map tabs before opening those same sources in Ship Workshop.
+
+CURRENT LIMITS
+Single-deck prototype. Existing hand-authored ships support source-map editing;
+the Build and Ship settings authoring controls apply to workshop-created ships.
+Preview PNG generation, BYOND compilation and gameplay tests are separate.
+The editor's static checks do not establish that a ship is playable.
+This is an unsigned test build.
+
+CHECK SAVED MAPS
+Run Check-Ships.cmd and choose the same .dme. It checks default loadouts and
+each alternative module against the other defaults, not every permutation.
+It only reads saved maps and puts JSON results in the reports folder here.
+Static warnings may already exist in the current fleet; compare before/after.
+
+SEND FEEDBACK
+Send feedback to the person who supplied this build, rather than upstream.
+Include:
+- Build ID above, Windows version and your game branch/commit.
+- Whether you were creating a ship or editing an existing one.
+- Hull/theme/slot/module and the active Editing source.
+- Steps, expected result, actual result, and a screenshot if useful.
+- Relevant .dmm/.dm/.ship.json diff and any checker report.
+- Latest editor log from:
+  %USERPROFILE%\AppData\Roaming\StrongDMM-Voidcrew\logs
+  Review logs before sharing; they can contain local paths.
+
+IF IT CLOSES AT STARTUP
+Use START.cmd from the extracted folder. If the editor crashes, the command
+window stays open and shows its exit code and the last error output.
+The reports folder beside START.cmd contains three matching files:
+startup-*.txt (launch details and exit code), editor-*.log, and crash-*.log.
+Send those files for the failed attempt to the person who supplied this build.
+If this folder is not writable, the launcher prints the fallback report path
+in the Windows temporary folder. Reports are local and are never uploaded.
+If the file picker was cancelled, the launcher exits without starting the editor.
+
+SOURCE AND LICENSE
+This is a modified StrongDMM build. Upstream: https://github.com/SpaiR/StrongDMM
+The license is in LICENSE. Matching source, dependency source/notices and
+build instructions are in Source.zip. Testers do not need to extract it.
+BUILD-INFO.json identifies this package; SHA256SUMS.txt lists file hashes.
