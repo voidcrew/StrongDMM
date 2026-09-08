@@ -2,7 +2,8 @@ package window
 
 import "github.com/SpaiR/imgui-go"
 
-func (w *Window) setDefaultTheme() {
+// ApplyDefaultTheme is shared by the native window and UI rendering tests.
+func ApplyDefaultTheme() {
 	imgui.StyleColorsDark()
 
 	s := imgui.CurrentStyle()

@@ -2,7 +2,6 @@ package wsship
 
 import (
 	"fmt"
-	"github.com/SpaiR/imgui-go"
 	"path/filepath"
 	"sdmm/internal/app/command"
 	"sdmm/internal/app/ui/cpwsarea/workspace"
@@ -12,6 +11,7 @@ import (
 	"sdmm/internal/dmapi/dmmap/dmminstance"
 	"sdmm/internal/ship"
 	"sdmm/internal/util"
+	"strings"
 )
 
 type App interface {
@@ -34,12 +34,20 @@ type WsShip struct {
 	wizard, focused                  bool
 	newID, newName, itemID, itemName string
 	width, height                    int32
-	rect                             [4]int32
+	stage                            int
+	task                             buildTask
+	wizardStep, sizePreset           int
+	starterDeck, customID            bool
+	emptyModule                      bool
+	shipFilter                       string
+	settings                         settingsForm
+	reviewReady                      bool
+	reviewed                         []reviewProject
 	SourceBusy                       func(string) bool
 }
 
 func New(app App, busy ...func(string) bool) *WsShip {
-	ws := &WsShip{app: app, projects: map[string]*ship.Project{}, panes: map[string]*pmap.PaneMap{}, width: 32, height: 32, rect: [4]int32{4, 4, 12, 12}}
+	ws := &WsShip{app: app, projects: map[string]*ship.Project{}, panes: map[string]*pmap.PaneMap{}, width: 32, height: 32, starterDeck: true, sizePreset: 1}
 	if len(busy) > 0 {
 		ws.SourceBusy = busy[0]
 	}
@@ -50,8 +58,12 @@ func New(app App, busy ...func(string) bool) *WsShip {
 		return ws
 	}
 	ws.app.CommandStorage().SetStack(ws.CommandStackId())
-	ws.defaults()
-	ws.rebuild()
+	// Start with the ship itself visible. This is the normal View filter, so
+	// the Areas checkbox and existing keyboard shortcut stay in sync.
+	if app.PathsFilter().IsVisiblePath("/area") {
+		app.PathsFilter().TogglePath("/area")
+	}
+	tools.SetEnabled(false)
 	return ws
 }
 func (ws *WsShip) Name() string {
@@ -76,7 +88,7 @@ func (ws *WsShip) Title() string {
 	return "Ship Workshop"
 }
 func (ws *WsShip) Map() *pmap.PaneMap {
-	if ws.wizard || ws.invalid {
+	if ws.wizard || ws.invalid || ws.stage != stepBuild {
 		return nil
 	}
 	return ws.pane
@@ -100,7 +112,10 @@ func (ws *WsShip) Focused() bool {
 }
 func (ws *WsShip) OnFocusChange(f bool) {
 	ws.focused = f
-	if ws.pane != nil && !ws.wizard {
+	if !f && tools.IsSelected(tools.TNRegion) {
+		tools.SetSelected(tools.TNAdd)
+	}
+	if ws.pane != nil && !ws.wizard && ws.stage == stepBuild {
 		if f && !ws.invalid {
 			ws.pane.OnActivate()
 		} else {
@@ -201,7 +216,7 @@ func (ws *WsShip) rebuild() {
 		}
 	}
 	ws.invalid = false
-	if ws.focused {
+	if ws.focused && ws.stage == stepBuild && !ws.wizard {
 		tools.SetEnabled(true)
 	}
 	ws.assembly = a
@@ -228,11 +243,15 @@ func (ws *WsShip) rebuild() {
 			offset = util.Point{}
 		}
 		pane.SetEditContext(&pmap.EditContext{View: view, Offset: offset, StackID: ws.CommandStackId(), Editable: editable, Refresh: ws.refresh, BeforeHistory: func() {
+			ws.stage = stepBuild
+			ws.wizard = false
+			ws.task = taskPaint
 			ws.hull = hull
 			ws.theme = theme
 			ws.selected = copySelection(selection)
 			ws.source = index
 			ws.rebuild()
+			ws.OnFocusChange(true)
 		}, Filter: ws.visible})
 	}
 	ws.activate(ws.panes[a.Sources[ws.source].File])
@@ -256,7 +275,7 @@ func (ws *WsShip) activate(p *pmap.PaneMap) {
 		ws.pane.OnDeactivate()
 	}
 	ws.pane = p
-	if ws.focused {
+	if ws.focused && ws.stage == stepBuild && !ws.wizard {
 		p.OnActivate()
 	}
 	ws.app.OnWorkspaceSwitched()
@@ -264,7 +283,17 @@ func (ws *WsShip) activate(p *pmap.PaneMap) {
 func (ws *WsShip) visible(path string) bool {
 	// Template placeholders are transparent; normal View controls govern all
 	// map content, including areas, pipes and cables.
-	return path != "/turf/template_noop" && path != "/area/template_noop"
+	if path == "/turf/template_noop" || path == "/area/template_noop" {
+		return false
+	}
+	// Draft area and docking-port types can be added after the project's
+	// filter was expanded. They must still respect their category's visibility.
+	for _, category := range []string{"/area", "/turf", "/obj", "/mob"} {
+		if strings.HasPrefix(path, category+"/") && ws.app.PathsFilter().IsHiddenPath(category) {
+			return false
+		}
+	}
+	return true
 }
 func (ws *WsShip) Owns(file string) bool {
 	for _, p := range ws.projects {
@@ -275,6 +304,8 @@ func (ws *WsShip) Owns(file string) bool {
 	return false
 }
 func (ws *WsShip) FocusSource(file string) {
+	ws.stage = stepBuild
+	ws.wizard = false
 	for h, hull := range ws.catalog.Hulls {
 		p := ws.projects[hull.Type]
 		if p == nil {
@@ -311,10 +342,11 @@ func (ws *WsShip) Save() bool {
 		return false
 	}
 	ws.app.CommandStorage().ForceBalance(ws.CommandStackId())
-	ws.message = "Ship sources saved."
+	ws.message = "Saved. Your ship files are up to date."
 	return true
 }
 func (ws *WsShip) flush() {
+	ws.reviewReady = false
 	tools.FinishStroke()
 	for _, p := range ws.panes {
 		p.Editor().CommitContextNow("Edit ship source")
@@ -333,6 +365,7 @@ func (ws *WsShip) change(label string, action func() error) {
 	}
 	after := p.Capture()
 	restore := func(state ship.State) {
+		ws.stage, ws.wizard, ws.task = stepBuild, false, taskPaint
 		p.Restore(state)
 		ws.hull = h
 		ws.theme = t
@@ -345,6 +378,7 @@ func (ws *WsShip) change(label string, action func() error) {
 			pane.CanvasState().SetMaxY(pane.Dmm().MaxY)
 		}
 		ws.rebuild()
+		ws.OnFocusChange(true)
 	}
 	for _, pane := range ws.panes {
 		pane.Snapshot().Sync()
@@ -354,162 +388,4 @@ func (ws *WsShip) change(label string, action func() error) {
 	ws.app.CommandStorage().PushV(ws.CommandStackId(), command.Make(label, func() { restore(before) }, func() { restore(after) }))
 	ws.catalog.Hulls[h] = p.Hull
 	ws.rebuild()
-}
-func (ws *WsShip) Process() {
-	imgui.BeginChildV("ship-controls", imgui.Vec2{X: 320}, true, 0)
-	ws.controls()
-	imgui.EndChild()
-	imgui.SameLine()
-	imgui.BeginChildV("ship-canvas", imgui.Vec2{}, false, imgui.WindowFlagsNoScrollbar|imgui.WindowFlagsNoScrollWithMouse)
-	if ws.wizard {
-		ws.newShip()
-	} else if ws.pane != nil && !ws.invalid {
-		ws.pane.Process()
-	} else {
-		imgui.TextWrapped(ws.message)
-	}
-	imgui.EndChild()
-}
-func (ws *WsShip) controls() {
-	imgui.Text("SHIP WORKSHOP")
-	if imgui.Button("New ship...") {
-		ws.BeginNewShip()
-	}
-	imgui.SameLine()
-	if imgui.Button("Save all ships") {
-		ws.Save()
-	}
-	if ws.catalog == nil {
-		imgui.TextWrapped(ws.message)
-		return
-	}
-	imgui.PushItemWidth(-1)
-	if imgui.BeginCombo("##ship", ws.catalog.Hulls[ws.hull].Name) {
-		for i, h := range ws.catalog.Hulls {
-			if imgui.SelectableV(h.Name, i == ws.hull, 0, imgui.Vec2{}) {
-				ws.flush()
-				ws.wizard = false
-				ws.hull = i
-				ws.theme = 0
-				ws.defaults()
-				ws.rebuild()
-				ws.OnFocusChange(true)
-			}
-		}
-		imgui.EndCombo()
-	}
-	if ws.project == nil {
-		imgui.PopItemWidth()
-		return
-	}
-	h := ws.project.Hull
-	if len(h.Themes) > 0 && imgui.BeginCombo("Theme", ws.currentTheme().Name) {
-		for i, t := range h.Themes {
-			if imgui.SelectableV(t.Name, i == ws.theme, 0, imgui.Vec2{}) {
-				ws.flush()
-				ws.theme = i
-				ws.defaults()
-				ws.rebuild()
-			}
-		}
-		imgui.EndCombo()
-	}
-	for _, slot := range h.SlotsFor(ws.currentTheme()) {
-		label := "Bare slot"
-		for _, m := range h.Modules {
-			if m.ID == ws.selected[slot] {
-				label = m.Name
-			}
-		}
-		if imgui.BeginCombo(slot, label) {
-			if imgui.Selectable("Bare slot") {
-				ws.flush()
-				ws.selected[slot] = ""
-				ws.source = 0
-				ws.rebuild()
-			}
-			for _, m := range h.Modules {
-				if m.Slot == slot && m.Available(ws.currentTheme().ID) && imgui.SelectableV(m.Name, ws.selected[slot] == m.ID, 0, imgui.Vec2{}) {
-					ws.flush()
-					ws.selected[slot] = m.ID
-					ws.source = 0
-					ws.rebuild()
-				}
-			}
-			imgui.EndCombo()
-		}
-	}
-	imgui.Separator()
-	imgui.Text("Editing")
-	if imgui.Checkbox("Source alone", &ws.isolated) {
-		ws.rebuild()
-		if ws.pane != nil {
-			ws.pane.FitView()
-		}
-	}
-	if ws.assembly != nil {
-		for i, s := range ws.assembly.Sources {
-			if imgui.SelectableV(s.Name, i == ws.source, 0, imgui.Vec2{}) {
-				ws.flush()
-				ws.source = i
-				ws.rebuild()
-			}
-		}
-		if ws.source < len(ws.assembly.Sources) {
-			s := ws.assembly.Sources[ws.source]
-			rel, _ := filepath.Rel(ws.catalog.Root, s.File)
-			imgui.TextWrapped(filepath.ToSlash(rel))
-			imgui.TextDisabled(fmt.Sprintf("Source %d x %d; offset %d, %d", s.Data.MaxX, s.Data.MaxY, s.Offset.X, s.Offset.Y))
-		}
-	}
-	if imgui.Button("Fit view") && ws.pane != nil {
-		ws.pane.FitView()
-	}
-	if ws.project.Settings != nil {
-		ws.authorControls()
-	}
-	if imgui.CollapsingHeader("Save preview") {
-		changes, err := ws.project.Changes()
-		if err != nil {
-			imgui.TextWrapped(err.Error())
-		} else {
-			for _, c := range changes {
-				rel, _ := filepath.Rel(ws.catalog.Root, c.Path)
-				prefix := "Edit "
-				if !c.Existed {
-					prefix = "New "
-				}
-				imgui.TextWrapped(prefix + filepath.ToSlash(rel))
-			}
-			if len(changes) == 0 {
-				imgui.TextDisabled("No changes")
-			}
-		}
-	}
-	if imgui.CollapsingHeader("Checks") {
-		if imgui.Button("Check current loadout") {
-			ws.rebuild()
-		}
-		if ws.assembly != nil {
-			for _, issue := range ws.assembly.Issues {
-				imgui.TextWrapped(issue.Message)
-			}
-		}
-		imgui.TextWrapped("Save drafts at any stage. Compile, regenerate purchase previews and playtest before shipping.")
-	}
-	if ws.message != "" {
-		imgui.Separator()
-		imgui.TextWrapped(ws.message)
-	}
-	imgui.PopItemWidth()
-}
-
-func (ws *WsShip) BeginNewShip() {
-	if ws.catalog == nil {
-		return
-	}
-	ws.flush()
-	ws.OnFocusChange(false)
-	ws.wizard = true
-	tools.SetEnabled(false)
 }

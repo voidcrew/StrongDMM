@@ -155,7 +155,7 @@ func (w *Window) setupImGui() {
 	io.SetIniFilename(w.application.LayoutIniPath())
 	io.SetConfigFlags(imgui.ConfigFlagsDockingEnable)
 
-	w.setDefaultTheme()
+	ApplyDefaultTheme()
 }
 
 func (*Window) disposeImGui() {

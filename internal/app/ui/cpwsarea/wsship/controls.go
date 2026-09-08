@@ -1,0 +1,471 @@
+package wsship
+
+import (
+	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+
+	"github.com/SpaiR/imgui-go"
+	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
+	"sdmm/internal/app/window"
+	"sdmm/internal/dmapi/dmmap"
+)
+
+const (
+	stepChoose = iota
+	stepBuild
+	stepReview
+)
+
+type reviewProject struct {
+	name, id, error string
+	files           []reviewFile
+}
+type reviewFile struct {
+	path    string
+	existed bool
+}
+
+func (ws *WsShip) prepareReview() {
+	ws.reviewed = nil
+	for _, h := range ws.catalog.Hulls {
+		p := ws.projects[h.Type]
+		if p == nil {
+			continue
+		}
+		changes, err := p.Changes()
+		item := reviewProject{name: p.Hull.Name, id: h.Type}
+		if err != nil {
+			item.error = err.Error()
+		}
+		for _, c := range changes {
+			rel, _ := filepath.Rel(ws.catalog.Root, c.Path)
+			item.files = append(item.files, reviewFile{filepath.ToSlash(rel), c.Existed})
+		}
+		if len(item.files) > 0 || err != nil {
+			ws.reviewed = append(ws.reviewed, item)
+		}
+	}
+	ws.reviewReady = true
+}
+
+func space() { imgui.Dummy(imgui.Vec2{Y: 6 * window.PointSize()}) }
+func heading(text string) {
+	space()
+	imgui.TextColored(imgui.Vec4{X: .45, Y: .81, Z: .83, W: 1}, text)
+}
+func title(text string) {
+	space()
+	imgui.PushFont(window.FontH2)
+	imgui.TextWrapped(text)
+	imgui.PopFont()
+	space()
+}
+func hint(text string) {
+	imgui.PushStyleColor(imgui.StyleColorText, imgui.CurrentStyle().Color(imgui.StyleColorTextDisabled))
+	imgui.TextWrapped(text)
+	imgui.PopStyleColor()
+}
+func tooltip(text string) {
+	if imgui.IsItemHovered() {
+		imgui.BeginTooltip()
+		imgui.PushTextWrapPosV(300 * window.PointSize())
+		imgui.TextWrapped(text)
+		imgui.PopTextWrapPos()
+		imgui.EndTooltip()
+	}
+}
+func textField(label, placeholder string, value *string) bool {
+	imgui.Text(label)
+	imgui.PushItemWidth(-1)
+	changed := imgui.InputTextWithHint("##"+label, placeholder, value)
+	imgui.PopItemWidth()
+	return changed
+}
+func numberField(label string, value *int32) {
+	imgui.Text(label)
+	imgui.PushItemWidth(-1)
+	imgui.InputInt("##"+label, value)
+	imgui.PopItemWidth()
+}
+func combo(label, preview string) bool {
+	imgui.Text(label)
+	imgui.PushItemWidth(-1)
+	open := imgui.BeginCombo("##"+label, preview)
+	imgui.PopItemWidth()
+	return open
+}
+func actionButton(label string, primary bool) bool {
+	if primary {
+		imgui.PushStyleColor(imgui.StyleColorButton, imgui.Vec4{X: .12, Y: .39, Z: .41, W: 1})
+		imgui.PushStyleColor(imgui.StyleColorButtonHovered, imgui.Vec4{X: .16, Y: .49, Z: .51, W: 1})
+		imgui.PushStyleColor(imgui.StyleColorButtonActive, imgui.Vec4{X: .09, Y: .32, Z: .34, W: 1})
+	}
+	clicked := imgui.ButtonV(label, imgui.Vec2{X: -1, Y: 30 * window.PointSize()})
+	if primary {
+		imgui.PopStyleColorV(3)
+	}
+	return clicked
+}
+
+func (ws *WsShip) setStage(stage int) {
+	ws.flush()
+	ws.OnFocusChange(false)
+	ws.stage, ws.wizard = stage, false
+	ws.task = taskPaint
+	if tools.IsSelected(tools.TNRegion) {
+		tools.SetSelected(tools.TNAdd)
+	}
+	if stage == stepReview {
+		ws.rebuild()
+	}
+	ws.OnFocusChange(true)
+}
+
+func (ws *WsShip) Process() {
+	scale := window.PointSize()
+	imgui.PushStyleVarVec2(imgui.StyleVarWindowPadding, imgui.Vec2{X: 14 * scale, Y: 12 * scale})
+	imgui.PushStyleVarVec2(imgui.StyleVarItemSpacing, imgui.Vec2{X: 8 * scale, Y: 7 * scale})
+	imgui.PushStyleVarVec2(imgui.StyleVarFramePadding, imgui.Vec2{X: 8 * scale, Y: 5 * scale})
+	imgui.PushStyleVarFloat(imgui.StyleVarFrameRounding, 3*scale)
+	imgui.BeginChildV("ship-controls", imgui.Vec2{X: 320 * scale}, true, imgui.WindowFlagsAlwaysUseWindowPadding)
+	ws.controls()
+	imgui.EndChild()
+	imgui.SameLine()
+	flags := imgui.WindowFlagsAlwaysUseWindowPadding
+	if ws.stage == stepBuild && !ws.wizard {
+		flags |= imgui.WindowFlagsNoScrollbar | imgui.WindowFlagsNoScrollWithMouse
+	}
+	imgui.BeginChildV("ship-content", imgui.Vec2{}, false, flags)
+	switch {
+	case ws.wizard:
+		ws.newShip()
+	case ws.stage == stepChoose:
+		ws.chooseShip()
+	case ws.stage == stepReview:
+		ws.review()
+	case ws.pane != nil && !ws.invalid:
+		ws.canvasHeader()
+		ws.pane.Process()
+	default:
+		imgui.TextWrapped(ws.message)
+	}
+	imgui.EndChild()
+	imgui.PopStyleVarV(4)
+}
+
+func (ws *WsShip) controls() {
+	heading("SHIP WORKSHOP")
+	if ws.project != nil && ws.stage != stepChoose && !ws.wizard {
+		imgui.TextWrapped(ws.project.Hull.Name)
+	} else {
+		hint("Make a ship, one step at a time.")
+	}
+	space()
+	for i, label := range []string{"1   Choose a ship", "2   Build", "3   Review & save"} {
+		imgui.BeginDisabledV(i != stepChoose && (ws.project == nil || ws.wizard))
+		if actionButton(label, ws.stage == i) {
+			ws.setStage(i)
+		}
+		imgui.EndDisabled()
+	}
+	space()
+	imgui.Separator()
+	if ws.catalog == nil {
+		imgui.TextWrapped(ws.message)
+		return
+	}
+	if ws.wizard {
+		heading("NEW SHIP")
+		hint("Name your ship, then choose its starting canvas.")
+		return
+	}
+	switch ws.stage {
+	case stepChoose:
+		heading("START HERE")
+		hint("Create a ship from scratch, or open an existing ship to work on it.")
+	case stepReview:
+		heading("READY TO SAVE?")
+		hint("Review the checks and changed ships. Saving writes your work to the project.")
+		space()
+		if actionButton("Back to building", false) {
+			ws.setStage(stepBuild)
+		}
+	default:
+		ws.buildControls()
+	}
+	if ws.message != "" && ws.stage != stepReview {
+		space()
+		imgui.Separator()
+		imgui.TextWrapped(ws.message)
+	}
+}
+
+func (ws *WsShip) chooseShip() {
+	title("What would you like to work on?")
+	hint("Open a ship to edit it on the map. You can return here at any time.")
+	space()
+	if actionButton("Create a new ship...", true) {
+		ws.BeginNewShip()
+	}
+	space()
+	heading("EXISTING SHIPS")
+	textField("Find a ship", "Search by name", &ws.shipFilter)
+	if ws.catalog == nil {
+		return
+	}
+	imgui.BeginChild("ship-list")
+	for i, h := range ws.catalog.Hulls {
+		if !strings.Contains(strings.ToLower(h.Name), strings.ToLower(ws.shipFilter)) {
+			continue
+		}
+		imgui.PushID(h.Type)
+		if imgui.SelectableV(h.Name, i == ws.hull, 0, imgui.Vec2{Y: 32 * window.PointSize()}) {
+			ws.flush()
+			ws.hull, ws.theme = i, 0
+			ws.isolated = false
+			ws.defaults()
+			ws.rebuild()
+			ws.setStage(stepBuild)
+			if ws.pane != nil {
+				ws.pane.FitView()
+			}
+		}
+		imgui.PopID()
+	}
+	imgui.EndChild()
+}
+
+func (ws *WsShip) buildControls() {
+	if ws.project == nil {
+		return
+	}
+	if ws.task != taskPaint {
+		ws.authorControls()
+		return
+	}
+	heading("PAINT & FURNISH")
+	hint("Pick a part to edit, then place walls and objects on the map.")
+	if ws.assembly != nil && ws.source < len(ws.assembly.Sources) && combo("Part to edit", ws.assembly.Sources[ws.source].Name) {
+		for i, s := range ws.assembly.Sources {
+			if imgui.SelectableV(s.Name, i == ws.source, 0, imgui.Vec2{}) {
+				ws.flush()
+				ws.source = i
+				ws.rebuild()
+			}
+		}
+		imgui.EndCombo()
+	}
+	if ws.project.Settings != nil {
+		space()
+		if actionButton("Add floor...", false) {
+			ws.beginTask(taskDeck)
+		}
+		if actionButton("Make an upgrade room...", false) {
+			ws.beginTask(taskRoom)
+		}
+	}
+	space()
+	heading("QUICK PIECES")
+	{
+		buttonWidth := (imgui.ContentRegionAvail().X - 8*window.PointSize()) / 2
+		for i, p := range []struct{ name, path string }{
+			{"Wall", "/turf/closed/wall"}, {"Airlock", "/obj/machinery/door/airlock"},
+			{"Table", "/obj/structure/table"}, {"Chair", "/obj/structure/chair"},
+		} {
+			if ws.app.LoadedEnvironment().Objects[p.path] == nil {
+				continue
+			}
+			if i%2 == 1 {
+				imgui.SameLine()
+			}
+			selected, hasSelected := ws.app.SelectedPrefab()
+			active := hasSelected && selected.Path() == p.path && tools.IsSelected(tools.TNAdd)
+			if active {
+				imgui.PushStyleColor(imgui.StyleColorButton, imgui.Vec4{X: .12, Y: .39, Z: .41, W: 1})
+			}
+			if imgui.ButtonV(p.name, imgui.Vec2{X: buttonWidth, Y: 28 * window.PointSize()}) {
+				ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial(p.path))
+				tools.SetSelected(tools.TNAdd)
+			}
+			if active {
+				imgui.PopStyleColor()
+			}
+		}
+		hint("Pick a piece, then click or drag to place it. Find more in the object tree.")
+	}
+	space()
+	if imgui.CollapsingHeader("Room options & ship variants") {
+		ws.loadoutControls()
+	}
+	if ws.project.Settings != nil && imgui.CollapsingHeader("Ship details & canvas size") {
+		if actionButton("Edit ship details...", false) {
+			ws.beginTask(taskSettings)
+		}
+		if actionButton("Change canvas size...", false) {
+			ws.beginTask(taskResize)
+		}
+	}
+	if imgui.CollapsingHeader("Advanced view & source files") {
+		if imgui.Checkbox("Show only the part being edited", &ws.isolated) {
+			ws.flush()
+			ws.rebuild()
+			if ws.pane != nil {
+				ws.pane.FitView()
+			}
+		}
+		if ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
+			s := ws.assembly.Sources[ws.source]
+			rel, _ := filepath.Rel(ws.catalog.Root, s.File)
+			hint(filepath.ToSlash(rel))
+			hint(fmt.Sprintf("%d x %d tiles; placed at %d, %d", s.Data.MaxX, s.Data.MaxY, s.Offset.X, s.Offset.Y))
+		}
+	}
+	space()
+	if actionButton("Continue to review & save", true) {
+		ws.setStage(stepReview)
+	}
+}
+
+func (ws *WsShip) canvasHeader() {
+	if imgui.Button("Show whole ship") {
+		if ws.isolated {
+			ws.flush()
+			ws.isolated = false
+			ws.rebuild()
+		}
+		ws.pane.FitView()
+	}
+	tooltip("Centers the ship and adjusts the zoom so it fits on screen.")
+	imgui.SameLine()
+	areas := ws.app.PathsFilter().IsVisiblePath("/area")
+	if imgui.Checkbox("Areas", &areas) {
+		ws.app.PathsFilter().TogglePath("/area")
+	}
+	tooltip("Show area markers. This is the same setting as View > Areas (Ctrl+1).")
+	imgui.SameLine()
+	if ws.task == taskDeck || ws.task == taskRoom {
+		imgui.Text("Drag a rectangle on the hull")
+	} else if ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
+		imgui.Text("Editing: " + ws.assembly.Sources[ws.source].Name)
+	}
+	if ws.task == taskDeck || ws.task == taskRoom {
+		hint("Release to select. Apply the change in the left panel.")
+	} else {
+		instruction := "Scroll to zoom  |  Middle mouse to pan  |  Ctrl+Z to undo"
+		if p, ok := ws.app.SelectedPrefab(); ok && tools.IsSelected(tools.TNAdd) {
+			name, err := strconv.Unquote(p.Vars().ValueV("name", ""))
+			if err != nil || name == "" {
+				name = filepath.Base(p.Path())
+			}
+			instruction = "Placing: " + name + "  |  " + instruction
+		}
+		hint(instruction)
+	}
+	imgui.Separator()
+}
+
+func (ws *WsShip) loadoutControls() {
+	h := ws.project.Hull
+	if len(h.Themes) > 1 && combo("Ship variant", ws.currentTheme().Name) {
+		for i, t := range h.Themes {
+			if imgui.SelectableV(t.Name, i == ws.theme, 0, imgui.Vec2{}) {
+				ws.flush()
+				ws.theme = i
+				ws.defaults()
+				ws.rebuild()
+			}
+		}
+		imgui.EndCombo()
+	}
+	for _, slot := range h.SlotsFor(ws.currentTheme()) {
+		label := "Empty room"
+		for _, m := range h.Modules {
+			if m.ID == ws.selected[slot] {
+				label = m.Name
+			}
+		}
+		if combo("Room: "+slot, label) {
+			if imgui.Selectable("Empty room") {
+				ws.flush()
+				ws.selected[slot] = ""
+				ws.source = 0
+				ws.rebuild()
+			}
+			for _, m := range h.Modules {
+				if m.Slot == slot && m.Available(ws.currentTheme().ID) && imgui.SelectableV(m.Name, ws.selected[slot] == m.ID, 0, imgui.Vec2{}) {
+					ws.flush()
+					ws.selected[slot] = m.ID
+					ws.source = 0
+					ws.rebuild()
+				}
+			}
+			imgui.EndCombo()
+		}
+	}
+	if ws.project.Settings == nil {
+		return
+	}
+	if actionButton("Copy ship as a new variant...", false) {
+		ws.beginTask(taskTheme)
+	}
+	if ws.source > 0 {
+		if actionButton("Create another room option...", false) {
+			ws.beginTask(taskModule)
+		}
+	}
+}
+
+func (ws *WsShip) review() {
+	if ws.project == nil {
+		return
+	}
+	title("Review & save")
+	imgui.TextWrapped(ws.project.Hull.Name)
+	hint("You can save a draft at any point and keep building later.")
+	space()
+	if actionButton("Save all changes", true) {
+		ws.Save()
+	}
+	if ws.message != "" {
+		imgui.TextWrapped(ws.message)
+	}
+	heading("MAP CHECKS")
+	if ws.invalid || ws.assembly == nil {
+		imgui.TextWrapped("The ship could not be assembled. Return to Build to resolve the reported problem.")
+	} else if len(ws.assembly.Issues) == 0 {
+		imgui.Text("No assembly warnings for this combination.")
+	} else {
+		imgui.Text(fmt.Sprintf("%d things to check", len(ws.assembly.Issues)))
+		for _, issue := range ws.assembly.Issues {
+			imgui.BulletText(issue.Message)
+		}
+	}
+	heading("CHANGES TO SAVE")
+	if !ws.reviewReady {
+		ws.prepareReview()
+	}
+	for _, item := range ws.reviewed {
+		if item.error != "" {
+			imgui.TextWrapped(item.name + ": " + item.error)
+			continue
+		}
+		imgui.Text(fmt.Sprintf("%s - %d files", item.name, len(item.files)))
+		if imgui.TreeNode("Show files##" + item.id) {
+			for _, c := range item.files {
+				prefix := "Update "
+				if !c.existed {
+					prefix = "Create "
+				}
+				hint(prefix + c.path)
+			}
+			imgui.TreePop()
+		}
+	}
+	if len(ws.reviewed) == 0 {
+		hint("All changes are saved.")
+	}
+	space()
+	hint("Before using a new ship in-game: compile the project, generate purchase previews, and playtest.")
+}

@@ -1,125 +1,445 @@
 package wsship
 
 import (
+	"fmt"
+	"strconv"
+	"strings"
+
 	"github.com/SpaiR/imgui-go"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
+	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/ship"
 	"sdmm/internal/util"
 )
 
-func (ws *WsShip) newShip() {
-	imgui.Text("Create a new ship")
-	imgui.TextWrapped("Start with an empty canvas and a docking port. Draw the permanent hull, then select rooms to turn into upgrade slots.")
-	imgui.InputText("Ship ID", &ws.newID)
-	imgui.InputText("Name", &ws.newName)
-	imgui.InputInt("Width", &ws.width)
-	imgui.InputInt("Height", &ws.height)
-	if imgui.Button("Create ship") {
-		p, err := ship.NewProject(ws.catalog, ws.app.LoadedEnvironment(), ws.newID, ws.newName, int(ws.width), int(ws.height))
-		if err != nil {
-			ws.message = err.Error()
+type buildTask int
+
+const (
+	taskPaint buildTask = iota
+	taskDeck
+	taskRoom
+	taskTheme
+	taskModule
+	taskResize
+	taskSettings
+)
+
+type settingsForm struct {
+	name, description     string
+	crew, cost, direction int32
+	hidden                bool
+}
+
+// IDs are a storage detail. Names remain unrestricted; generated IDs are valid,
+// short, and unique among the existing project entries.
+func suggestedID(name string, used func(string) bool) string {
+	var b strings.Builder
+	separator := false
+	for _, r := range strings.ToLower(name) {
+		if r >= 'a' && r <= 'z' || r >= '0' && r <= '9' {
+			if separator && b.Len() > 0 {
+				b.WriteByte('_')
+			}
+			b.WriteRune(r)
+			separator = false
 		} else {
-			ws.projects[p.Hull.Type] = p
-			ws.catalog.Hulls = append(ws.catalog.Hulls, p.Hull)
-			ws.hull = len(ws.catalog.Hulls) - 1
-			ws.theme = 0
-			ws.defaults()
-			ws.wizard = false
-			ws.rebuild()
-			ws.OnFocusChange(true)
-			ws.pane.FitView()
-			ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial("/turf/open/floor/plating"))
+			separator = true
 		}
 	}
-	imgui.SameLine()
-	if imgui.Button("Cancel") {
-		ws.wizard = false
-		ws.OnFocusChange(true)
+	base := b.String()
+	if base == "" {
+		base = "ship"
+	}
+	if base[0] < 'a' || base[0] > 'z' {
+		base = "ship_" + base
+	}
+	if len(base) > 40 {
+		base = strings.TrimRight(base[:40], "_")
+	}
+	id := base
+	for n := 2; used(id); n++ {
+		id = base + "_" + strconv.Itoa(n)
+	}
+	return id
+}
+func (ws *WsShip) shipIDUsed(id string) bool {
+	typePath := ship.HullType + "/" + id
+	if ws.app.LoadedEnvironment().Objects[typePath] != nil {
+		return true
+	}
+	for _, h := range ws.catalog.Hulls {
+		if h.Type == typePath {
+			return true
+		}
+	}
+	return false
+}
+func (ws *WsShip) itemIDUsed(id string) bool {
+	h := ws.project.Hull
+	for _, t := range h.Themes {
+		if t.ID == id {
+			return true
+		}
+	}
+	for _, slot := range h.Slots {
+		if slot == id {
+			return true
+		}
+	}
+	for _, m := range h.Modules {
+		if m.ID == id || m.ID == id+"_basic" {
+			return true
+		}
+	}
+	return false
+}
+
+func (ws *WsShip) BeginNewShip() {
+	if ws.catalog == nil {
+		return
+	}
+	ws.flush()
+	ws.OnFocusChange(false)
+	ws.stage, ws.wizard, ws.wizardStep = stepChoose, true, 0
+	ws.newID, ws.newName, ws.message = "", "", ""
+	ws.customID, ws.starterDeck = false, true
+	ws.sizePreset, ws.width, ws.height = 1, 32, 32
+	tools.SetEnabled(false)
+}
+func (ws *WsShip) newShip() {
+	// Keep the setup form readable even when the canvas is very wide.
+	available := imgui.ContentRegionAvail().X
+	formWidth := min(520*window.PointSize(), available)
+	pos := imgui.CursorPos()
+	pos.X += max(0, (available-formWidth)/2)
+	imgui.SetCursorPos(pos)
+	imgui.BeginChildV("new-ship-form", imgui.Vec2{X: formWidth}, false, 0)
+	title("Create a new ship")
+	space()
+	if !ws.customID {
+		ws.newID = suggestedID(ws.newName, ws.shipIDUsed)
+	}
+	if ws.wizardStep == 0 {
+		imgui.Text("1 of 2  /  Name your ship")
+		hint("Choose the name mappers and players will see.")
+		space()
+		if textField("Ship name", "e.g. Wayfarer", &ws.newName) && !ws.customID {
+			ws.newID = suggestedID(ws.newName, ws.shipIDUsed)
+		}
+		space()
+		if imgui.CollapsingHeader("Advanced: file identifier") {
+			if textField("File identifier", "lowercase_letters", &ws.newID) {
+				ws.customID = true
+			}
+			hint("Used for generated file names. The automatic value is usually all you need.")
+		}
+		valid := strings.TrimSpace(ws.newName) != "" && ship.ValidID(ws.newID) == nil && !ws.shipIDUsed(ws.newID)
+		if ws.customID && !valid {
+			hint("Use a unique lowercase identifier starting with a letter.")
+		}
+		space()
+		imgui.BeginDisabledV(!valid)
+		if actionButton("Next: choose a canvas", true) {
+			ws.wizardStep = 1
+			ws.message = ""
+		}
+		imgui.EndDisabled()
+	} else {
+		imgui.Text("2 of 2  /  Choose a starting canvas")
+		imgui.TextWrapped(ws.newName)
+		hint("This is the space available to build in. You can resize it later.")
+		space()
+		for i, size := range []int32{24, 32, 48} {
+			name := []string{"Small", "Medium", "Large"}[i]
+			if actionButton(fmt.Sprintf("%s  -  %d x %d tiles", name, size, size), ws.sizePreset == i) {
+				ws.sizePreset, ws.width, ws.height = i, size, size
+			}
+		}
+		if actionButton("Custom size...", ws.sizePreset == 3) {
+			ws.sizePreset = 3
+		}
+		if ws.sizePreset == 3 {
+			numberField("Width in tiles", &ws.width)
+			numberField("Height in tiles", &ws.height)
+		}
+		space()
+		imgui.Checkbox("Start with a floor foundation", &ws.starterDeck)
+		hint("A rectangle of plating to shape and furnish. Turn this off for an empty canvas.")
+		valid := ws.width >= 5 && ws.height >= 5 && ws.width <= 128 && ws.height <= 128
+		if !valid {
+			hint("Choose a width and height between 5 and 128 tiles.")
+		}
+		space()
+		imgui.BeginDisabledV(!valid)
+		if actionButton("Create ship & start building", true) {
+			ws.createShip()
+		}
+		imgui.EndDisabled()
+		if actionButton("Back to name", false) {
+			ws.wizardStep = 0
+		}
+	}
+	if actionButton("Cancel", false) {
+		ws.setStage(stepChoose)
 	}
 	if ws.message != "" {
 		imgui.TextWrapped(ws.message)
 	}
+	imgui.EndChild()
 }
+
+func (ws *WsShip) createShip() {
+	p, err := ship.NewProject(ws.catalog, ws.app.LoadedEnvironment(), ws.newID, strings.TrimSpace(ws.newName), int(ws.width), int(ws.height))
+	if err != nil {
+		ws.message = err.Error()
+		return
+	}
+	if ws.starterDeck {
+		err = p.Deck(p.Hull.Themes[0], util.Point{X: 2, Y: 1, Z: 1}, util.Point{X: int(ws.width) - 1, Y: int(ws.height) - 1, Z: 1})
+		if err != nil {
+			ws.message = err.Error()
+			return
+		}
+	}
+	ws.projects[p.Hull.Type] = p
+	ws.catalog.Hulls = append(ws.catalog.Hulls, p.Hull)
+	ws.hull, ws.theme = len(ws.catalog.Hulls)-1, 0
+	ws.wizard, ws.isolated, ws.stage, ws.task = false, false, stepBuild, taskPaint
+	ws.defaults()
+	ws.rebuild()
+	ws.OnFocusChange(true)
+	if ws.pane != nil {
+		ws.pane.FitView()
+	}
+	ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial("/turf/closed/wall"))
+	tools.SetSelected(tools.TNAdd)
+}
+
+func (ws *WsShip) beginTask(task buildTask) {
+	ws.flush()
+	ws.task, ws.itemName, ws.itemID, ws.message = task, "", "", ""
+	ws.customID, ws.emptyModule = false, false
+	if task == taskDeck || task == taskRoom {
+		ws.source, ws.isolated = 0, false
+		ws.rebuild()
+		tools.SetSelected(tools.TNRegion).OnDeselect()
+	}
+	if task == taskSettings {
+		s := ws.project.Settings
+		ws.settings = settingsForm{ws.project.Hull.Name, s.Description, int32(s.Crew), int32(s.Cost), int32(s.PortDirection), s.Hidden}
+	}
+	if task == taskResize && ws.assembly != nil {
+		s := ws.assembly.Sources[0]
+		ws.width, ws.height = int32(s.Data.MaxX), int32(s.Data.MaxY)
+	}
+}
+
+func (ws *WsShip) finishTask() {
+	ws.task = taskPaint
+	tools.SetSelected(tools.TNAdd)
+}
+
 func (ws *WsShip) authorControls() {
-	if imgui.CollapsingHeader("Build") {
-		imgui.InputText("ID##item", &ws.itemID)
-		imgui.InputText("Name##item", &ws.itemName)
-		if imgui.Button("Use selection bounds") && ws.source == 0 {
-			points := tools.SelectedTiles()
-			if len(points) > 0 {
-				lo, hi := points[0], points[0]
-				for _, p := range points {
-					lo.X = min(lo.X, p.X)
-					lo.Y = min(lo.Y, p.Y)
-					hi.X = max(hi.X, p.X)
-					hi.Y = max(hi.Y, p.Y)
-				}
-				ws.rect = [4]int32{int32(lo.X), int32(lo.Y), int32(hi.X), int32(hi.Y)}
-			}
+	if actionButton("< Back to painting", false) {
+		ws.finishTask()
+		return
+	}
+	switch ws.task {
+	case taskDeck, taskRoom:
+		ws.regionControls()
+	case taskTheme, taskModule:
+		ws.copyControls()
+	case taskSettings:
+		ws.settingsControls()
+	case taskResize:
+		heading("CHANGE CANVAS SIZE")
+		hint("Add room to build. Shrinking is allowed only where the canvas is empty.")
+		numberField("Width in tiles", &ws.width)
+		numberField("Height in tiles", &ws.height)
+		valid := ws.width >= 5 && ws.height >= 5 && ws.width <= 128 && ws.height <= 128
+		if !valid {
+			hint("Use 5 to 128 tiles in each direction.")
 		}
-		imgui.InputInt("Left", &ws.rect[0])
-		imgui.InputInt("Bottom", &ws.rect[1])
-		imgui.InputInt("Right", &ws.rect[2])
-		imgui.InputInt("Top", &ws.rect[3])
-		lo := util.Point{X: int(ws.rect[0]), Y: int(ws.rect[1]), Z: 1}
-		hi := util.Point{X: int(ws.rect[2]), Y: int(ws.rect[3]), Z: 1}
-		imgui.BeginDisabledV(ws.source != 0)
-		if imgui.Button("Lay permanent deck") {
-			ws.change("Lay permanent deck", func() error { return ws.project.Deck(ws.currentTheme(), lo, hi) })
-		}
-		if imgui.Button("Extract upgrade slot") {
-			ws.change("Extract upgrade slot", func() error { return ws.project.AddSlot(ws.theme, ws.itemID, ws.itemName, lo, hi) })
+		imgui.BeginDisabledV(!valid)
+		if actionButton("Apply canvas size", true) {
+			ws.change("Resize hull", func() error { return ws.project.Resize(ws.currentTheme(), int(ws.width), int(ws.height)) })
 			if ws.message == "" {
-				ws.defaults()
-				ws.rebuild()
+				ws.finishTask()
+				ws.pane.FitView()
 			}
 		}
 		imgui.EndDisabled()
-		if imgui.Button("Clone theme") {
-			ws.change("Clone theme", func() error { return ws.project.AddTheme(ws.theme, ws.itemID, ws.itemName) })
+	}
+}
+
+func (ws *WsShip) regionControls() {
+	if ws.task == taskDeck {
+		heading("ADD FLOOR")
+		hint("Fill a rectangle with plating and assign it to your ship.")
+	} else {
+		heading("MAKE AN UPGRADE ROOM")
+		hint("Turn a furnished room into a swappable upgrade. Its walls and floor stay in the hull.")
+	}
+	heading("1. Select the area")
+	hint("Drag a rectangle over the hull. Drag again to change the selection.")
+	if !tools.IsSelected(tools.TNRegion) && actionButton("Select an area on the map", false) {
+		tools.SetSelected(tools.TNRegion)
+	}
+	lo, hi, ready := tools.RegionBounds()
+	if ready {
+		imgui.Text(fmt.Sprintf("Selected: %d x %d tiles", hi.X-lo.X+1, hi.Y-lo.Y+1))
+	} else {
+		hint("No area selected yet.")
+	}
+	label := "Add floor to selected area"
+	valid := ready && ws.source == 0
+	if ws.task == taskRoom {
+		heading("2. Name the room")
+		textField("Room name", "e.g. Cargo bay", &ws.itemName)
+		ws.itemIdentifier()
+		valid = valid && strings.TrimSpace(ws.itemName) != "" && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
+		label = "Make this an upgrade room"
+	}
+	space()
+	imgui.BeginDisabledV(!valid)
+	if actionButton(label, true) {
+		ws.applyRegion()
+	}
+	imgui.EndDisabled()
+	hint("You can undo this with Ctrl+Z.")
+}
+
+func (ws *WsShip) applyRegion() {
+	lo, hi, ready := tools.RegionBounds()
+	if !ready || ws.source != 0 || ws.pane == nil || !ws.pane.Dmm().HasTile(lo) || !ws.pane.Dmm().HasTile(hi) {
+		ws.message = "Drag a rectangle inside the hull first."
+		return
+	}
+	if ws.task == taskDeck {
+		ws.change("Add floor", func() error { return ws.project.Deck(ws.currentTheme(), lo, hi) })
+	} else {
+		ws.change("Make upgrade room", func() error { return ws.project.AddSlot(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), lo, hi) })
+		if ws.message == "" {
+			ws.defaults()
+			ws.rebuild()
+			for i, s := range ws.assembly.Sources {
+				if s.Slot == ws.itemID {
+					ws.source = i
+					break
+				}
+			}
+			ws.rebuild()
 		}
-		if ws.source > 0 && ws.assembly != nil {
+	}
+	if ws.message == "" {
+		ws.finishTask()
+	}
+}
+
+func (ws *WsShip) itemIdentifier() {
+	if !ws.customID {
+		ws.itemID = suggestedID(ws.itemName, ws.itemIDUsed)
+	}
+	if imgui.CollapsingHeader("Advanced: file identifier") {
+		if textField("File identifier", "lowercase_letters", &ws.itemID) {
+			ws.customID = true
+		}
+		if ship.ValidID(ws.itemID) != nil || ws.itemIDUsed(ws.itemID) {
+			hint("Use a unique lowercase identifier starting with a letter.")
+		}
+	}
+}
+func (ws *WsShip) copyControls() {
+	label := "Create ship variant"
+	if ws.task == taskTheme {
+		heading("NEW SHIP VARIANT")
+		hint("Copy this ship layout and its rooms, then edit the copy independently.")
+		textField("Variant name", "e.g. Salvager", &ws.itemName)
+	} else {
+		heading("NEW ROOM OPTION")
+		hint("Create another option for the room you are editing.")
+		textField("Room option name", "e.g. Medical bay", &ws.itemName)
+		imgui.Checkbox("Start with an empty room", &ws.emptyModule)
+		hint("Otherwise, the current room's contents are copied.")
+		label = "Create room option"
+	}
+	ws.itemIdentifier()
+	valid := strings.TrimSpace(ws.itemName) != "" && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
+	imgui.BeginDisabledV(!valid)
+	if actionButton(label, true) {
+		if ws.task == taskTheme {
+			ws.change("Create ship variant", func() error { return ws.project.AddTheme(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName)) })
+			if ws.message == "" {
+				ws.theme = len(ws.project.Hull.Themes) - 1
+				ws.defaults()
+				ws.rebuild()
+			}
+		} else if ws.assembly != nil && ws.source > 0 && ws.source < len(ws.assembly.Sources) {
 			slot := ws.assembly.Sources[ws.source].Slot
 			for _, m := range ws.project.Hull.Modules {
 				if m.ID == ws.selected[slot] {
-					if imgui.Button("Clone module") {
-						ws.change("Clone module", func() error { return ws.project.AddModule(ws.theme, m, ws.itemID, ws.itemName, false) })
-					}
-					if imgui.Button("New empty alternative") {
-						ws.change("Create module", func() error { return ws.project.AddModule(ws.theme, m, ws.itemID, ws.itemName, true) })
+					ws.change("Create room option", func() error {
+						return ws.project.AddModule(ws.theme, m, ws.itemID, strings.TrimSpace(ws.itemName), ws.emptyModule)
+					})
+					if ws.message == "" {
+						ws.selected[slot] = ws.itemID
+						ws.rebuild()
 					}
 					break
 				}
 			}
 		}
-	}
-	if imgui.CollapsingHeader("Ship settings") {
-		s := ws.project.Settings
-		name, desc := ws.project.Hull.Name, s.Description
-		crew, cost, dir := int32(s.Crew), int32(s.Cost), int32(s.PortDirection)
-		hidden := s.Hidden
-		changed := imgui.InputText("Ship name", &name)
-		changed = imgui.InputText("Description", &desc) || changed
-		changed = imgui.InputInt("Crew", &crew) || changed
-		changed = imgui.InputInt("Misc part cost", &cost) || changed
-		changed = imgui.InputInt("Dock: N1 S2 E4 W8", &dir) || changed
-		changed = imgui.Checkbox("Development only", &hidden) || changed
-		if changed {
-			ws.change("Ship settings", func() error {
-				ws.project.Hull.Name = name
-				s.Description = desc
-				s.Crew = int(crew)
-				s.Cost = int(cost)
-				s.PortDirection = int(dir)
-				s.Hidden = hidden
-				return nil
-			})
-		}
-		imgui.InputInt("Canvas width", &ws.width)
-		imgui.InputInt("Canvas height", &ws.height)
-		if imgui.Button("Resize hull") {
-			ws.change("Resize hull", func() error { return ws.project.Resize(ws.currentTheme(), int(ws.width), int(ws.height)) })
+		if ws.message == "" {
+			ws.finishTask()
 		}
 	}
+	imgui.EndDisabled()
+}
+func (ws *WsShip) settingsControls() {
+	heading("SHIP DETAILS")
+	s := &ws.settings
+	textField("Ship name", "Name shown to players", &s.name)
+	textField("Description", "What is this ship for?", &s.description)
+	numberField("Crew capacity", &s.crew)
+	numberField("Build cost (misc parts)", &s.cost)
+	directions := []struct {
+		name  string
+		value int32
+	}{{"North", 1}, {"South", 2}, {"East", 4}, {"West", 8}}
+	current := "Choose a direction"
+	for _, d := range directions {
+		if d.value == s.direction {
+			current = d.name
+		}
+	}
+	if combo("Docking direction", current) {
+		for _, d := range directions {
+			if imgui.SelectableV(d.name, d.value == s.direction, 0, imgui.Vec2{}) {
+				s.direction = d.value
+			}
+		}
+		imgui.EndCombo()
+	}
+	imgui.Checkbox("Hide from the player ship list", &s.hidden)
+	hint("Keep this checked while your ship is a work in progress.")
+	valid := strings.TrimSpace(s.name) != "" && s.crew >= 1 && s.crew <= 32 && s.cost >= 0
+	if !valid {
+		hint("Enter a name, 1 to 32 crew, and a cost of zero or more.")
+	}
+	space()
+	imgui.BeginDisabledV(!valid)
+	if actionButton("Apply ship details", true) {
+		ws.change("Ship details", func() error {
+			ws.project.Hull.Name = strings.TrimSpace(s.name)
+			settings := ws.project.Settings
+			settings.Description, settings.Crew, settings.Cost = s.description, int(s.crew), int(s.cost)
+			settings.PortDirection, settings.Hidden = int(s.direction), s.hidden
+			return nil
+		})
+		if ws.message == "" {
+			ws.finishTask()
+		}
+	}
+	imgui.EndDisabled()
 }

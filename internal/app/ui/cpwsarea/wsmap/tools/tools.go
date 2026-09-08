@@ -22,6 +22,7 @@ const (
 	TNPick    = "Pick"
 	TNDelete  = "Delete"
 	TNReplace = "Replace"
+	TNRegion  = "Select region"
 )
 
 func init() {
@@ -82,6 +83,7 @@ var (
 		TNPick:    newPick(),
 		TNDelete:  newDelete(),
 		TNReplace: newReplace(),
+		TNRegion:  &ToolRegion{},
 	}
 
 	selectedToolName = TNAdd

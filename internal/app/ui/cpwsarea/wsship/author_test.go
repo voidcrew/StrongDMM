@@ -30,19 +30,56 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 		t.Fatal(err)
 	}
 	catalog := &ship.Catalog{Root: root, ModuleDir: "_maps/voidcrew/ship_modules/"}
-	project, err := ship.NewProject(catalog, &draftEnv, "workshop_fixture", "Workshop Fixture", 24, 24)
-	if err != nil {
-		t.Fatal(err)
+	ws.catalog = catalog
+	ws.app.(*previewApp).dme = &draftEnv
+	ws.BeginNewShip()
+	ws.newName = "Workshop Fixture"
+	if ws.Map() != nil {
+		t.Fatal("new ship setup exposes the old map")
 	}
-	ws.projects[project.Hull.Type] = project
-	ws.catalog.Hulls = append(ws.catalog.Hulls, project.Hull)
-	ws.hull = len(ws.catalog.Hulls) - 1
-	ws.theme = 0
-	ws.defaults()
-	ws.rebuild()
+	capture := func(name string) {
+		for i := 0; i < 3; i++ {
+			render()
+		}
+		if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
+			captureFrame(t, filepath.Join(dst, name+".png"), 1400, 960)
+		}
+	}
+	capture("new-ship-name")
+	if ws.newID != "workshop_fixture" {
+		t.Fatal("ship name did not generate a file identifier")
+	}
+	ws.wizardStep = 1
+	ws.sizePreset, ws.width, ws.height = 0, 24, 24
+	capture("new-ship-canvas")
+	ws.createShip()
+	project := ws.project
 	if ws.message != "" {
 		t.Fatal(ws.message)
 	}
+	if ws.Map() == nil || ws.wizard || ws.stage != stepBuild {
+		t.Fatal("creating a ship did not enter the editor")
+	}
+	if project.Hull.Name != "Workshop Fixture" || project.Settings.ID != "workshop_fixture" {
+		t.Fatal("creation lost ship identity")
+	}
+	foundFloor := false
+	for _, i := range ws.pane.Dmm().GetTile(util.Point{X: 3, Y: 3, Z: 1}).Instances() {
+		if i.Prefab().Path() == "/turf/open/floor/plating" {
+			foundFloor = true
+		}
+	}
+	if !foundFloor {
+		t.Fatal("starting floor was not created")
+	}
+	capture("new-ship-foundation")
+	ws.beginTask(taskRoom)
+	ws.itemName = "Cargo bay"
+	capture("guided-room")
+	ws.finishTask()
+	ws.beginTask(taskSettings)
+	capture("ship-details")
+	ws.finishTask()
 	lo, hi := util.Point{X: 4, Y: 5, Z: 1}, util.Point{X: 12, Y: 13, Z: 1}
 	ws.change("Lay permanent deck", func() error { return project.Deck(ws.currentTheme(), lo, hi) })
 	ws.change("Extract cargo", func() error { return project.AddSlot(0, "cargo", "Cargo", lo, hi) })
@@ -111,6 +148,12 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	ws.rebuild()
 	// Save just the isolated fixture, never production maps.
 	ws.flush()
+	ws.setStage(stepReview)
+	capture("review-unsaved")
+	if len(ws.reviewed) != 1 || len(ws.reviewed[0].files) == 0 {
+		t.Fatal("review did not list the new ship's files")
+	}
+	ws.setStage(stepBuild)
 	if err := project.Save(); err != nil {
 		t.Fatal(err)
 	}
@@ -130,4 +173,9 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
 		captureFrame(t, filepath.Join(dst, "new-ship-workshop.png"), 1400, 960)
 	}
+	ws.setStage(stepReview)
+	if ws.Map() != nil {
+		t.Fatal("review screen exposes map tools")
+	}
+	capture("review-save")
 }

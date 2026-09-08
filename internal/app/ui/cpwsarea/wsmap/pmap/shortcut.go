@@ -159,6 +159,7 @@ func (p *PaneMap) doToggleMob() {
 func (p *PaneMap) DoDeselect() {
 	log.Print("do deselect")
 	tools.Tools()[tools.TNGrab].OnDeselect()
+	tools.Tools()[tools.TNRegion].OnDeselect()
 }
 
 func (p *PaneMap) doMoveCameraUp() {

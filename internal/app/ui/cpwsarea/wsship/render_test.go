@@ -48,6 +48,7 @@ func TestRenderShipWorkspace(t *testing.T) {
 	}
 	context := imgui.CreateContext(nil)
 	defer context.Destroy()
+	window.ApplyDefaultTheme()
 	io := imgui.CurrentIO()
 	io.SetIniFilename("")
 	io.SetDisplaySize(imgui.Vec2{X: width, Y: height})
@@ -84,6 +85,15 @@ func TestRenderShipWorkspace(t *testing.T) {
 		platform.Render(imgui.RenderedDrawData())
 		gl.Finish()
 	}
+	for i := 0; i < 3; i++ {
+		render()
+	}
+	if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
+		captureFrame(t, filepath.Join(dst, "choose-ship.png"), width, height)
+	}
+	if ws.Map() != nil {
+		t.Fatal("ship chooser exposes an editable map")
+	}
 	hashes := map[string][32]byte{}
 	remember := func() {
 		for _, source := range ws.assembly.Sources {
@@ -109,6 +119,7 @@ func TestRenderShipWorkspace(t *testing.T) {
 		ws.theme = 0
 		ws.defaults()
 		ws.rebuild()
+		ws.setStage(stepBuild)
 		ws.pane.FitView()
 		if ws.message != "" {
 			t.Fatal(ws.message)

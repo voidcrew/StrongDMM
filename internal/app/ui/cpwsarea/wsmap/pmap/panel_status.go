@@ -26,7 +26,11 @@ func (p *PaneMap) showStatusPanel() {
 
 func (p *PaneMap) panelStatusLayoutStatus() (layout w.Layout) {
 	if p.canvasState.HoverOutOfBounds() {
-		layout = append(layout, w.TextFrame("out of bounds"))
+		label := "out of bounds"
+		if p.InContext() {
+			label = "Move pointer onto the map"
+		}
+		layout = append(layout, w.TextFrame(label))
 	} else {
 		t := p.canvasState.HoveredTile()
 		layout = append(layout, w.TextFrame(fmt.Sprintf("X:%03d Y:%03d", t.X, t.Y)))
