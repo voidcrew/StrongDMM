@@ -77,7 +77,7 @@ func (w *WsArea) OpenShip() *wsship.WsShip {
 	}
 	content := wsship.New(w.app, func(file string) bool {
 		for _, ws := range w.workspaces {
-			if m, ok := ws.Content().(*wsmap.WsMap); ok && m.Map().Dmm().Path.Absolute == file {
+			if m, ok := ws.Content().(*wsmap.WsMap); ok && util.SamePath(m.Map().Dmm().Path.Absolute, file) {
 				return true
 			}
 		}

@@ -77,6 +77,7 @@ type app interface {
 	HasVoidcrewProject() bool
 
 	HasActiveMap() bool
+	HasSaveableWorkspace() bool
 
 	PathsFilter() *dm.PathsFilter
 	CommandStorage() *command.Storage
@@ -153,11 +154,11 @@ func (m *Menu) Process() {
 			w.Separator(),
 			w.MenuItem("Save", m.app.DoSave).
 				Icon(icon.Save).
-				Enabled(m.app.HasActiveMap()).
+				Enabled(m.app.HasSaveableWorkspace()).
 				Shortcut(platform.KeyModName(), "S"),
 			w.MenuItem("Save All", m.app.DoSaveAll).
 				Icon(icon.Save).
-				Enabled(m.app.HasActiveMap()).
+				Enabled(m.app.HasSaveableWorkspace()).
 				Shortcut(platform.KeyModName(), "Shift", "S"),
 			w.Separator(),
 			w.MenuItem("Preferences", m.app.DoOpenPreferences).

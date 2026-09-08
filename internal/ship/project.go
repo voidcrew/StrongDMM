@@ -41,22 +41,23 @@ type Settings struct {
 }
 
 type Project struct {
-	BeforeOpen     func(string) error
-	Catalog        *Catalog
-	Dme            *dmenv.Dme
-	Hull           Hull
-	Settings       *Settings // nil for hand-authored registrations
-	Documents      map[string]*Document
-	files          map[string]FileChange
-	savedSettings  []byte
-	RoomAreas      []RoomArea
-	savedAreas     []byte
-	draftAreaPaths map[string]bool
-	rooms          *roomEditing
-	savedRooms     []byte
-	Crew           *CrewConfig
-	savedCrew      []byte
-	crewOriginal   map[string][]CrewJob
+	BeforeOpen      func(string) error
+	Catalog         *Catalog
+	Dme             *dmenv.Dme
+	Hull            Hull
+	Settings        *Settings // nil for hand-authored registrations
+	Documents       map[string]*Document
+	files           map[string]FileChange
+	savedSettings   []byte
+	RoomAreas       []RoomArea
+	savedAreas      []byte
+	draftAreaPaths  map[string]bool
+	rooms           *roomEditing
+	savedRooms      []byte
+	Crew            *CrewConfig
+	savedCrew       []byte
+	crewOriginal    map[string][]CrewJob
+	generatedBefore map[string][]byte
 }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
@@ -130,6 +131,15 @@ func OpenProject(c *Catalog, dme *dmenv.Dme, h Hull) (*Project, error) {
 	if err = p.openCrew(); err != nil {
 		return nil, err
 	}
+	if p.Settings != nil {
+		hull, modules, e := p.registration()
+		if e != nil {
+			return nil, e
+		}
+		paths := p.outputPaths()
+		p.expectGenerated(paths[1], hull)
+		p.expectGenerated(paths[2], modules)
+	}
 	return p, nil
 }
 
@@ -196,6 +206,11 @@ func (p *Project) moduleFile(m Module, theme string) (string, error) {
 		return base, nil
 	}
 	return p.Catalog.ModuleFile(m, theme)
+}
+
+// ModuleSource includes unsaved room options and variants in the current project.
+func (p *Project) ModuleSource(m Module, theme string) (string, error) {
+	return p.moduleFile(m, theme)
 }
 
 func (p *Project) Assemble(theme Theme, selected map[string]string) (*Assembly, error) {
@@ -387,9 +402,6 @@ func (p *Project) settingsBytes() []byte {
 	if p.Settings == nil {
 		return nil
 	}
-	if p.Settings == nil {
-		return nil
-	}
 	p.Settings.Hull = p.Hull
 	b, _ := json.MarshalIndent(p.Settings, "", "  ")
 	return append(b, '\n')
@@ -456,6 +468,11 @@ func (p *Project) Changes() ([]FileChange, error) {
 	}
 	if p.Settings != nil && (!bytes.Equal(p.settingsBytes(), p.savedSettings) || !bytes.Equal(p.crewBytes(), p.savedCrew)) {
 		paths := p.outputPaths()
+		for _, path := range paths[1:3] {
+			if err := p.checkGenerated(path); err != nil {
+				return nil, err
+			}
+		}
 		hull, modules, err := p.registration()
 		if err != nil {
 			return nil, err
@@ -517,6 +534,9 @@ func (p *Project) accept(changes []FileChange) error {
 			}
 			d.fingerprint = fingerprint(d.Map)
 		} else if _, tracked := p.files[c.Path]; tracked {
+			if _, generated := p.generatedBefore[c.Path]; generated {
+				p.expectGenerated(c.Path, c.After)
+			}
 			c.Before = c.After
 			c.Existed = true
 			c.After = nil

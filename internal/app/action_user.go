@@ -143,8 +143,10 @@ func (a *app) DoCloseAll() {
 // DoSave saves current active map.
 func (a *app) DoSave() {
 	log.Print("do save")
-	if ws, ok := a.activeWsMap(); ok {
-		ws.Save()
+	if ws := a.layout.WsArea.ActiveWorkspace(); ws != nil {
+		if content, ok := ws.Content().(editableWorkspace); ok {
+			content.Save()
+		}
 	}
 }
 

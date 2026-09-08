@@ -72,7 +72,7 @@ func New(app App, busy ...func(string) bool) *WsShip {
 }
 func (ws *WsShip) Name() string {
 	prefix := ""
-	dirty := ws.app.CommandStorage().IsModified(ws.CommandStackId())
+	dirty := ws.app.CommandStorage().IsModified(ws.CommandStackId()) || (ws.task == taskCrew && ws.crew.dirty)
 	for _, project := range ws.projects {
 		for _, d := range project.Documents {
 			if d.Active && !d.Existed {
@@ -142,14 +142,23 @@ func (ws *WsShip) Dispose() {
 	ws.app.CommandStorage().DisposeStack(ws.CommandStackId())
 }
 func (ws *WsShip) currentTheme() ship.Theme {
+	if ws.catalog == nil || ws.hull < 0 || ws.hull >= len(ws.catalog.Hulls) {
+		return ship.Theme{}
+	}
 	h := ws.catalog.Hulls[ws.hull]
 	if len(h.Themes) == 0 {
 		return ship.Theme{}
+	}
+	if ws.theme < 0 || ws.theme >= len(h.Themes) {
+		ws.theme = 0
 	}
 	return h.Themes[ws.theme]
 }
 func (ws *WsShip) defaults() {
 	ws.selected = map[string]string{}
+	if ws.catalog == nil || ws.hull < 0 || ws.hull >= len(ws.catalog.Hulls) {
+		return
+	}
 	h := ws.catalog.Hulls[ws.hull]
 	t := ws.currentTheme()
 	for _, slot := range h.SlotsFor(t) {
@@ -167,12 +176,29 @@ func (ws *WsShip) rebuild() {
 	if ws.catalog == nil {
 		return
 	}
+	// Any failed transition must detach the previous ship's editing context.
+	ws.invalid = true
+	defer func() {
+		if ws.invalid {
+			ws.assembly = nil
+			tools.SetEnabled(false)
+			if ws.pane != nil {
+				ws.pane.OnDeactivate()
+			}
+		}
+	}()
+	if ws.hull < 0 || ws.hull >= len(ws.catalog.Hulls) {
+		ws.project = nil
+		ws.message = "Choose a ship to edit."
+		return
+	}
 	h := ws.catalog.Hulls[ws.hull]
 	p := ws.projects[h.Type]
 	if p == nil {
 		var err error
 		p, err = ship.OpenProject(ws.catalog, ws.app.LoadedEnvironment(), h)
 		if err != nil {
+			ws.project = nil
 			ws.message = err.Error()
 			return
 		}
@@ -275,6 +301,9 @@ func copySelection(s map[string]string) map[string]string {
 }
 func (ws *WsShip) activate(p *pmap.PaneMap) {
 	if ws.pane == p {
+		if !p.Focused() && ws.focused && !ws.invalid && ws.stage == stepBuild && !ws.wizard && ws.task != taskCrew {
+			p.OnActivate()
+		}
 		return
 	}
 	if ws.pane != nil {
@@ -282,7 +311,7 @@ func (ws *WsShip) activate(p *pmap.PaneMap) {
 		ws.pane.OnDeactivate()
 	}
 	ws.pane = p
-	if ws.focused && ws.stage == stepBuild && !ws.wizard {
+	if ws.focused && ws.stage == stepBuild && !ws.wizard && ws.task != taskCrew {
 		p.OnActivate()
 	}
 	ws.app.OnWorkspaceSwitched()
@@ -304,33 +333,59 @@ func (ws *WsShip) visible(path string) bool {
 }
 func (ws *WsShip) Owns(file string) bool {
 	for _, p := range ws.projects {
-		if d := p.Documents[file]; d != nil && d.Active {
-			return true
+		for path, d := range p.Documents {
+			if d.Active && util.SamePath(path, file) {
+				return true
+			}
 		}
 	}
 	return false
 }
 func (ws *WsShip) FocusSource(file string) {
+	if !ws.commitCrew() {
+		return
+	}
+	ws.flush()
+	ws.OnFocusChange(false)
 	ws.stage = stepBuild
 	ws.wizard = false
+	ws.task = taskPaint
 	for h, hull := range ws.catalog.Hulls {
 		p := ws.projects[hull.Type]
 		if p == nil {
 			continue
 		}
-		if d := p.Documents[file]; d == nil || !d.Active {
+		owned := false
+		for path, d := range p.Documents {
+			if d.Active && util.SamePath(path, file) {
+				file, owned = path, true
+				break
+			}
+		}
+		if !owned {
 			continue
 		}
 		ws.hull = h
 		for ti := 0; ti < max(1, len(hull.Themes)); ti++ {
 			ws.theme = ti
 			ws.defaults()
+			theme := ws.currentTheme()
+			for _, m := range p.Hull.Modules {
+				if !m.Available(theme.ID) || !ship.Contains(p.Hull.SlotsFor(theme), m.Slot) {
+					continue
+				}
+				path, err := p.ModuleSource(m, theme.ID)
+				if err == nil && util.SamePath(path, file) {
+					ws.selected[m.Slot] = m.ID
+				}
+			}
 			ws.rebuild()
 			if ws.assembly != nil {
 				for i, s := range ws.assembly.Sources {
 					if s.File == file {
 						ws.source = i
 						ws.rebuild()
+						ws.OnFocusChange(true)
 						return
 					}
 				}

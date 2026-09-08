@@ -80,6 +80,7 @@ func (p *Project) openAreas() error {
 		p.draftAreaPaths[area.Path] = true
 	}
 	p.RoomAreas = settings.Areas
+	p.expectGenerated(code, renderRoomAreas(p.RoomAreas))
 	p.savedAreas = p.areaBytes()
 	for _, file := range []string{meta, code, p.Dme.RootFile} {
 		if _, ok := p.files[file]; !ok {
@@ -277,6 +278,14 @@ func addInclude(content []byte, root, file string) []byte {
 	return append(append([]byte{}, content...), []byte(newline+line+newline)...)
 }
 
+func renderRoomAreas(areas []RoomArea) []byte {
+	var definitions strings.Builder
+	for _, area := range areas {
+		fmt.Fprintf(&definitions, "%s\n\tname = %s\n\ticon_state = %s\n\n", area.Path, dmQuote(area.Name), dmQuote(area.IconState))
+	}
+	return []byte(definitions.String())
+}
+
 func (p *Project) areaChanges(changes []FileChange) ([]FileChange, error) {
 	if bytes.Equal(p.areaBytes(), p.savedAreas) {
 		return changes, nil
@@ -285,18 +294,19 @@ func (p *Project) areaChanges(changes []FileChange) ([]FileChange, error) {
 	if err != nil {
 		return nil, err
 	}
-	var definitions strings.Builder
+	if err = p.checkGenerated(code); err != nil {
+		return nil, err
+	}
 	for _, area := range p.RoomAreas {
 		if err = validateRoomArea(area); err != nil {
 			return nil, err
 		}
-		fmt.Fprintf(&definitions, "%s\n\tname = %s\n\ticon_state = %s\n\n", area.Path, dmQuote(area.Name), dmQuote(area.IconState))
 	}
 	metadata := p.areaBytes()
 	if metadata == nil {
 		metadata, _ = json.MarshalIndent(areaSettings{1, p.Hull.Type, []RoomArea{}}, "", "  ")
 	}
-	for path, content := range map[string][]byte{meta: metadata, code: []byte(definitions.String())} {
+	for path, content := range map[string][]byte{meta: metadata, code: renderRoomAreas(p.RoomAreas)} {
 		c := p.files[path]
 		c.After = content
 		changes = append(changes, c)

@@ -126,7 +126,7 @@ func (p *Project) openCrew() error {
 	if e != nil {
 		return e
 	}
-	if !bytes.Equal(actual, p.crewOutfits()) {
+	if !sameDMSource(actual, p.crewOutfits()) {
 		return fmt.Errorf("crew outfits were edited outside the workshop: %s; reload the matching crew project before editing", code)
 	}
 	if p.Settings == nil {
@@ -292,6 +292,30 @@ func (p *Project) SetCrewJobs(scope string, jobs []CrewJob) error {
 	if e := p.ValidateCrew(jobs); e != nil {
 		return e
 	}
+	ids := map[string]bool{}
+	if p.Crew != nil {
+		for key, roster := range p.Crew.Rosters {
+			if key != scope {
+				for _, j := range roster {
+					if j.ID != "" {
+						ids[j.ID] = true
+					}
+				}
+			}
+		}
+	}
+	for _, j := range jobs {
+		if j.ID == "" {
+			continue
+		}
+		if e := ValidID(j.ID); e != nil {
+			return e
+		}
+		if ids[j.ID] {
+			return fmt.Errorf("duplicate crew identifier %s; copy jobs with new identifiers", j.ID)
+		}
+		ids[j.ID] = true
+	}
 	s, e := p.crewScope(scope)
 	if e != nil {
 		return e
@@ -350,6 +374,9 @@ func (p *Project) SetCrewJobs(scope string, jobs []CrewJob) error {
 	}
 	jobs = CloneCrewJobs(jobs)
 	used := map[string]bool{}
+	for id := range ids {
+		used[id] = true
+	}
 	if p.Crew != nil {
 		for _, roster := range p.Crew.Rosters {
 			for _, j := range roster {
@@ -359,11 +386,6 @@ func (p *Project) SetCrewJobs(scope string, jobs []CrewJob) error {
 	}
 	for i := range jobs {
 		j := &jobs[i]
-		if j.ID != "" {
-			if e := ValidID(j.ID); e != nil {
-				return e
-			}
-		}
 		if j.ID == "" {
 			for n := 1; ; n++ {
 				id := "job_" + strconv.Itoa(n)
@@ -596,7 +618,7 @@ func dmListParts(raw string) ([]string, error) {
 	return out, nil
 }
 func dmCrewText(s string) string {
-	if v, e := strconv.Unquote(strings.TrimSpace(s)); e == nil {
+	if v, e := dmUnquote(strings.TrimSpace(s)); e == nil {
 		return v
 	}
 	return strings.TrimSpace(s)

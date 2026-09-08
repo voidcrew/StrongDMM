@@ -30,7 +30,7 @@ func (m *Menu) addShortcuts() {
 		FirstKeyAlt: platform.KeyModRight(),
 		SecondKey:   glfw.KeyS,
 		Action:      m.app.DoSave,
-		IsEnabled:   m.app.HasActiveMap,
+		IsEnabled:   m.app.HasSaveableWorkspace,
 	})
 	m.shortcuts.Add(shortcut.Shortcut{
 		Name:         "menu#DoSaveAll",
@@ -40,7 +40,7 @@ func (m *Menu) addShortcuts() {
 		SecondKeyAlt: glfw.KeyRightShift,
 		ThirdKey:     glfw.KeyS,
 		Action:       m.app.DoSaveAll,
-		IsEnabled:    m.app.HasActiveMap,
+		IsEnabled:    m.app.HasSaveableWorkspace,
 	})
 
 	m.shortcuts.Add(shortcut.Shortcut{

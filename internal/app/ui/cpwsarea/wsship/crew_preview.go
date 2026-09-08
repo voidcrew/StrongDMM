@@ -39,14 +39,29 @@ var wornSlots = []wornSlot{
 }
 
 func crewColor(s string) uint32 {
-	if len(s) != 7 || s[0] != '#' {
+	if (len(s) != 7 && len(s) != 9) || s[0] != '#' {
 		return 0xffffffff
 	}
 	v, e := strconv.ParseUint(s[1:], 16, 32)
 	if e != nil {
 		return 0xffffffff
 	}
-	return 0xff000000 | uint32(v&255)<<16 | uint32(v&0xff00) | uint32(v>>16)
+	alpha := uint32(255)
+	if len(s) == 9 {
+		alpha = uint32(v & 255)
+		v >>= 8
+	}
+	return alpha<<24 | uint32(v&255)<<16 | uint32(v&0xff00) | uint32(v>>16)
+}
+
+func (v *crewVisual) tintSince(start int, tint uint32) {
+	for i := start; i < len(v.layers); i++ {
+		color := uint32(0)
+		for shift := uint(0); shift < 32; shift += 8 {
+			color |= (((v.layers[i].color >> shift) & 255) * ((tint >> shift) & 255) / 255) << shift
+		}
+		v.layers[i].color = color
+	}
 }
 func (v *crewVisual) add(file, state string, dir, layer int, color uint32) bool {
 	dmi, e := dmicon.Cache.Get(file)
@@ -77,10 +92,6 @@ func (v *crewVisual) greyscale(dme *dmenv.Dme, config, colors, state string, dir
 	data, e := os.ReadFile(path)
 	if e != nil {
 		return false
-	}
-	type part struct {
-		Type, IconState, BlendMode string
-		ColorIDs                   []int
 	}
 	var raw map[string][]struct {
 		Type   string `json:"type"`
@@ -165,13 +176,18 @@ func buildCrewVisual(p *ship.Project, j ship.CrewJob, dir int) crewVisual {
 		if state == "" {
 			state = o.Vars.TextV("icon_state", "")
 		}
+		first := len(v.layers)
+		tint := crewColor(o.Vars.TextV("color", ""))
+		alpha := uint32(max(0, min(255, o.Vars.IntV("alpha", 255))))
+		tint = tint&0xffffff | ((tint>>24)*alpha/255)<<24
 		if config != "" && config != "null" {
 			if v.greyscale(p.Dme, config, o.Vars.TextV("greyscale_colors", ""), state, dir, layer) {
+				v.tintSince(first, tint)
 				continue
 			}
 			v.warnings = append(v.warnings, slot.id+": custom color layers unavailable")
 		}
-		if !v.add(file, state, dir, layer, crewColor(o.Vars.TextV("color", ""))) {
+		if !v.add(file, state, dir, layer, tint) {
 			v.warnings = append(v.warnings, slot.id+": no static worn sprite")
 		}
 	}

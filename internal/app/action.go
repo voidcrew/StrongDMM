@@ -137,6 +137,16 @@ func (a *app) HasActiveMap() bool {
 	return ok
 }
 
+// Metadata editors can save without exposing a map to paint/cut/paste tools.
+func (a *app) HasSaveableWorkspace() bool {
+	ws := a.layout.WsArea.ActiveWorkspace()
+	if ws == nil {
+		return false
+	}
+	_, ok := ws.Content().(editableWorkspace)
+	return ok
+}
+
 // UpdateTitle updates title in the application system window.
 // The title depends on current open environment and workspace.
 func (a *app) UpdateTitle() {

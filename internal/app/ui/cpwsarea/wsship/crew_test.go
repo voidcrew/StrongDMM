@@ -64,6 +64,30 @@ func exerciseCrew(t *testing.T, ws *WsShip, render func(), legacy bool) {
 	if len(ws.crewVisual.layers) < 10 {
 		t.Fatalf("missing worn/body sprites: %d %+v", len(ws.crewVisual.layers), ws.crewVisual.warnings)
 	}
+	if !legacy {
+		path := "/obj/item/clothing/under/color/blue/audit_tint"
+		if e := ws.project.Dme.AddDraftType(path, map[string]string{"alpha": "128", "color": `"#ff8040"`}); e != nil {
+			t.Fatal(e)
+		}
+		job := ship.CloneCrewJobs([]ship.CrewJob{ws.crew.jobs[1]})[0]
+		job.Equipment["uniform"] = path
+		for _, dir := range []int{1, 2, 4, 8} {
+			plain := buildCrewVisual(ws.project, ws.crew.jobs[1], dir)
+			tinted := buildCrewVisual(ws.project, job, dir)
+			if len(plain.layers) != len(tinted.layers) {
+				t.Fatal("tint lost worn layers")
+			}
+			changed := false
+			for i, l := range tinted.layers {
+				if l.color != plain.layers[i].color && l.color>>24 == 128 {
+					changed = true
+				}
+			}
+			if !changed {
+				t.Fatalf("missing clothing tint/alpha in direction %d", dir)
+			}
+		}
+	}
 	if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
 		name := "crew-editor.png"
 		if legacy {

@@ -44,7 +44,7 @@ type Catalog struct {
 }
 
 func text(v *dmvars.Variables, name string) string {
-	s, _ := strconv.Unquote(v.ValueV(name, `""`))
+	s, _ := dmUnquote(v.ValueV(name, `""`))
 	return s
 }
 
@@ -56,7 +56,7 @@ func stringList(s string) ([]string, error) {
 		return nil, nil
 	}
 	if strings.HasPrefix(s, `"`) {
-		v, err := strconv.Unquote(s)
+		v, err := dmUnquote(s)
 		return []string{v}, err
 	}
 	if !strings.HasPrefix(s, "list(") || !strings.HasSuffix(s, ")") {
@@ -81,7 +81,7 @@ func stringList(s string) ([]string, error) {
 		if end >= len(s) {
 			return nil, fmt.Errorf("unterminated ID")
 		}
-		v, err := strconv.Unquote(s[:end+1])
+		v, err := dmUnquote(s[:end+1])
 		if err != nil {
 			return nil, err
 		}

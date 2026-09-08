@@ -114,7 +114,10 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 	if err != nil {
 		return err
 	}
-	file, _ := p.Catalog.HullFile(p.Hull, theme)
+	file, err := p.Catalog.HullFile(p.Hull, theme)
+	if err != nil {
+		return err
+	}
 	hull, err := p.document(file)
 	if err != nil {
 		return err
@@ -191,6 +194,17 @@ func (p *Project) AddModule(themeIndex int, base Module, id, name string, empty 
 	if err := p.moduleIDError(id); err != nil {
 		return err
 	}
+	var jobs []CrewJob
+	if !empty {
+		var err error
+		jobs, err = p.CrewJobs("module/" + base.ID)
+		if err != nil {
+			return err
+		}
+		for i := range jobs {
+			jobs[i].ID = ""
+		}
+	}
 	theme, err := p.roomTheme(themeIndex)
 	if err != nil {
 		return err
@@ -226,6 +240,9 @@ func (p *Project) AddModule(themeIndex int, base Module, id, name string, empty 
 		return err
 	}
 	p.Hull.Modules = append(p.Hull.Modules, m)
+	if len(jobs) > 0 {
+		return p.SetCrewJobs("module/"+id, jobs)
+	}
 	return nil
 }
 
@@ -244,14 +261,23 @@ func (p *Project) AddTheme(baseIndex int, id, name string) error {
 			return fmt.Errorf("theme ID already exists")
 		}
 	}
-	base := p.Hull.Themes[baseIndex]
+	base, err := p.roomTheme(baseIndex)
+	if err != nil {
+		return err
+	}
 	theme := Theme{ID: id, Name: name, Suffix: p.Settings.ID + "_" + id, Slots: append([]string{}, p.Hull.SlotsFor(base)...)}
-	file, _ := p.Catalog.HullFile(p.Hull, base)
+	file, err := p.Catalog.HullFile(p.Hull, base)
+	if err != nil {
+		return err
+	}
 	hull, err := p.document(file)
 	if err != nil {
 		return err
 	}
-	target, _ := p.Catalog.HullFile(p.Hull, theme)
+	target, err := p.Catalog.HullFile(p.Hull, theme)
+	if err != nil {
+		return err
+	}
 	type clone struct {
 		file string
 		data *dmmdata.DmmData
@@ -269,7 +295,10 @@ func (p *Project) AddTheme(baseIndex int, id, name string) error {
 		if err != nil {
 			return err
 		}
-		target, _ := Inside(p.Catalog.Root, filepath.Join(p.Catalog.ModuleDir, strings.TrimSuffix(m.File, ".dmm")+"_"+id+".dmm"))
+		target, err := Inside(p.Catalog.Root, filepath.Join(p.Catalog.ModuleDir, strings.TrimSuffix(m.File, ".dmm")+"_"+id+".dmm"))
+		if err != nil {
+			return err
+		}
 		clones = append(clones, clone{target, RawData(d.Map)})
 	}
 	added := []string{}
@@ -362,7 +391,10 @@ func (p *Project) Resize(theme Theme, w, h int) error {
 	if w < 5 || h < 5 || w > 128 || h > 128 {
 		return fmt.Errorf("canvas dimensions must be between 5 and 128")
 	}
-	file, _ := p.Catalog.HullFile(p.Hull, theme)
+	file, err := p.Catalog.HullFile(p.Hull, theme)
+	if err != nil {
+		return err
+	}
 	d, err := p.document(file)
 	if err != nil {
 		return err

@@ -97,6 +97,9 @@ func (ws *WsShip) itemIDUsed(id string) bool {
 }
 
 func (ws *WsShip) BeginNewShip() {
+	if !ws.commitCrew() {
+		return
+	}
 	if ws.catalog == nil {
 		return
 	}
