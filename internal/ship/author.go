@@ -84,16 +84,19 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 	if err := p.ModuleNameError(name); err != nil {
 		return err
 	}
-	if p.Settings == nil {
-		return fmt.Errorf("slot creation requires an authored ship project")
-	}
 	if err := ValidID(id); err != nil {
 		return err
 	}
-	if Contains(p.Hull.Slots, id) {
+	if p.slotIDUsed(id) {
 		return fmt.Errorf("slot ID already exists")
 	}
-	theme := p.Hull.Themes[themeIndex]
+	if err := p.moduleIDError(id + "_basic"); err != nil {
+		return err
+	}
+	theme, err := p.roomTheme(themeIndex)
+	if err != nil {
+		return err
+	}
 	file, _ := p.Catalog.HullFile(p.Hull, theme)
 	hull, err := p.document(file)
 	if err != nil {
@@ -111,8 +114,14 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 			}
 		}
 	}
-	module := Module{ID: id + "_basic", Name: name, Slot: id, File: p.Settings.ID + "/" + id + "_basic.dmm", Themes: []string{theme.ID}, Default: true}
-	target, _ := Inside(p.Catalog.Root, filepath.Join(p.Catalog.ModuleDir, strings.TrimSuffix(module.File, ".dmm")+"_"+theme.ID+".dmm"))
+	if err = p.prepareRooms(&theme); err != nil {
+		return err
+	}
+	module, target, err := p.newRoomModule(theme, id+"_basic", name, id)
+	if err != nil {
+		return err
+	}
+	module.Default = true
 	data := blankData(max.X-min.X+1, max.Y-min.Y+1)
 	if err = p.addMap(target, data); err != nil {
 		return err
@@ -134,12 +143,19 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 	}
 	dst.GetTile(util.Point{X: 1, Y: 1, Z: 1}).InstancesAdd(dmmap.PrefabStorage.Initial(Connector))
 	hull.Map.GetTile(min).InstancesAdd(p.prefab(SlotMarker, map[string]string{"key": strconv.Quote(id)}))
-	// Keep other themes' slot sets explicit before expanding the shared list.
-	for i, t := range p.Hull.Themes {
-		p.Hull.Themes[i].Slots = append([]string{}, p.Hull.SlotsFor(t)...)
+	if p.Settings == nil && theme.ID != "" {
+		// Existing ships can inherit their slot list. Override only the chosen
+		// theme, leaving the base and every other variant's registration intact.
+		p.Hull.Themes[themeIndex].Slots = append(append([]string{}, p.Hull.SlotsFor(theme)...), id)
+	} else {
+		for i, t := range p.Hull.Themes {
+			p.Hull.Themes[i].Slots = append([]string{}, p.Hull.SlotsFor(t)...)
+		}
+		p.Hull.Slots = append(p.Hull.Slots, id)
+		if theme.ID != "" {
+			p.Hull.Themes[themeIndex].Slots = append(p.Hull.Themes[themeIndex].Slots, id)
+		}
 	}
-	p.Hull.Slots = append(p.Hull.Slots, id)
-	p.Hull.Themes[themeIndex].Slots = append(p.Hull.Themes[themeIndex].Slots, id)
 	p.Hull.Modules = append(p.Hull.Modules, module)
 	p.reserveAnchors(hull.Map)
 	p.reserveAnchors(dst)
@@ -152,18 +168,16 @@ func (p *Project) AddModule(themeIndex int, base Module, id, name string, empty 
 	if err := p.ModuleNameError(name); err != nil {
 		return err
 	}
-	if p.Settings == nil {
-		return fmt.Errorf("module creation requires an authored ship project")
-	}
 	if err := ValidID(id); err != nil {
 		return err
 	}
-	for _, m := range p.Hull.Modules {
-		if m.ID == id {
-			return fmt.Errorf("module ID already exists")
-		}
+	if err := p.moduleIDError(id); err != nil {
+		return err
 	}
-	theme := p.Hull.Themes[themeIndex]
+	theme, err := p.roomTheme(themeIndex)
+	if err != nil {
+		return err
+	}
 	file, err := p.moduleFile(base, theme.ID)
 	if err != nil {
 		return err
@@ -172,8 +186,13 @@ func (p *Project) AddModule(themeIndex int, base Module, id, name string, empty 
 	if err != nil {
 		return err
 	}
-	m := Module{ID: id, Name: name, Slot: base.Slot, File: p.Settings.ID + "/" + id + ".dmm", Themes: []string{theme.ID}}
-	target, _ := Inside(p.Catalog.Root, filepath.Join(p.Catalog.ModuleDir, strings.TrimSuffix(m.File, ".dmm")+"_"+theme.ID+".dmm"))
+	if err = p.prepareRooms(nil); err != nil {
+		return err
+	}
+	m, target, err := p.newRoomModule(theme, id, name, base.Slot)
+	if err != nil {
+		return err
+	}
 	data := RawData(d.Map)
 	if empty {
 		for k, prefabs := range data.Dictionary {

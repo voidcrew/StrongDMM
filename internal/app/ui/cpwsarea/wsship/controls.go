@@ -296,10 +296,8 @@ func (ws *WsShip) buildControls() {
 		ws.beginTask(taskDocking)
 	}
 	tooltip("Select an entrance with Grab (3), then place or move this ship's mobile docking port there.")
-	if ws.project.Settings != nil {
-		if actionButton("Make an upgrade room...", false) {
-			ws.beginTask(taskRoom)
-		}
+	if actionButton("Make an upgrade room...", false) {
+		ws.beginTask(taskRoom)
 	}
 	space()
 	if imgui.CollapsingHeader("Room options & ship variants") {
@@ -409,10 +407,7 @@ func (ws *WsShip) loadoutControls() {
 			imgui.EndCombo()
 		}
 	}
-	if ws.project.Settings == nil {
-		return
-	}
-	if actionButton("Copy ship as a new variant...", false) {
+	if ws.project.Settings != nil && actionButton("Copy ship as a new variant...", false) {
 		ws.beginTask(taskTheme)
 	}
 	if ws.source > 0 {

@@ -325,4 +325,5 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 		t.Fatal("review screen exposes map tools")
 	}
 	capture("review-save")
+	exerciseLoadedShipRooms(t, ws, render)
 }

@@ -52,6 +52,8 @@ type Project struct {
 	RoomAreas      []RoomArea
 	savedAreas     []byte
 	draftAreaPaths map[string]bool
+	rooms          *roomEditing
+	savedRooms     []byte
 }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
@@ -121,6 +123,7 @@ func OpenProject(c *Catalog, dme *dmenv.Dme, h Hull) (*Project, error) {
 	if err = p.openAreas(); err != nil {
 		return nil, err
 	}
+	p.savedRooms = p.roomBytes()
 	return p, nil
 }
 
@@ -178,6 +181,13 @@ func (p *Project) moduleFile(m Module, theme string) (string, error) {
 	}
 	if theme != "" && p.Documents[themed] != nil && p.Documents[themed].Active {
 		return themed, nil
+	}
+	base, err := Inside(p.Catalog.Root, filepath.Join(p.Catalog.ModuleDir, m.File))
+	if err != nil {
+		return "", err
+	}
+	if theme == "" && p.Documents[base] != nil && p.Documents[base].Active {
+		return base, nil
 	}
 	return p.Catalog.ModuleFile(m, theme)
 }
@@ -379,6 +389,9 @@ func (p *Project) settingsBytes() []byte {
 	return append(b, '\n')
 }
 func (p *Project) Modified() bool {
+	if !bytes.Equal(p.roomBytes(), p.savedRooms) {
+		return true
+	}
 	if !bytes.Equal(p.areaBytes(), p.savedAreas) {
 		return true
 	}
@@ -464,6 +477,10 @@ func (p *Project) Changes() ([]FileChange, error) {
 		}
 	}
 	var err error
+	changes, err = p.roomChanges(changes)
+	if err != nil {
+		return nil, err
+	}
 	changes, err = p.areaChanges(changes)
 	if err != nil {
 		return nil, err
@@ -495,6 +512,7 @@ func (p *Project) accept(changes []FileChange) error {
 	}
 	p.savedSettings = p.settingsBytes()
 	p.savedAreas = p.areaBytes()
+	p.savedRooms = p.roomBytes()
 	return nil
 }
 

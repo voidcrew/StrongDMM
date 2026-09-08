@@ -78,7 +78,7 @@ func (ws *WsShip) shipIDUsed(id string) bool {
 func (ws *WsShip) itemIDUsed(id string) bool {
 	h := ws.project.Hull
 	for _, t := range h.Themes {
-		if t.ID == id {
+		if t.ID == id || ship.Contains(t.Slots, id) {
 			return true
 		}
 	}
