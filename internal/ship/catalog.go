@@ -21,12 +21,14 @@ const Connector = "/obj/modular_map_connector"
 
 type Theme struct {
 	ID, Name, Suffix string
+	Description      *string  `json:",omitempty"` // nil keeps the inherited description.
 	Slots            []string // nil inherits the hull's slots; an empty list disables them.
 	Default          bool
 }
 
 type Module struct {
 	ID, Name, Slot, File string
+	Description          *string `json:",omitempty"`
 	Themes               []string
 	Default              bool
 }
@@ -46,6 +48,14 @@ type Catalog struct {
 func text(v *dmvars.Variables, name string) string {
 	s, _ := dmUnquote(v.ValueV(name, `""`))
 	return s
+}
+
+func description(v *dmvars.Variables) *string {
+	s, err := dmUnquote(v.ValueV("desc", "null"))
+	if err != nil {
+		return nil
+	}
+	return &s
 }
 
 // stringList deliberately rejects expressions and associative lists: these fields
@@ -234,7 +244,7 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 			if err != nil {
 				return nil, fmt.Errorf("%s for_theme: %w", path, err)
 			}
-			m := Module{ID: id, Name: text(v, "name"), Slot: text(v, "slot"), File: text(v, "map_file"), Themes: allowed, Default: v.IntV("is_default", 0) != 0}
+			m := Module{ID: id, Name: text(v, "name"), Description: description(v), Slot: text(v, "slot"), File: text(v, "map_file"), Themes: allowed, Default: v.IntV("is_default", 0) != 0}
 			for _, prior := range modules[forShip] {
 				if prior.ID == id {
 					return nil, fmt.Errorf("duplicate module ID %s", id)
@@ -251,7 +261,7 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 					return nil, fmt.Errorf("duplicate theme ID %s", id)
 				}
 			}
-			themes[forShip] = append(themes[forShip], Theme{ID: id, Name: text(v, "name"), Suffix: text(v, "template_suffix"), Slots: slots, Default: v.IntV("is_default", 0) != 0})
+			themes[forShip] = append(themes[forShip], Theme{ID: id, Name: text(v, "name"), Description: description(v), Suffix: text(v, "template_suffix"), Slots: slots, Default: v.IntV("is_default", 0) != 0})
 		}
 	}
 	for _, path := range paths {

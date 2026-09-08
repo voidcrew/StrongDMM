@@ -26,7 +26,9 @@ type costEditor struct {
 	filter, group, error string
 }
 
-func (ws *WsShip) commitDraft() bool { return ws.commitCrew() && ws.commitCosts() }
+func (ws *WsShip) commitDraft() bool {
+	return ws.commitCrew() && ws.commitCosts() && ws.commitRename()
+}
 
 func (ws *WsShip) beginCosts(scope string) {
 	if !ws.commitDraft() {

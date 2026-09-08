@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.6
+Version: 0.5.7
 
 START
 1. Extract the whole ZIP into a writable folder.
@@ -57,12 +57,13 @@ workshop; its checkbox and the normal View shortcut control the same setting.
 
 PURCHASE PREVIEWS
 Saving ships automatically runs the project's tools/ship_previews generator.
-This also applies to hull and module maps saved in normal map tabs. The full
-fleet renders in the background; further saves queue another refresh. You can
+This also applies to hull and module maps saved in normal map tabs. Changed or
+missing images render in the background; unchanged images are reused. You can
 keep editing or close the editor while it finishes. Failed generation preserves
 the previous images and does not undo your ship save.
 Status and Retry previews appear in Ship Workshop. Help > Ship Purchase Previews
-also shows status, logs and a manual regeneration action.
+also shows status, logs and Rebuild all previews. Use a full rebuild after
+changing icons or rendering code. Further saves queue another refresh.
 Preview tools are included in StrongDMM.exe. No Python, Pillow, or dmm-tools
 installation is needed. The first preview extracts the tools into the editor's
 local profile; later previews reuse them. Your system Python setup is not used.

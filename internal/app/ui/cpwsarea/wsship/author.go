@@ -220,6 +220,7 @@ func (ws *WsShip) createShip() {
 func (ws *WsShip) beginTask(task buildTask) {
 	ws.flush()
 	ws.task, ws.itemName, ws.itemID, ws.message = task, "", "", ""
+	ws.itemDescription = ""
 	ws.customID, ws.emptyModule = false, false
 	if task == taskTheme || task == taskModule {
 		ws.itemCosts = ship.PartCosts{}
@@ -489,6 +490,7 @@ func (ws *WsShip) copyControls() {
 		hint("Otherwise, the current room's contents are copied.")
 		label = "Create room option"
 	}
+	descriptionField(&ws.itemDescription)
 	ws.itemIdentifier()
 	nameErr := ws.project.ModuleNameError(ws.itemName)
 	if ws.task == taskTheme {
@@ -516,6 +518,9 @@ func (ws *WsShip) copyControls() {
 				if err := ws.project.AddTheme(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName)); err != nil {
 					return err
 				}
+				if err := ws.project.SetDescription("theme/"+ws.itemID, ws.itemDescription); err != nil {
+					return err
+				}
 				return ws.project.SetPartCosts("theme/"+ws.itemID, ws.itemCosts)
 			})
 			if ws.message == "" {
@@ -529,6 +534,9 @@ func (ws *WsShip) copyControls() {
 				if m.ID == ws.selected[slot] {
 					ws.change("Create room option", func() error {
 						if err := ws.project.AddModule(ws.theme, m, ws.itemID, strings.TrimSpace(ws.itemName), ws.emptyModule); err != nil {
+							return err
+						}
+						if err := ws.project.SetDescription("module/"+ws.itemID, ws.itemDescription); err != nil {
 							return err
 						}
 						return ws.project.SetPartCosts("module/"+ws.itemID, ws.itemCosts)

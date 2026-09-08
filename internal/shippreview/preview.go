@@ -87,20 +87,29 @@ func python() (string, []string, error) {
 // This also covers Save when closing the editor: no pending launch goroutine
 // can be lost during shutdown. The helper owns one queue per project.
 func (c *Client) Request(root, environment string) {
+	c.request(root, environment, false)
+}
+
+// RequestFull also refreshes unchanged maps after icon or rendering-code edits.
+func (c *Client) RequestFull(root, environment string) {
+	c.request(root, environment, true)
+}
+
+func (c *Client) request(root, environment string, force bool) {
 	folder := c.folder(root)
 	c.mu.Lock()
 	c.status[folder] = Status{Phase: "starting", Message: "Starting preview generation...", Log: filepath.Join(folder, "generation.log")}
 	c.checked[folder] = time.Now()
 	c.requested[folder] = time.Now()
 	c.mu.Unlock()
-	if err := c.launch(folder, root, environment); err != nil {
+	if err := c.launch(folder, root, environment, force); err != nil {
 		c.mu.Lock()
 		c.status[folder] = Status{Phase: "error", Message: "Ship saved. Previews could not start: " + err.Error(), Log: filepath.Join(folder, "generation.log")}
 		c.mu.Unlock()
 	}
 }
 
-func (c *Client) launch(folder, root, environment string) error {
+func (c *Client) launch(folder, root, environment string, force bool) error {
 	if !Available(root) {
 		return fmt.Errorf("%s is missing from this project", Script)
 	}
@@ -139,6 +148,9 @@ func (c *Client) launch(folder, root, environment string) error {
 	}
 	defer log.Close()
 	args = append(args, "-B", "-u", helper, folder, root, environment)
+	if force {
+		args = append(args, "--force")
+	}
 	cmd := exec.Command(executable, args...)
 	cmd.Env = environmentVars
 	cmd.Dir, cmd.Stdout, cmd.Stderr = root, log, log
@@ -187,6 +199,9 @@ func (c *Client) Status(root string) Status {
 		}
 	case "complete":
 		status.Message = "Purchase previews are up to date."
+		if line := lastLine(status.Log); strings.HasPrefix(line, "Preview images: ") {
+			status.Message += "\n" + line
+		}
 	case "failed":
 		status.Message = "Ship saved. Preview generation failed. Check the log, then retry."
 	case "starting":

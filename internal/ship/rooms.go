@@ -12,11 +12,12 @@ import (
 // Handwritten ships keep their existing registrations. Source snapshots remain
 // fixed for the session so undo after Save can restore the original definitions.
 type roomEditing struct {
-	base    Hull
-	sources map[string]FileChange
-	targets map[string]string     // theme ID -> DM type; empty ID edits the base hull
-	names   map[string]nameTarget // component scope -> original name definition
-	code    string
+	base         Hull
+	sources      map[string]FileChange
+	targets      map[string]string     // theme ID -> DM type; empty ID edits the base hull
+	names        map[string]nameTarget // component scope -> original name definition
+	descriptions map[string]nameTarget
+	code         string
 }
 
 func (p *Project) roomBytes() []byte {
@@ -227,6 +228,18 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 			return nil, err
 		}
 	}
+	for scope, target := range p.rooms.descriptions {
+		value, ok := componentDescription(p.Hull, scope)
+		before, _ := componentDescription(p.rooms.base, scope)
+		if !ok || reflect.DeepEqual(value, before) {
+			continue
+		}
+		var err error
+		contents[target.file], err = rewriteTextField(contents[target.file], target.typePath, "desc", descriptionText(before), descriptionText(value))
+		if err != nil {
+			return nil, err
+		}
+	}
 	baseIDs := map[string]bool{}
 	for _, module := range p.rooms.base.Modules {
 		baseIDs[module.ID] = true
@@ -245,6 +258,9 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 			themes = dmList(module.Themes)
 		}
 		fmt.Fprintf(&definitions, "\n%s\n\tid = %s\n\tname = %s\n\tslot = %s\n\tfor_ship = %s\n\tfor_theme = %s\n\tmap_file = %s\n\tis_default = %s\n", roomModuleType(id, module.ID), dmQuote(module.ID), dmQuote(module.Name), dmQuote(module.Slot), p.Hull.Type, themes, dmQuote(module.File), def)
+		if module.Description != nil {
+			fmt.Fprintf(&definitions, "\tdesc = %s\n", dmQuote(*module.Description))
+		}
 	}
 	contents[p.rooms.code] = append(contents[p.rooms.code], definitions.String()...)
 	for path, content := range contents {

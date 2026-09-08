@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 
 	"sdmm/internal/dmapi/dmenv"
@@ -34,6 +35,7 @@ func exerciseRenaming(t *testing.T, ws *WsShip, render func()) {
 			t.Fatal("rename form accepted an empty name")
 		}
 		ws.itemName = target.name
+		ws.itemDescription = "A medical \"bay\" with supplies.\nReady for longer trips."
 		ws.message = ""
 		for i := 0; i < 3; i++ {
 			render()
@@ -58,6 +60,9 @@ func exerciseRenaming(t *testing.T, ws *WsShip, render func()) {
 		if obj := fresh.Objects[target.typePath]; obj == nil || obj.Vars.ValueV("name", "") != strconv.Quote(target.name) {
 			t.Fatal("renamed component was not present in the reloaded environment")
 		}
+		if got := fresh.Objects[target.typePath].Vars.ValueV("desc", ""); got != strconv.Quote(ws.itemDescription) {
+			t.Fatalf("description did not survive Save and environment reload: %s", got)
+		}
 		ws.app.CommandStorage().Undo()
 		if !ws.Save() {
 			t.Fatal(ws.message)
@@ -71,5 +76,61 @@ func exerciseRenaming(t *testing.T, ws *WsShip, render func()) {
 		if !ws.Save() {
 			t.Fatal(ws.message)
 		}
+	}
+	// Save also has to include text still in the form, without an Apply click.
+	theme = ws.currentTheme()
+	ws.beginRename(taskRenameTheme, theme.ID, theme.Name)
+	ws.itemName = "Variant saved directly from form"
+	ws.itemDescription = "Description saved directly from form"
+	if !ws.IsModified() || !strings.HasPrefix(ws.Name(), "* ") {
+		t.Fatal("variant name draft has no unsaved indicator")
+	}
+	if !ws.Save() {
+		t.Fatal(ws.message)
+	}
+	fresh, err := dmenv.New(ws.project.Dme.RootFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := "/datum/ship_theme/workshop_fixture_" + theme.ID
+	if obj := fresh.Objects[path]; obj == nil || obj.Vars.ValueV("name", "") != strconv.Quote("Variant saved directly from form") {
+		t.Fatal("Save discarded the variant name still being edited in its form")
+	}
+	if fresh.Objects[path].Vars.ValueV("desc", "") != strconv.Quote(ws.itemDescription) {
+		t.Fatal("Save discarded the description draft")
+	}
+	ws.app.CommandStorage().Undo()
+	if !ws.Save() {
+		t.Fatal(ws.message)
+	}
+	ws.beginRename(taskRenameTheme, theme.ID, theme.Name)
+	ws.itemName = ""
+	if ws.Save() || ws.task != taskRenameTheme {
+		t.Fatal("Save accepted or discarded an invalid variant name")
+	}
+	ws.itemName = "Cancelled variant name"
+	ws.itemDescription = "Cancelled description"
+	ws.cancelRename()
+	if ws.IsModified() || ws.currentTheme().Name != theme.Name || ws.project.Description("theme/"+theme.ID) == "Cancelled description" {
+		t.Fatal("Cancel applied the variant name draft")
+	}
+	ws.beginRename(taskRenameTheme, theme.ID, theme.Name)
+	ws.itemDescription = "Only the description changes"
+	if !ws.IsModified() || !ws.Save() || ws.currentTheme().Name != theme.Name {
+		t.Fatalf("description-only draft did not save: %s", ws.message)
+	}
+	ws.beginRename(taskRenameTheme, theme.ID, theme.Name)
+	ws.itemDescription = ""
+	if !ws.Save() {
+		t.Fatal(ws.message)
+	}
+	fresh, err = dmenv.New(ws.project.Dme.RootFile)
+	if err != nil || fresh.Objects[path].Vars.ValueV("desc", "missing") != `""` {
+		t.Fatalf("clearing the description did not persist: %v", err)
+	}
+	ws.app.CommandStorage().Undo()
+	ws.app.CommandStorage().Undo()
+	if !ws.Save() {
+		t.Fatal(ws.message)
 	}
 }

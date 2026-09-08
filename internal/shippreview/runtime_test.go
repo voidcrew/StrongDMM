@@ -139,9 +139,17 @@ func TestBundledGamePreview(t *testing.T) {
 	withoutSystemTools(t)
 	root, client := fixture(t)
 	gameRoot := filepath.Dir(dme)
-	script := fmt.Sprintf(`import json, runpy, tempfile
+	source := filepath.Join(root, "ship_fixture.dmm")
+	mapData, err := os.ReadFile(filepath.Join(gameRoot, "_maps/voidcrew/ships/ship_delta_a.dmm"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	write(t, source, string(mapData))
+	script := fmt.Sprintf(`import hashlib, json, runpy, tempfile
 from pathlib import Path
 game = runpy.run_path(%q)
+Dmm = game["Dmm"]
+render = game["render"]
 OUTPUT_DIR = Path("wrong-output")
 ENVIRONMENT = "wrong-environment"
 def main():
@@ -149,9 +157,9 @@ def main():
     source = Path(%q)
     renderer = game["find_dmm_tools"]()
     with tempfile.TemporaryDirectory() as temp:
-        game["render"](renderer, source, OUTPUT_DIR / "ship_delta.png", Path(temp), game["Dmm"](source))
-    (OUTPUT_DIR / "manifest.json").write_text(json.dumps({"hulls": {"delta": {"png": "ship_delta.png"}}, "modules": {}}))
-	`, filepath.ToSlash(filepath.Join(gameRoot, Script)), filepath.ToSlash(filepath.Join(gameRoot, "_maps/voidcrew/ships/ship_delta_a.dmm")))
+        render(renderer, source, OUTPUT_DIR / "ship_delta.png", Path(temp), Dmm(source))
+    (OUTPUT_DIR / "manifest.json").write_text(json.dumps({"hulls": {"delta": {"png": "ship_delta.png", "src_md5": hashlib.md5(source.read_bytes()).hexdigest()}}, "modules": {}}))
+	`, filepath.ToSlash(filepath.Join(gameRoot, Script)), filepath.ToSlash(source))
 	write(t, filepath.Join(root, Script), script)
 	client.Request(root, dme)
 	until(t, func() bool {
@@ -175,5 +183,21 @@ def main():
 		if err := os.WriteFile(destination, data, 0600); err != nil {
 			t.Fatal(err)
 		}
+	}
+	client.Request(root, dme)
+	until(t, func() bool {
+		status := client.Status(root)
+		if status.Phase == "failed" || status.Phase == "error" {
+			log, _ := os.ReadFile(status.Log)
+			t.Fatalf("incremental real render failed: %s\n%s", status.Message, log)
+		}
+		return status.Phase == "complete"
+	})
+	if !strings.Contains(client.Status(root).Message, "0 rendered, 1 reused") {
+		t.Fatal("the unchanged real ship was rendered again: " + client.Status(root).Message)
+	}
+	again, _ := os.ReadFile(output)
+	if !bytes.Equal(data, again) {
+		t.Fatal("reusing a real ship changed its preview")
 	}
 }

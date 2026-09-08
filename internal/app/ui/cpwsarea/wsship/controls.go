@@ -414,7 +414,7 @@ func (ws *WsShip) loadoutControls() {
 		}
 		imgui.EndCombo()
 	}
-	if len(h.Themes) > 0 && actionButton("Rename ship variant...", false) {
+	if len(h.Themes) > 0 && actionButton("Variant name & description...", false) {
 		theme := ws.currentTheme()
 		ws.beginRename(taskRenameTheme, theme.ID, theme.Name)
 	}
@@ -445,7 +445,7 @@ func (ws *WsShip) loadoutControls() {
 			imgui.EndCombo()
 		}
 		imgui.BeginDisabledV(!selected)
-		if actionButton("Rename room option...", false) {
+		if actionButton("Room name & description...", false) {
 			ws.beginRename(taskRenameModule, ws.selected[slot], label)
 		}
 		imgui.EndDisabled()

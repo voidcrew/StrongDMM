@@ -33,7 +33,7 @@ func (a *app) DoShipPreviews() {
 	dialog.Open(dialog.TypeCustom{Title: "Ship purchase previews", CloseButton: true, Layout: w.Layout{
 		w.Custom(func() {
 			imgui.Dummy(imgui.Vec2{X: 420 * window.PointSize()})
-			imgui.TextWrapped("Ship saves automatically regenerate purchase previews in the background. You can keep editing or close the editor while they finish.")
+			imgui.TextWrapped("Ship saves refresh changed or missing purchase previews in the background and reuse unchanged images. You can keep editing or close the editor while they finish.")
 			workshop.Gap()
 			status := a.ShipPreviewStatus()
 			workshop.PreviewStatus(status, a.ShipFilesSaved)
@@ -41,8 +41,11 @@ func (a *app) DoShipPreviews() {
 				imgui.TextWrapped("No preview generation has run for this project yet.")
 			}
 			if status.Phase == "" || status.Phase == "complete" {
-				if imgui.Button("Regenerate previews") {
-					a.ShipFilesSaved()
+				imgui.TextWrapped("After changing icons or rendering code, rebuild all previews to refresh unchanged maps too.")
+				if imgui.Button("Rebuild all previews") {
+					if dme := a.LoadedEnvironment(); dme != nil {
+						a.previews.RequestFull(dme.RootDir, dme.RootFile)
+					}
 				}
 			}
 			workshop.Gap()

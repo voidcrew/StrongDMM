@@ -61,6 +61,9 @@ func (p *Project) registration() ([]byte, []byte, error) {
 			def = "TRUE"
 		}
 		fmt.Fprintf(&modules, "\n/datum/ship_theme/%s_%s\n\tid = %s\n\tname = %s\n\tfor_ship = %s\n\ttemplate_suffix = %s\n\tis_default = %s\n\tupgrade_slot_ids = %s\n", s.ID, t.ID, dmQuote(t.ID), dmQuote(t.Name), h.Type, dmQuote(t.Suffix), def, dmList(h.SlotsFor(t)))
+		if t.Description != nil {
+			fmt.Fprintf(&modules, "\tdesc = %s\n", dmQuote(*t.Description))
+		}
 	}
 	for _, m := range h.Modules {
 		def := "FALSE"
@@ -68,6 +71,9 @@ func (p *Project) registration() ([]byte, []byte, error) {
 			def = "TRUE"
 		}
 		fmt.Fprintf(&modules, "\n/datum/ship_upgrade_module/%s_%s\n\tid = %s\n\tname = %s\n\tslot = %s\n\tfor_ship = %s\n\tfor_theme = %s\n\tmap_file = %s\n\tis_default = %s\n", s.ID, m.ID, dmQuote(m.ID), dmQuote(m.Name), dmQuote(m.Slot), h.Type, dmList(m.Themes), dmQuote(m.File), def)
+		if m.Description != nil {
+			fmt.Fprintf(&modules, "\tdesc = %s\n", dmQuote(*m.Description))
+		}
 	}
 	hullBytes, moduleBytes := []byte(hull), []byte(modules.String())
 	if p.Crew != nil {
