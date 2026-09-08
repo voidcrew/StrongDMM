@@ -42,13 +42,18 @@ var EquipmentSlots = []EquipmentSlot{
 func (p *Project) CrewScopes() []CrewScope {
 	scopes := []CrewScope{{"ship", "Ship crew", p.Hull.Type, "job_slots"}}
 	id, _ := p.roomID()
+	themes, modules := map[string]string{}, map[string]string{}
+	for path, object := range p.Dme.Objects {
+		if strings.HasPrefix(path, "/datum/ship_theme/") && object.Vars.ValueV("for_ship", "") == p.Hull.Type {
+			themes[text(object.Vars, "id")] = path
+		} else if strings.HasPrefix(path, "/datum/ship_upgrade_module/") && object.Vars.ValueV("for_ship", "") == p.Hull.Type {
+			modules[text(object.Vars, "id")] = path
+		}
+	}
 	for _, t := range p.Hull.Themes {
 		path := "/datum/ship_theme/" + id + "_" + t.ID
-		for k, o := range p.Dme.Objects {
-			if strings.HasPrefix(k, "/datum/ship_theme/") && text(o.Vars, "id") == t.ID && o.Vars.ValueV("for_ship", "") == p.Hull.Type {
-				path = k
-				break
-			}
+		if existing := themes[t.ID]; existing != "" {
+			path = existing
 		}
 		scopes = append(scopes, CrewScope{"theme/" + t.ID, "Variant: " + t.Name, path, "job_slots"})
 	}
@@ -57,11 +62,8 @@ func (p *Project) CrewScopes() []CrewScope {
 		if p.Settings == nil {
 			path = roomModuleType(id, m.ID)
 		}
-		for k, o := range p.Dme.Objects {
-			if strings.HasPrefix(k, "/datum/ship_upgrade_module/") && text(o.Vars, "id") == m.ID && o.Vars.ValueV("for_ship", "") == p.Hull.Type {
-				path = k
-				break
-			}
+		if existing := modules[m.ID]; existing != "" {
+			path = existing
 		}
 		scopes = append(scopes, CrewScope{"module/" + m.ID, "Room option: " + m.Name, path, "job_slots_add"})
 	}

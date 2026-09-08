@@ -37,6 +37,7 @@ type Settings struct {
 	Crew            int
 	Hidden          bool
 	Cost            int
+	PartCosts       map[string]PartCosts `json:",omitempty"`
 	PortDirection   int
 }
 
@@ -58,6 +59,11 @@ type Project struct {
 	savedCrew       []byte
 	crewOriginal    map[string][]CrewJob
 	generatedBefore map[string][]byte
+	partCosts       map[string]PartCosts
+	savedPartCosts  []byte
+	costOriginal    map[string]costSource
+	costSources     map[string][]byte
+	costEdited      map[string]bool
 }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
@@ -111,6 +117,8 @@ func OpenProject(c *Catalog, dme *dmenv.Dme, h Hull) (*Project, error) {
 			return nil, fmt.Errorf("project ID does not match its template")
 		}
 		p.Settings = &s
+		p.partCosts = cloneCostScopes(s.PartCosts)
+		p.savedPartCosts = p.costBytes()
 		p.Hull = s.Hull
 		if err = p.installTypes(); err != nil {
 			return nil, err
@@ -403,10 +411,14 @@ func (p *Project) settingsBytes() []byte {
 		return nil
 	}
 	p.Settings.Hull = p.Hull
+	p.Settings.PartCosts = cloneCostScopes(p.partCosts)
 	b, _ := json.MarshalIndent(p.Settings, "", "  ")
 	return append(b, '\n')
 }
 func (p *Project) Modified() bool {
+	if !bytes.Equal(p.costBytes(), p.savedPartCosts) {
+		return true
+	}
 	if !bytes.Equal(p.crewBytes(), p.savedCrew) {
 		return true
 	}
@@ -515,6 +527,10 @@ func (p *Project) Changes() ([]FileChange, error) {
 	if err != nil {
 		return nil, err
 	}
+	changes, err = p.costChanges(changes)
+	if err != nil {
+		return nil, err
+	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Path < changes[j].Path })
 	return changes, nil
 }
@@ -545,6 +561,7 @@ func (p *Project) accept(changes []FileChange) error {
 	}
 	p.savedSettings = p.settingsBytes()
 	p.savedCrew = p.crewBytes()
+	p.savedPartCosts = p.costBytes()
 	p.savedAreas = p.areaBytes()
 	p.savedRooms = p.roomBytes()
 	return nil

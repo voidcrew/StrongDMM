@@ -85,7 +85,7 @@ func (p *Project) registration() ([]byte, []byte, error) {
 			}
 		}
 	}
-	return hullBytes, moduleBytes, nil
+	return p.applyGeneratedCosts(hullBytes, moduleBytes)
 }
 
 func permanent(path string) bool {
@@ -333,6 +333,7 @@ func (p *Project) AddTheme(baseIndex int, id, name string) error {
 
 // State stores authoring changes as a single history entry across every file.
 type State struct {
+	PartCosts map[string]PartCosts
 	Crew      *CrewConfig
 	Hull      Hull
 	RoomAreas []RoomArea
@@ -343,6 +344,7 @@ type State struct {
 func (p *Project) Capture() State {
 	state := State{Maps: map[string]dmmap.Dmm{}}
 	state.Crew = cloneCrew(p.Crew)
+	state.PartCosts = cloneCostScopes(p.partCosts)
 	// JSON round-trip deep-copies nested registration slices.
 	state.Hull = cloneHull(p.Hull)
 	state.RoomAreas = append([]RoomArea(nil), p.RoomAreas...)
@@ -358,6 +360,7 @@ func (p *Project) Capture() State {
 	return state
 }
 func (p *Project) Restore(state State) {
+	p.partCosts = cloneCostScopes(state.PartCosts)
 	p.Crew = cloneCrew(state.Crew)
 	p.Hull = cloneHull(state.Hull)
 	p.RoomAreas = append([]RoomArea(nil), state.RoomAreas...)

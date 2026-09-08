@@ -29,7 +29,7 @@ func (ws *WsShip) removalBlocker(plan *ship.RemovalPlan) error {
 }
 
 func (ws *WsShip) requestRemoval(h ship.Hull) *workshop.RemovalConfirmation {
-	if ws.project != nil && ws.project.Hull.Type != h.Type && !strings.HasPrefix(ws.project.Hull.Type, h.Type+"/") && !ws.commitCrew() {
+	if ws.project != nil && ws.project.Hull.Type != h.Type && !strings.HasPrefix(ws.project.Hull.Type, h.Type+"/") && !ws.commitDraft() {
 		return nil
 	}
 	ws.flush()
@@ -94,6 +94,7 @@ func (ws *WsShip) finishRemoval(plan *ship.RemovalPlan, backup string) {
 	ws.pane, ws.assembly, ws.project = nil, nil, nil
 	ws.projects = map[string]*ship.Project{}
 	ws.crew = crewEditor{}
+	ws.costs = costEditor{}
 	ws.reviewed = nil
 	ws.reviewReady = false
 	ws.wizard, ws.invalid, ws.isolated = false, false, false

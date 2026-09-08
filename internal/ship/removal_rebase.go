@@ -15,6 +15,15 @@ func RebaseAfterRemoval(source FileChange, changes []FileChange) FileChange {
 }
 
 func (p *Project) RebaseRemoval(changes []FileChange) {
+	for _, change := range changes {
+		if bytes.Equal(p.costSources[change.Path], change.Before) {
+			if change.Delete {
+				delete(p.costSources, change.Path)
+			} else if p.costSources != nil {
+				p.costSources[change.Path] = append([]byte{}, change.After...)
+			}
+		}
+	}
 	for path, source := range p.files {
 		if p.rooms != nil {
 			if original, ok := p.rooms.sources[path]; ok {

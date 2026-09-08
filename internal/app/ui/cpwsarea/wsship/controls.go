@@ -100,7 +100,7 @@ func comboHelp(label, preview, help string) bool {
 func actionButton(label string, primary bool) bool { return workshop.Button(label, primary) }
 
 func (ws *WsShip) setStage(stage int) {
-	if !ws.commitCrew() {
+	if !ws.commitDraft() {
 		return
 	}
 	ws.flush()
@@ -148,6 +148,8 @@ func (ws *WsShip) Process() {
 		ws.review()
 	case ws.task == taskCrew:
 		ws.crewContent()
+	case ws.task == taskCosts:
+		ws.costsContent()
 	case ws.pane != nil && !ws.invalid:
 		ws.canvasHeader()
 		ws.pane.Process()
@@ -267,6 +269,10 @@ func (ws *WsShip) buildControls() {
 		ws.crewControls()
 		return
 	}
+	if ws.task == taskCosts {
+		ws.costsControls()
+		return
+	}
 	if ws.task != taskPaint {
 		ws.authorControls()
 		return
@@ -315,6 +321,9 @@ func (ws *WsShip) buildControls() {
 	}
 	space()
 	heading("CONFIGURATION")
+	if workshop.Row("open-costs", "Part costs", "Hull, variants & room options", ">", false, style.Amber, 0) {
+		ws.beginCosts("ship")
+	}
 	if workshop.DangerButton("Remove ship...") {
 		ws.requestRemoval(ws.project.Hull)
 	}

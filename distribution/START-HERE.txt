@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.3
+Version: 0.5.4
 
 START
 1. Extract the whole ZIP into a writable folder.
@@ -43,7 +43,11 @@ Room options & ship variants contains alternative room layouts and ship themes.
 Choosing a room option also selects that module as the Part to edit.
 Names must be unique within the fleet's ship list and each ship's room options,
 themes and areas. Capitalization and extra spaces do not make a name unique.
-Ship details & canvas size contains names, crew, cost, docking and resizing.
+Part costs sets Combat, Science, Trade and Misc quantities for the hull, ship
+variants and room options, for both new and existing ships. Choose a component,
+enter its costs, then Apply costs and Review & save. Zero means no cost of that
+part type. New variants and room options also have costs in their creation form.
+Ship details & canvas size contains names, crew, docking and resizing.
 Advanced view & source files contains the isolated source view and file paths.
 Show whole ship centers the map and adjusts the zoom to fit it on screen.
 Scroll to zoom, middle mouse to pan, and Ctrl+Z to undo.

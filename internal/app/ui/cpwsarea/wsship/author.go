@@ -24,11 +24,12 @@ const (
 	taskSettings
 	taskDocking
 	taskCrew
+	taskCosts
 )
 
 type settingsForm struct {
 	name, description string
-	crew, cost        int32
+	crew              int32
 	hidden            bool
 }
 
@@ -97,7 +98,7 @@ func (ws *WsShip) itemIDUsed(id string) bool {
 }
 
 func (ws *WsShip) BeginNewShip() {
-	if !ws.commitCrew() {
+	if !ws.commitDraft() {
 		return
 	}
 	if ws.catalog == nil {
@@ -218,6 +219,9 @@ func (ws *WsShip) beginTask(task buildTask) {
 	ws.flush()
 	ws.task, ws.itemName, ws.itemID, ws.message = task, "", "", ""
 	ws.customID, ws.emptyModule = false, false
+	if task == taskTheme || task == taskModule {
+		ws.itemCosts = ship.PartCosts{}
+	}
 	if task == taskRoom || task == taskDocking {
 		lo, hi, selected := tools.SelectionBounds()
 		if selected && ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
@@ -240,7 +244,7 @@ func (ws *WsShip) beginTask(task buildTask) {
 	}
 	if task == taskSettings {
 		s := ws.project.Settings
-		ws.settings = settingsForm{ws.project.Hull.Name, s.Description, int32(s.Crew), int32(s.Cost), s.Hidden}
+		ws.settings = settingsForm{ws.project.Hull.Name, s.Description, int32(s.Crew), s.Hidden}
 	}
 	if task == taskResize && ws.assembly != nil {
 		s := ws.assembly.Sources[0]
@@ -249,7 +253,7 @@ func (ws *WsShip) beginTask(task buildTask) {
 }
 
 func (ws *WsShip) finishTask() {
-	if !ws.commitCrew() {
+	if !ws.commitDraft() {
 		return
 	}
 	ws.task = taskPaint
@@ -486,14 +490,30 @@ func (ws *WsShip) copyControls() {
 	if ws.task == taskTheme {
 		nameErr = ws.project.ThemeNameError(ws.itemName)
 	}
-	valid := nameErr == nil && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
+	if imgui.CollapsingHeader("Part costs / " + ws.itemCosts.Summary() + "###new-part-costs") {
+		for _, class := range ship.PartClasses {
+			value := int32(ws.itemCosts[class.ID])
+			numberField(class.Name, &value)
+			ws.itemCosts[class.ID] = int(value)
+		}
+	}
+	costErr := ws.itemCosts.Validate()
+	if costErr != nil {
+		hint(costErr.Error())
+	}
+	valid := nameErr == nil && costErr == nil && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
 	if strings.TrimSpace(ws.itemName) != "" && nameErr != nil {
 		hint(nameErr.Error())
 	}
 	imgui.BeginDisabledV(!valid)
 	if actionButton(label, true) {
 		if ws.task == taskTheme {
-			ws.change("Create ship variant", func() error { return ws.project.AddTheme(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName)) })
+			ws.change("Create ship variant", func() error {
+				if err := ws.project.AddTheme(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName)); err != nil {
+					return err
+				}
+				return ws.project.SetPartCosts("theme/"+ws.itemID, ws.itemCosts)
+			})
 			if ws.message == "" {
 				ws.theme = len(ws.project.Hull.Themes) - 1
 				ws.defaults()
@@ -504,7 +524,10 @@ func (ws *WsShip) copyControls() {
 			for _, m := range ws.project.Hull.Modules {
 				if m.ID == ws.selected[slot] {
 					ws.change("Create room option", func() error {
-						return ws.project.AddModule(ws.theme, m, ws.itemID, strings.TrimSpace(ws.itemName), ws.emptyModule)
+						if err := ws.project.AddModule(ws.theme, m, ws.itemID, strings.TrimSpace(ws.itemName), ws.emptyModule); err != nil {
+							return err
+						}
+						return ws.project.SetPartCosts("module/"+ws.itemID, ws.itemCosts)
 					})
 					if ws.message == "" {
 						ws.selected[slot] = ws.itemID
@@ -530,16 +553,15 @@ func (ws *WsShip) settingsControls() {
 	} else {
 		hint("Crew capacity is set by the slots in Crew & equipment.")
 	}
-	numberField("Build cost (misc parts)", &s.cost)
 	imgui.Checkbox("Hide from the player ship list", &s.hidden)
 	hint("Keep this checked while your ship is a work in progress.")
 	nameErr := ship.ShipNameError(ws.catalog, ws.app.LoadedEnvironment(), s.name, ws.project.Hull.Type)
-	valid := nameErr == nil && s.crew >= 1 && s.crew <= 32 && s.cost >= 0
+	valid := nameErr == nil && s.crew >= 1 && s.crew <= 32
 	if strings.TrimSpace(s.name) != "" && nameErr != nil {
 		hint(nameErr.Error())
 	}
 	if !valid {
-		hint("Enter a name, 1 to 32 crew, and a cost of zero or more.")
+		hint("Enter a name and 1 to 32 crew.")
 	}
 	space()
 	imgui.BeginDisabledV(!valid)
@@ -547,7 +569,7 @@ func (ws *WsShip) settingsControls() {
 		ws.change("Ship details", func() error {
 			ws.project.Hull.Name = strings.TrimSpace(s.name)
 			settings := ws.project.Settings
-			settings.Description, settings.Crew, settings.Cost = s.description, int(s.crew), int(s.cost)
+			settings.Description, settings.Crew = s.description, int(s.crew)
 			settings.Hidden = s.hidden
 			return nil
 		})

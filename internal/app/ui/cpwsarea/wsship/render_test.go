@@ -194,6 +194,7 @@ func TestRenderShipWorkspace(t *testing.T) {
 		}
 	}
 	exerciseResponsiveCrew(t, ws, render, func(w, h int) { viewWidth, viewHeight = w, h })
+	exerciseResponsiveCosts(t, ws, render, func(w, h int) { viewWidth, viewHeight = w, h })
 	viewWidth, viewHeight = width, height
 	exerciseAuthoring(t, ws, dme, render)
 	if code := gl.GetError(); code != gl.NO_ERROR {

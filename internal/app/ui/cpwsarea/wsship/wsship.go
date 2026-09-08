@@ -49,6 +49,8 @@ type WsShip struct {
 	SourceBusy                       func(string) bool
 	crew                             crewEditor
 	crewVisual                       crewVisual
+	costs                            costEditor
+	itemCosts                        ship.PartCosts
 }
 
 func New(app App, busy ...func(string) bool) *WsShip {
@@ -73,7 +75,7 @@ func New(app App, busy ...func(string) bool) *WsShip {
 }
 func (ws *WsShip) Name() string {
 	prefix := ""
-	dirty := ws.app.CommandStorage().IsModified(ws.CommandStackId()) || (ws.task == taskCrew && ws.crew.dirty)
+	dirty := ws.app.CommandStorage().IsModified(ws.CommandStackId()) || (ws.task == taskCrew && ws.crew.dirty) || (ws.task == taskCosts && ws.costs.dirty)
 	for _, project := range ws.projects {
 		for _, d := range project.Documents {
 			if d.Active && !d.Existed {
@@ -93,7 +95,7 @@ func (ws *WsShip) Title() string {
 	return "Ship Workshop"
 }
 func (ws *WsShip) Map() *pmap.PaneMap {
-	if ws.wizard || ws.invalid || ws.stage != stepBuild || ws.task == taskCrew {
+	if ws.wizard || ws.invalid || ws.stage != stepBuild || ws.task == taskCrew || ws.task == taskCosts {
 		return nil
 	}
 	return ws.pane
@@ -101,6 +103,9 @@ func (ws *WsShip) Map() *pmap.PaneMap {
 func (ws *WsShip) CommandStackId() string { return "ship:" + ws.Id() }
 func (ws *WsShip) IsModified() bool {
 	if ws.task == taskCrew && ws.crew.dirty {
+		return true
+	}
+	if ws.task == taskCosts && ws.costs.dirty {
 		return true
 	}
 	for _, p := range ws.projects {
@@ -123,7 +128,7 @@ func (ws *WsShip) OnFocusChange(f bool) {
 	if !f && tools.IsSelected(tools.TNRegion) {
 		tools.SetSelected(tools.TNAdd)
 	}
-	if ws.pane != nil && !ws.wizard && ws.stage == stepBuild && ws.task != taskCrew {
+	if ws.pane != nil && !ws.wizard && ws.stage == stepBuild && ws.task != taskCrew && ws.task != taskCosts {
 		if f && !ws.invalid {
 			ws.pane.OnActivate()
 		} else {
@@ -250,7 +255,7 @@ func (ws *WsShip) rebuild() {
 		}
 	}
 	ws.invalid = false
-	if ws.focused && ws.stage == stepBuild && !ws.wizard && ws.task != taskCrew {
+	if ws.focused && ws.stage == stepBuild && !ws.wizard && ws.task != taskCrew && ws.task != taskCosts {
 		tools.SetEnabled(true)
 	}
 	ws.assembly = a
@@ -302,7 +307,7 @@ func copySelection(s map[string]string) map[string]string {
 }
 func (ws *WsShip) activate(p *pmap.PaneMap) {
 	if ws.pane == p {
-		if !p.Focused() && ws.focused && !ws.invalid && ws.stage == stepBuild && !ws.wizard && ws.task != taskCrew {
+		if !p.Focused() && ws.focused && !ws.invalid && ws.stage == stepBuild && !ws.wizard && ws.task != taskCrew && ws.task != taskCosts {
 			p.OnActivate()
 		}
 		return
@@ -312,7 +317,7 @@ func (ws *WsShip) activate(p *pmap.PaneMap) {
 		ws.pane.OnDeactivate()
 	}
 	ws.pane = p
-	if ws.focused && ws.stage == stepBuild && !ws.wizard && ws.task != taskCrew {
+	if ws.focused && ws.stage == stepBuild && !ws.wizard && ws.task != taskCrew && ws.task != taskCosts {
 		p.OnActivate()
 	}
 	ws.app.OnWorkspaceSwitched()
@@ -343,7 +348,7 @@ func (ws *WsShip) Owns(file string) bool {
 	return false
 }
 func (ws *WsShip) FocusSource(file string) {
-	if !ws.commitCrew() {
+	if !ws.commitDraft() {
 		return
 	}
 	ws.flush()
@@ -395,7 +400,7 @@ func (ws *WsShip) FocusSource(file string) {
 	}
 }
 func (ws *WsShip) Save() bool {
-	if !ws.commitCrew() {
+	if !ws.commitDraft() {
 		return false
 	}
 	ws.flush()
@@ -424,6 +429,10 @@ func (ws *WsShip) change(label string, action func() error) {
 	before := p.Capture()
 	h, t := ws.hull, ws.theme
 	crewTask, crewScope, crewSelection := ws.task == taskCrew, ws.crew.scope, ws.crew.selected
+	costTask, costScope := ws.task == taskCosts, "ship"
+	if costTask && ws.costs.selected >= 0 {
+		costScope = ws.costs.entries[ws.costs.selected].scope.ID
+	}
 	sel := copySelection(ws.selected)
 	if err := action(); err != nil {
 		p.Restore(before)
@@ -454,6 +463,9 @@ func (ws *WsShip) change(label string, action func() error) {
 			ws.beginCrew()
 			ws.loadCrewScope(crewScope)
 			ws.crew.selected = min(crewSelection, len(ws.crew.jobs)-1)
+		}
+		if costTask {
+			ws.beginCosts(costScope)
 		}
 		ws.OnFocusChange(true)
 		tools.RefreshGrabSelection()
