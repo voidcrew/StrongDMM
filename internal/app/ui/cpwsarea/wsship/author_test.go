@@ -69,10 +69,10 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 			foundFloor = true
 		}
 	}
-	if !foundFloor {
-		t.Fatal("starting floor was not created")
+	if foundFloor {
+		t.Fatal("new ship painted floors automatically")
 	}
-	capture("new-ship-foundation")
+	capture("new-ship-canvas-empty")
 	ws.beginTask(taskRoom)
 	ws.itemName = "Cargo bay"
 	capture("guided-room")
@@ -82,6 +82,39 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	ws.finishTask()
 	lo, hi := util.Point{X: 4, Y: 5, Z: 1}, util.Point{X: 12, Y: 13, Z: 1}
 	ws.change("Lay permanent deck", func() error { return project.Deck(ws.currentTheme(), lo, hi) })
+	ws.beginTask(taskArea)
+	ws.itemName, ws.areaIcon = "Bridge", "bridge"
+	capture("ship-areas-create")
+	ws.createArea()
+	if ws.message != "" {
+		t.Fatal(ws.message)
+	}
+	bridgeArea := ws.areaPath
+	ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial(bridgeArea))
+	ws.app.CommandStorage().Undo()
+	if project.AreaActive(bridgeArea) {
+		t.Fatal("undo kept created area")
+	}
+	if selected, ok := ws.app.SelectedPrefab(); ok && selected.Path() == bridgeArea {
+		t.Fatal("undo kept an invalid area brush")
+	}
+	ws.app.CommandStorage().Redo()
+	ws.beginTask(taskArea)
+	ws.itemName, ws.areaIcon = "Cargo bay", "quart"
+	capture("ship-areas-second")
+	ws.createArea()
+	if ws.message != "" {
+		t.Fatal(ws.message)
+	}
+	cargoArea := ws.areaPath
+	ws.change("Assign bridge area", func() error {
+		return project.AssignArea(ws.currentTheme(), ws.assembly.Sources[0].File, bridgeArea, lo, hi)
+	})
+	ws.change("Assign cargo area", func() error {
+		return project.AssignArea(ws.currentTheme(), ws.assembly.Sources[0].File, cargoArea, util.Point{X: 8, Y: 5, Z: 1}, hi)
+	})
+	capture("ship-areas-assigned")
+	ws.finishTask()
 	ws.change("Extract cargo", func() error { return project.AddSlot(0, "cargo", "Cargo", lo, hi) })
 	if ws.message != "" {
 		t.Fatal(ws.message)
@@ -156,6 +189,15 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	ws.setStage(stepBuild)
 	if err := project.Save(); err != nil {
 		t.Fatal(err)
+	}
+	parsed, err := dmenv.New(draftEnv.RootFile)
+	if err != nil {
+		t.Fatal("generated area definitions did not parse:", err)
+	}
+	for _, path := range []string{bridgeArea, cargoArea} {
+		if parsed.Objects[path] == nil || parsed.Objects[path].Parent().Path != "/area/shuttle/voidcrew/workshop_fixture" {
+			t.Fatal("saved room area lost ship inheritance:", path)
+		}
 	}
 	reopened, err := ship.OpenProject(catalog, &draftEnv, project.Hull)
 	if err != nil {

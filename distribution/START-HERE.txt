@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.2.1
+Version: 0.3.0
 
 START
 1. Extract the whole ZIP into a writable folder.
@@ -17,12 +17,15 @@ This build needs 64-bit Windows and a graphics driver supporting OpenGL 3.3.
 SHIP WORKSHOP
 1. Choose a ship: open an existing ship or choose Create a new ship.
    For a new ship, enter its name, pick a canvas size, and start building.
-   File identifiers are generated automatically. A floor foundation is optional.
+   File identifiers and the docking port are created automatically.
 2. Build: choose the Part to edit, then place pieces on the assembled map.
-   Add floor and Make an upgrade room guide you through selecting an area.
-   Drag a rectangle on the map; no coordinates are needed. Room creation
-   keeps walls and flooring in the hull and moves furnishings into a module.
-   Quick pieces select common walls, doors and furniture for painting.
+   Use the normal StrongDMM tools for floors, walls, objects and utilities.
+   Ship areas creates named room areas and their DM definitions. Select an
+   existing area or create one, then paint it or assign it to selected tiles.
+   Area assignment preserves floors, walls and objects. New and existing ships
+   are supported. The selected hull or module receives the area edits.
+   Make an upgrade room keeps walls and flooring in the hull and moves
+   furnishings into a module.
 3. Review & save: check the current ship and save all changed ships.
    New ships stay hidden from the player ship list while under development.
 
@@ -38,7 +41,9 @@ workshop; its checkbox and the normal View shortcut control the same setting.
 SAVE BEHAVIOR
 Saving writes into the checkout you selected. A new ship creates .dmm maps,
 its hull/module/theme registrations, a .ship.json project file and .dme
-includes. Save all changes saves every changed ship in this workshop session.
+includes. Created room areas use a separate generated .dm file, .areas.json
+metadata and a .dme include. Hand-authored ship registrations are preserved.
+Save all changes saves every changed ship in this workshop session.
 Files edited elsewhere after opening are checked before replacement.
 Close ordinary map tabs before opening those same sources in Ship Workshop.
 

@@ -9,7 +9,6 @@ import (
 	"github.com/SpaiR/imgui-go"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
 	"sdmm/internal/app/window"
-	"sdmm/internal/dmapi/dmmap"
 )
 
 const (
@@ -160,7 +159,7 @@ func (ws *WsShip) controls() {
 	if ws.project != nil && ws.stage != stepChoose && !ws.wizard {
 		imgui.TextWrapped(ws.project.Hull.Name)
 	} else {
-		hint("Make a ship, one step at a time.")
+		hint("Ships, modules, themes and areas.")
 	}
 	space()
 	for i, label := range []string{"1   Choose a ship", "2   Build", "3   Review & save"} {
@@ -247,8 +246,8 @@ func (ws *WsShip) buildControls() {
 		ws.authorControls()
 		return
 	}
-	heading("PAINT & FURNISH")
-	hint("Pick a part to edit, then place walls and objects on the map.")
+	heading("EDIT SHIP")
+	hint("Edits write to the selected part of the assembled ship.")
 	if ws.assembly != nil && ws.source < len(ws.assembly.Sources) && combo("Part to edit", ws.assembly.Sources[ws.source].Name) {
 		for i, s := range ws.assembly.Sources {
 			if imgui.SelectableV(s.Name, i == ws.source, 0, imgui.Vec2{}) {
@@ -259,43 +258,14 @@ func (ws *WsShip) buildControls() {
 		}
 		imgui.EndCombo()
 	}
+	space()
+	if actionButton("Ship areas...", false) {
+		ws.beginTask(taskArea)
+	}
 	if ws.project.Settings != nil {
-		space()
-		if actionButton("Add floor...", false) {
-			ws.beginTask(taskDeck)
-		}
 		if actionButton("Make an upgrade room...", false) {
 			ws.beginTask(taskRoom)
 		}
-	}
-	space()
-	heading("QUICK PIECES")
-	{
-		buttonWidth := (imgui.ContentRegionAvail().X - 8*window.PointSize()) / 2
-		for i, p := range []struct{ name, path string }{
-			{"Wall", "/turf/closed/wall"}, {"Airlock", "/obj/machinery/door/airlock"},
-			{"Table", "/obj/structure/table"}, {"Chair", "/obj/structure/chair"},
-		} {
-			if ws.app.LoadedEnvironment().Objects[p.path] == nil {
-				continue
-			}
-			if i%2 == 1 {
-				imgui.SameLine()
-			}
-			selected, hasSelected := ws.app.SelectedPrefab()
-			active := hasSelected && selected.Path() == p.path && tools.IsSelected(tools.TNAdd)
-			if active {
-				imgui.PushStyleColor(imgui.StyleColorButton, imgui.Vec4{X: .12, Y: .39, Z: .41, W: 1})
-			}
-			if imgui.ButtonV(p.name, imgui.Vec2{X: buttonWidth, Y: 28 * window.PointSize()}) {
-				ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial(p.path))
-				tools.SetSelected(tools.TNAdd)
-			}
-			if active {
-				imgui.PopStyleColor()
-			}
-		}
-		hint("Pick a piece, then click or drag to place it. Find more in the object tree.")
 	}
 	space()
 	if imgui.CollapsingHeader("Room options & ship variants") {
@@ -347,12 +317,12 @@ func (ws *WsShip) canvasHeader() {
 	}
 	tooltip("Show area markers. This is the same setting as View > Areas (Ctrl+1).")
 	imgui.SameLine()
-	if ws.task == taskDeck || ws.task == taskRoom {
-		imgui.Text("Drag a rectangle on the hull")
+	if tools.IsSelected(tools.TNRegion) && (ws.task == taskArea || ws.task == taskRoom) {
+		imgui.Text("Select tiles in the part being edited")
 	} else if ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
 		imgui.Text("Editing: " + ws.assembly.Sources[ws.source].Name)
 	}
-	if ws.task == taskDeck || ws.task == taskRoom {
+	if tools.IsSelected(tools.TNRegion) && (ws.task == taskArea || ws.task == taskRoom) {
 		hint("Release to select. Apply the change in the left panel.")
 	} else {
 		instruction := "Scroll to zoom  |  Middle mouse to pan  |  Ctrl+Z to undo"

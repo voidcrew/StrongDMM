@@ -10,14 +10,13 @@ import (
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/ship"
-	"sdmm/internal/util"
 )
 
 type buildTask int
 
 const (
 	taskPaint buildTask = iota
-	taskDeck
+	taskArea
 	taskRoom
 	taskTheme
 	taskModule
@@ -103,7 +102,7 @@ func (ws *WsShip) BeginNewShip() {
 	ws.OnFocusChange(false)
 	ws.stage, ws.wizard, ws.wizardStep = stepChoose, true, 0
 	ws.newID, ws.newName, ws.message = "", "", ""
-	ws.customID, ws.starterDeck = false, true
+	ws.customID = false
 	ws.sizePreset, ws.width, ws.height = 1, 32, 32
 	tools.SetEnabled(false)
 }
@@ -164,8 +163,6 @@ func (ws *WsShip) newShip() {
 			numberField("Height in tiles", &ws.height)
 		}
 		space()
-		imgui.Checkbox("Start with a floor foundation", &ws.starterDeck)
-		hint("A rectangle of plating to shape and furnish. Turn this off for an empty canvas.")
 		valid := ws.width >= 5 && ws.height >= 5 && ws.width <= 128 && ws.height <= 128
 		if !valid {
 			hint("Choose a width and height between 5 and 128 tiles.")
@@ -195,13 +192,6 @@ func (ws *WsShip) createShip() {
 		ws.message = err.Error()
 		return
 	}
-	if ws.starterDeck {
-		err = p.Deck(p.Hull.Themes[0], util.Point{X: 2, Y: 1, Z: 1}, util.Point{X: int(ws.width) - 1, Y: int(ws.height) - 1, Z: 1})
-		if err != nil {
-			ws.message = err.Error()
-			return
-		}
-	}
 	ws.projects[p.Hull.Type] = p
 	ws.catalog.Hulls = append(ws.catalog.Hulls, p.Hull)
 	ws.hull, ws.theme = len(ws.catalog.Hulls)-1, 0
@@ -212,7 +202,6 @@ func (ws *WsShip) createShip() {
 	if ws.pane != nil {
 		ws.pane.FitView()
 	}
-	ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial("/turf/closed/wall"))
 	tools.SetSelected(tools.TNAdd)
 }
 
@@ -220,9 +209,16 @@ func (ws *WsShip) beginTask(task buildTask) {
 	ws.flush()
 	ws.task, ws.itemName, ws.itemID, ws.message = task, "", "", ""
 	ws.customID, ws.emptyModule = false, false
-	if task == taskDeck || task == taskRoom {
+	if task == taskRoom {
 		ws.source, ws.isolated = 0, false
 		ws.rebuild()
+		tools.SetSelected(tools.TNRegion).OnDeselect()
+	}
+	if task == taskArea {
+		ws.areaPath, ws.areaIcon = "", "station"
+		if !ws.app.PathsFilter().IsVisiblePath("/area") {
+			ws.app.PathsFilter().TogglePath("/area")
+		}
 		tools.SetSelected(tools.TNRegion).OnDeselect()
 	}
 	if task == taskSettings {
@@ -241,12 +237,14 @@ func (ws *WsShip) finishTask() {
 }
 
 func (ws *WsShip) authorControls() {
-	if actionButton("< Back to painting", false) {
+	if actionButton("< Back to ship", false) {
 		ws.finishTask()
 		return
 	}
 	switch ws.task {
-	case taskDeck, taskRoom:
+	case taskArea:
+		ws.areaControls()
+	case taskRoom:
 		ws.regionControls()
 	case taskTheme, taskModule:
 		ws.copyControls()
@@ -274,13 +272,8 @@ func (ws *WsShip) authorControls() {
 }
 
 func (ws *WsShip) regionControls() {
-	if ws.task == taskDeck {
-		heading("ADD FLOOR")
-		hint("Fill a rectangle with plating and assign it to your ship.")
-	} else {
-		heading("MAKE AN UPGRADE ROOM")
-		hint("Turn a furnished room into a swappable upgrade. Its walls and floor stay in the hull.")
-	}
+	heading("MAKE AN UPGRADE ROOM")
+	hint("Turn a furnished room into a swappable upgrade. Its walls and floor stay in the hull.")
 	heading("1. Select the area")
 	hint("Drag a rectangle over the hull. Drag again to change the selection.")
 	if !tools.IsSelected(tools.TNRegion) && actionButton("Select an area on the map", false) {
@@ -292,7 +285,7 @@ func (ws *WsShip) regionControls() {
 	} else {
 		hint("No area selected yet.")
 	}
-	label := "Add floor to selected area"
+	label := "Make this an upgrade room"
 	valid := ready && ws.source == 0
 	if ws.task == taskRoom {
 		heading("2. Name the room")
@@ -316,9 +309,7 @@ func (ws *WsShip) applyRegion() {
 		ws.message = "Drag a rectangle inside the hull first."
 		return
 	}
-	if ws.task == taskDeck {
-		ws.change("Add floor", func() error { return ws.project.Deck(ws.currentTheme(), lo, hi) })
-	} else {
+	{
 		ws.change("Make upgrade room", func() error { return ws.project.AddSlot(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), lo, hi) })
 		if ws.message == "" {
 			ws.defaults()
@@ -334,6 +325,98 @@ func (ws *WsShip) applyRegion() {
 	}
 	if ws.message == "" {
 		ws.finishTask()
+	}
+}
+
+func (ws *WsShip) areaControls() {
+	heading("SHIP AREAS")
+	if ws.assembly == nil || ws.source >= len(ws.assembly.Sources) {
+		return
+	}
+	imgui.TextWrapped("Editing: " + ws.assembly.Sources[ws.source].Name)
+	areas, err := ws.project.Areas(ws.currentTheme())
+	if err != nil {
+		imgui.TextWrapped(err.Error())
+		return
+	}
+	root, _ := ws.project.AreaRoot(ws.currentTheme())
+	hint("Areas share this ship's ownership across themes and modules.")
+	space()
+	imgui.BeginChildV("ship-area-list", imgui.Vec2{Y: 130 * window.PointSize()}, true, 0)
+	for _, area := range areas {
+		imgui.PushID(area.Path)
+		if imgui.SelectableV(area.Name, ws.areaPath == area.Path, 0, imgui.Vec2{Y: 26 * window.PointSize()}) {
+			ws.areaPath = area.Path
+		}
+		tooltip(area.Path)
+		imgui.PopID()
+	}
+	imgui.EndChild()
+	imgui.BeginDisabledV(ws.areaPath == "")
+	if actionButton("Paint selected area", false) {
+		ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial(ws.areaPath))
+		ws.finishTask()
+	}
+	imgui.EndDisabled()
+	if !tools.IsSelected(tools.TNRegion) && actionButton("Select tiles...", false) {
+		tools.SetSelected(tools.TNRegion).OnDeselect()
+	}
+	lo, hi, ready := tools.RegionBounds()
+	if ready {
+		imgui.Text(fmt.Sprintf("Selected: %d x %d tiles", hi.X-lo.X+1, hi.Y-lo.Y+1))
+	}
+	imgui.BeginDisabledV(!ready || ws.areaPath == "")
+	if actionButton("Assign area to selected tiles", true) {
+		file := ws.assembly.Sources[ws.source].File
+		ws.change("Assign ship area", func() error { return ws.project.AssignArea(ws.currentTheme(), file, ws.areaPath, lo, hi) })
+	}
+	imgui.EndDisabled()
+	hint("Changes only the area assignment. Floors, walls and objects stay as mapped.")
+	space()
+	imgui.Separator()
+	heading("CREATE AREA")
+	textField("Area name", "e.g. Bridge or Cargo bay", &ws.itemName)
+	if !ws.customID {
+		ws.itemID = suggestedID(ws.itemName, func(id string) bool { return ws.project.AreaIDUsed(root, id) })
+	}
+	markers := []struct{ name, state string }{{"General", "station"}, {"Bridge", "bridge"}, {"Cargo", "quart"}, {"Engineering", "engie"}, {"Medical", "medbay"}, {"Crew", "commons"}}
+	markerName := "General"
+	for _, marker := range markers {
+		if marker.state == ws.areaIcon {
+			markerName = marker.name
+		}
+	}
+	if combo("Map marker", markerName) {
+		for _, marker := range markers {
+			if imgui.SelectableV(marker.name, marker.state == ws.areaIcon, 0, imgui.Vec2{}) {
+				ws.areaIcon = marker.state
+			}
+		}
+		imgui.EndCombo()
+	}
+	if imgui.CollapsingHeader("Advanced: area type") {
+		if textField("File identifier", "lowercase_letters", &ws.itemID) {
+			ws.customID = true
+		}
+		hint(root + "/" + ws.itemID)
+	}
+	valid := strings.TrimSpace(ws.itemName) != "" && ship.ValidID(ws.itemID) == nil && !ws.project.AreaIDUsed(root, ws.itemID)
+	imgui.BeginDisabledV(!valid)
+	if actionButton("Create area", true) {
+		ws.createArea()
+	}
+	imgui.EndDisabled()
+	hint("Saving writes the area definition and adds its code to the project.")
+}
+
+func (ws *WsShip) createArea() {
+	ws.change("Create ship area", func() error {
+		var err error
+		ws.areaPath, err = ws.project.AddArea(ws.currentTheme(), ws.itemID, ws.itemName, ws.areaIcon)
+		return err
+	})
+	if ws.message == "" {
+		ws.itemName, ws.itemID, ws.customID = "", "", false
 	}
 }
 

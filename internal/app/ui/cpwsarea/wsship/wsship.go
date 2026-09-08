@@ -37,7 +37,8 @@ type WsShip struct {
 	stage                            int
 	task                             buildTask
 	wizardStep, sizePreset           int
-	starterDeck, customID            bool
+	customID                         bool
+	areaPath, areaIcon               string
 	emptyModule                      bool
 	shipFilter                       string
 	settings                         settingsForm
@@ -47,7 +48,7 @@ type WsShip struct {
 }
 
 func New(app App, busy ...func(string) bool) *WsShip {
-	ws := &WsShip{app: app, projects: map[string]*ship.Project{}, panes: map[string]*pmap.PaneMap{}, width: 32, height: 32, starterDeck: true, sizePreset: 1}
+	ws := &WsShip{app: app, projects: map[string]*ship.Project{}, panes: map[string]*pmap.PaneMap{}, width: 32, height: 32, sizePreset: 1}
 	if len(busy) > 0 {
 		ws.SourceBusy = busy[0]
 	}
@@ -372,6 +373,11 @@ func (ws *WsShip) change(label string, action func() error) {
 		ws.selected = copySelection(sel)
 		ws.source = 0
 		ws.catalog.Hulls[h] = p.Hull
+		if selected, ok := ws.app.SelectedPrefab(); ok && !p.AreaActive(selected.Path()) {
+			if root, err := p.AreaRoot(ws.currentTheme()); err == nil {
+				ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial(root))
+			}
+		}
 		for _, pane := range ws.panes {
 			pane.Snapshot().Sync()
 			pane.CanvasState().SetMaxX(pane.Dmm().MaxX)

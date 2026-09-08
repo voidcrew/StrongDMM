@@ -245,15 +245,17 @@ func (p *Project) AddTheme(baseIndex int, id, name string) error {
 
 // State stores authoring changes as a single history entry across every file.
 type State struct {
-	Hull     Hull
-	Settings *Settings
-	Maps     map[string]dmmap.Dmm
+	Hull      Hull
+	RoomAreas []RoomArea
+	Settings  *Settings
+	Maps      map[string]dmmap.Dmm
 }
 
 func (p *Project) Capture() State {
 	state := State{Maps: map[string]dmmap.Dmm{}}
 	// JSON round-trip deep-copies nested registration slices.
 	state.Hull = cloneHull(p.Hull)
+	state.RoomAreas = append([]RoomArea(nil), p.RoomAreas...)
 	if p.Settings != nil {
 		s := *p.Settings
 		state.Settings = &s
@@ -267,6 +269,7 @@ func (p *Project) Capture() State {
 }
 func (p *Project) Restore(state State) {
 	p.Hull = cloneHull(state.Hull)
+	p.RoomAreas = append([]RoomArea(nil), state.RoomAreas...)
 	if state.Settings != nil {
 		s := *state.Settings
 		p.Settings = &s

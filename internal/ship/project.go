@@ -41,14 +41,17 @@ type Settings struct {
 }
 
 type Project struct {
-	BeforeOpen    func(string) error
-	Catalog       *Catalog
-	Dme           *dmenv.Dme
-	Hull          Hull
-	Settings      *Settings // nil for hand-authored registrations
-	Documents     map[string]*Document
-	files         map[string]FileChange
-	savedSettings []byte
+	BeforeOpen     func(string) error
+	Catalog        *Catalog
+	Dme            *dmenv.Dme
+	Hull           Hull
+	Settings       *Settings // nil for hand-authored registrations
+	Documents      map[string]*Document
+	files          map[string]FileChange
+	savedSettings  []byte
+	RoomAreas      []RoomArea
+	savedAreas     []byte
+	draftAreaPaths map[string]bool
 }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
@@ -113,6 +116,9 @@ func OpenProject(c *Catalog, dme *dmenv.Dme, h Hull) (*Project, error) {
 		}
 		p.savedSettings = p.settingsBytes()
 	} else if !os.IsNotExist(err) {
+		return nil, err
+	}
+	if err = p.openAreas(); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -365,11 +371,17 @@ func (p *Project) settingsBytes() []byte {
 	if p.Settings == nil {
 		return nil
 	}
+	if p.Settings == nil {
+		return nil
+	}
 	p.Settings.Hull = p.Hull
 	b, _ := json.MarshalIndent(p.Settings, "", "  ")
 	return append(b, '\n')
 }
 func (p *Project) Modified() bool {
+	if !bytes.Equal(p.areaBytes(), p.savedAreas) {
+		return true
+	}
 	if !bytes.Equal(p.settingsBytes(), p.savedSettings) {
 		return true
 	}
@@ -406,6 +418,13 @@ func (p *Project) Changes() ([]FileChange, error) {
 	for path, d := range p.Documents {
 		if !d.Modified() {
 			continue
+		}
+		for _, tile := range d.Map.Tiles {
+			for _, inst := range tile.Instances() {
+				if !p.AreaActive(inst.Prefab().Path()) {
+					return nil, fmt.Errorf("map uses an undone area definition: %s; redo its creation or assign another area", inst.Prefab().Path())
+				}
+			}
 		}
 		data, err := dmmsave.Prepare(p.Dme, d.Map, d.Initial)
 		if err != nil {
@@ -444,6 +463,11 @@ func (p *Project) Changes() ([]FileChange, error) {
 			}
 		}
 	}
+	var err error
+	changes, err = p.areaChanges(changes)
+	if err != nil {
+		return nil, err
+	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Path < changes[j].Path })
 	return changes, nil
 }
@@ -470,6 +494,7 @@ func (p *Project) accept(changes []FileChange) error {
 		}
 	}
 	p.savedSettings = p.settingsBytes()
+	p.savedAreas = p.areaBytes()
 	return nil
 }
 
