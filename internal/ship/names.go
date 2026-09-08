@@ -39,17 +39,29 @@ func ShipNameError(c *Catalog, dme *dmenv.Dme, name, except string) error {
 }
 
 func (p *Project) ModuleNameError(name string) error {
+	return p.moduleNameError(name, "")
+}
+
+func (p *Project) moduleNameError(name, except string) error {
 	existing := []string{"Hull", "Empty room"}
 	for _, module := range p.Hull.Modules {
-		existing = append(existing, module.Name)
+		if module.ID != except {
+			existing = append(existing, module.Name)
+		}
 	}
 	return uniqueName(name, existing)
 }
 
 func (p *Project) ThemeNameError(name string) error {
+	return p.themeNameError(name, "")
+}
+
+func (p *Project) themeNameError(name, except string) error {
 	var existing []string
 	for _, theme := range p.Hull.Themes {
-		existing = append(existing, theme.Name)
+		if theme.ID != except {
+			existing = append(existing, theme.Name)
+		}
 	}
 	return uniqueName(name, existing)
 }

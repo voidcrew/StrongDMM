@@ -1,0 +1,38 @@
+[
+  {
+    "name": "python-3.13.15-embed-amd64.zip",
+    "kind": "python",
+    "url": "https://www.python.org/ftp/python/3.13.15/python-3.13.15-embed-amd64.zip",
+    "sha256": "d1f04d990aee1253d8569e8e5104e30fa9f5fa830899f14843448872d936a2cf"
+  },
+  {
+    "name": "pillow-12.3.0-cp313-cp313-win_amd64.whl",
+    "kind": "pillow",
+    "url": "https://files.pythonhosted.org/packages/a6/9b/7a58e61d62be561da3a356fe2384d4059a6345fc130e23ef1c36a5b81d24/pillow-12.3.0-cp313-cp313-win_amd64.whl",
+    "sha256": "1cca606cd25738df4ed873d5ad46bbdb3d83b5cbca291f6b4ff13a4df6b0bbe8"
+  },
+  {
+    "name": "dmm-tools.exe",
+    "kind": "renderer",
+    "url": "https://github.com/SpaceManiac/SpacemanDMM/releases/download/suite-1.11/dmm-tools.exe",
+    "sha256": "37b9b2b4c8ae08a6b856dedc5dbcf954ca4c0acada986535cbe603d3f996ef88"
+  },
+  {
+    "name": "SpacemanDMM-suite-1.11.zip",
+    "kind": "renderer-source",
+    "url": "https://codeload.github.com/SpaceManiac/SpacemanDMM/zip/0290db5c",
+    "sha256": "81e0001ed2b23456555b3bce6f55f2a7368bd082249f042d5253ae07d29ca866"
+  },
+  {
+    "name": "Python-3.13.15.tar.xz",
+    "kind": "source",
+    "url": "https://www.python.org/ftp/python/3.13.15/Python-3.13.15.tar.xz",
+    "sha256": "1e66a7945a48390ee4c2a4268a0e4185884059a13c4aab6d148aa208deea4a76"
+  },
+  {
+    "name": "pillow-12.3.0.tar.gz",
+    "kind": "source",
+    "url": "https://files.pythonhosted.org/packages/1c/3d/bb7fca845737cf9d7dbde16ed1843984665ff2e0a518f5db43e77ec540b9/pillow-12.3.0.tar.gz",
+    "sha256": "3b8182a766685eaa002637e28b4ec8d6b18819a0c71f579bf0dbaa5830297cce"
+  }
+]

@@ -14,7 +14,8 @@ import (
 type roomEditing struct {
 	base    Hull
 	sources map[string]FileChange
-	targets map[string]string // theme ID -> DM type; empty ID edits the base hull
+	targets map[string]string     // theme ID -> DM type; empty ID edits the base hull
+	names   map[string]nameTarget // component scope -> original name definition
 	code    string
 }
 
@@ -210,6 +211,18 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 			return nil, err
 		}
 		contents[file], err = rewriteRoomSlots(contents[file], typePath, before, after)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for scope, target := range p.rooms.names {
+		name, ok := componentName(p.Hull, scope)
+		before, _ := componentName(p.rooms.base, scope)
+		if !ok || name == before {
+			continue
+		}
+		var err error
+		contents[target.file], err = rewriteName(contents[target.file], target.typePath, before, name)
 		if err != nil {
 			return nil, err
 		}

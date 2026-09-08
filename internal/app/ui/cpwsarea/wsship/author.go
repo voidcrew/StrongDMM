@@ -25,6 +25,8 @@ const (
 	taskDocking
 	taskCrew
 	taskCosts
+	taskRenameTheme
+	taskRenameModule
 )
 
 type settingsForm struct {
@@ -273,6 +275,8 @@ func (ws *WsShip) authorControls() {
 		ws.dockingControls()
 	case taskTheme, taskModule:
 		ws.copyControls()
+	case taskRenameTheme, taskRenameModule:
+		ws.renameControls()
 	case taskSettings:
 		ws.settingsControls()
 	case taskResize:

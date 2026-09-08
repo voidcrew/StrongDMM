@@ -52,7 +52,8 @@ func (p *Project) registration() ([]byte, []byte, error) {
 	if s.Crew > 1 {
 		hull += fmt.Sprintf("\t\tlist(name = \"Crew\", outfit = /datum/outfit/job/assistant, category = JOB_CAT_ASSISTANT, slots = %d),\n", s.Crew-1)
 	}
-	hull += fmt.Sprintf("\t)\n\n%s\n\tname = %s\n\tarea_type = %s\n\tport_direction = %d\n\tpreferred_direction = NORTH\n\n%s\n\tname = %s\n\ticon_state = \"station\"\n", p.portType(), dmQuote(h.Name), p.areaType(), s.PortDirection, p.areaType(), dmQuote(h.Name))
+	hull += "\t)\n" + p.availableThemesLine()
+	hull += fmt.Sprintf("\n%s\n\tname = %s\n\tarea_type = %s\n\tport_direction = %d\n\tpreferred_direction = NORTH\n\n%s\n\tname = %s\n\ticon_state = \"station\"\n", p.portType(), dmQuote(h.Name), p.areaType(), s.PortDirection, p.areaType(), dmQuote(h.Name))
 	var modules strings.Builder
 	for _, t := range h.Themes {
 		def := "FALSE"
@@ -86,6 +87,14 @@ func (p *Project) registration() ([]byte, []byte, error) {
 		}
 	}
 	return p.applyGeneratedCosts(hullBytes, moduleBytes)
+}
+
+func (p *Project) availableThemesLine() string {
+	ids := make([]string, 0, len(p.Hull.Themes))
+	for _, theme := range p.Hull.Themes {
+		ids = append(ids, theme.ID)
+	}
+	return "\tavailable_themes = " + dmList(ids) + "\n"
 }
 
 func permanent(path string) bool {

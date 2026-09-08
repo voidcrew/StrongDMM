@@ -403,7 +403,7 @@ func (ws *WsShip) canvasHeader() {
 
 func (ws *WsShip) loadoutControls() {
 	h := ws.project.Hull
-	if len(h.Themes) > 1 && combo("Ship variant", ws.currentTheme().Name) {
+	if len(h.Themes) > 0 && combo("Ship variant", ws.currentTheme().Name) {
 		for i, t := range h.Themes {
 			if imgui.SelectableV(t.Name, i == ws.theme, 0, imgui.Vec2{}) {
 				ws.flush()
@@ -414,11 +414,18 @@ func (ws *WsShip) loadoutControls() {
 		}
 		imgui.EndCombo()
 	}
+	if len(h.Themes) > 0 && actionButton("Rename ship variant...", false) {
+		theme := ws.currentTheme()
+		ws.beginRename(taskRenameTheme, theme.ID, theme.Name)
+	}
 	for _, slot := range h.SlotsFor(ws.currentTheme()) {
+		imgui.PushID(slot)
 		label := "Empty room"
+		selected := false
 		for _, m := range h.Modules {
 			if m.ID == ws.selected[slot] {
 				label = m.Name
+				selected = true
 			}
 		}
 		if comboHelp("Room: "+slot, label, "Choose which room option is shown here. Choosing it also makes it the part you edit.") {
@@ -437,6 +444,12 @@ func (ws *WsShip) loadoutControls() {
 			}
 			imgui.EndCombo()
 		}
+		imgui.BeginDisabledV(!selected)
+		if actionButton("Rename room option...", false) {
+			ws.beginRename(taskRenameModule, ws.selected[slot], label)
+		}
+		imgui.EndDisabled()
+		imgui.PopID()
 	}
 	if ws.project.Settings != nil && actionButton("Copy ship as a new variant...", false) {
 		ws.beginTask(taskTheme)

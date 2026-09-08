@@ -27,3 +27,6 @@ logs/
 
 # Build destination folder
 dst/
+
+# Downloaded runtime embedded by the Windows release builder
+/internal/shippreview/preview-runtime.zip

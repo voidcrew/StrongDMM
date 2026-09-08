@@ -42,28 +42,29 @@ type Settings struct {
 }
 
 type Project struct {
-	BeforeOpen      func(string) error
-	Catalog         *Catalog
-	Dme             *dmenv.Dme
-	Hull            Hull
-	Settings        *Settings // nil for hand-authored registrations
-	Documents       map[string]*Document
-	files           map[string]FileChange
-	savedSettings   []byte
-	RoomAreas       []RoomArea
-	savedAreas      []byte
-	draftAreaPaths  map[string]bool
-	rooms           *roomEditing
-	savedRooms      []byte
-	Crew            *CrewConfig
-	savedCrew       []byte
-	crewOriginal    map[string][]CrewJob
-	generatedBefore map[string][]byte
-	partCosts       map[string]PartCosts
-	savedPartCosts  []byte
-	costOriginal    map[string]costSource
-	costSources     map[string][]byte
-	costEdited      map[string]bool
+	BeforeOpen          func(string) error
+	Catalog             *Catalog
+	Dme                 *dmenv.Dme
+	Hull                Hull
+	Settings            *Settings // nil for hand-authored registrations
+	Documents           map[string]*Document
+	files               map[string]FileChange
+	savedSettings       []byte
+	RoomAreas           []RoomArea
+	savedAreas          []byte
+	draftAreaPaths      map[string]bool
+	rooms               *roomEditing
+	savedRooms          []byte
+	Crew                *CrewConfig
+	savedCrew           []byte
+	crewOriginal        map[string][]CrewJob
+	generatedBefore     map[string][]byte
+	registrationUpgrade bool
+	partCosts           map[string]PartCosts
+	savedPartCosts      []byte
+	costOriginal        map[string]costSource
+	costSources         map[string][]byte
+	costEdited          map[string]bool
 }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
@@ -145,6 +146,13 @@ func OpenProject(c *Catalog, dme *dmenv.Dme, h Hull) (*Project, error) {
 			return nil, e
 		}
 		paths := p.outputPaths()
+		// Older workshop exports omitted the hull's theme list, so the game
+		// could not count variant-only crew. Migrate only an exact legacy export.
+		legacy := bytes.Replace(hull, []byte(p.availableThemesLine()), nil, 1)
+		if sameDMSource(p.files[paths[1]].Before, legacy) {
+			hull = legacy
+			p.registrationUpgrade = true
+		}
 		p.expectGenerated(paths[1], hull)
 		p.expectGenerated(paths[2], modules)
 	}
@@ -416,6 +424,9 @@ func (p *Project) settingsBytes() []byte {
 	return append(b, '\n')
 }
 func (p *Project) Modified() bool {
+	if p.registrationUpgrade {
+		return true
+	}
 	if !bytes.Equal(p.costBytes(), p.savedPartCosts) {
 		return true
 	}
@@ -478,7 +489,7 @@ func (p *Project) Changes() ([]FileChange, error) {
 		}
 		changes = append(changes, FileChange{Path: path, Before: d.Before, Existed: d.Existed, After: data.EncodeTGM()})
 	}
-	if p.Settings != nil && (!bytes.Equal(p.settingsBytes(), p.savedSettings) || !bytes.Equal(p.crewBytes(), p.savedCrew)) {
+	if p.Settings != nil && (p.registrationUpgrade || !bytes.Equal(p.settingsBytes(), p.savedSettings) || !bytes.Equal(p.crewBytes(), p.savedCrew)) {
 		paths := p.outputPaths()
 		for _, path := range paths[1:3] {
 			if err := p.checkGenerated(path); err != nil {
@@ -564,6 +575,7 @@ func (p *Project) accept(changes []FileChange) error {
 	p.savedPartCosts = p.costBytes()
 	p.savedAreas = p.areaBytes()
 	p.savedRooms = p.roomBytes()
+	p.registrationUpgrade = false
 	return nil
 }
 

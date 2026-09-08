@@ -18,7 +18,7 @@ func PreviewStatus(status shippreview.Status, retry func()) {
 		if imgui.Button("Retry previews") {
 			retry()
 		}
-		Muted("Setup: Help > Ship Purchase Previews")
+		Muted("Help > Ship Purchase Previews")
 	}
 	_, logErr := os.Stat(status.Log)
 	if status.Log != "" && logErr == nil && imgui.Button("Open preview log") {

@@ -31,7 +31,7 @@ def main():
 
 func fixture(t *testing.T) (string, *Client) {
 	t.Helper()
-	if _, _, err := python(); err != nil {
+	if _, _, err := python(); err != nil && !Bundled() {
 		t.Skip("Python is needed for the preview worker integration tests")
 	}
 	root := filepath.Join(t.TempDir(), "Project with spaces & brackets [test]")
@@ -128,7 +128,11 @@ func TestMissingGeneratorAndPython(t *testing.T) {
 	root, client = fixture(t)
 	t.Setenv("STRONGDMM_PYTHON", filepath.Join(root, "not-python"))
 	client.Request(root, filepath.Join(root, "selected.dme"))
-	until(t, func() bool { return client.Status(root).Phase == "error" })
+	if Bundled() {
+		until(t, func() bool { return client.Status(root).Phase == "complete" })
+	} else {
+		until(t, func() bool { return client.Status(root).Phase == "error" })
+	}
 }
 
 func TestShipMapPaths(t *testing.T) {

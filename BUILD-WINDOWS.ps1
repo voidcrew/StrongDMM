@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.5.5',
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.5.6',
     [string]$Revision = 'source',
     [switch]$Test
 )
@@ -13,12 +13,21 @@ try {
         }
     }
     $env:CGO_ENABLED = '1'
-    # Keep the source builder's machine path out of Rust panic locations.
-    $env:CARGO_ENCODED_RUSTFLAGS = "--remap-path-prefix=$PSScriptRoot=source"
+    # Keep local source and dependency paths out of Rust panic locations.
+    $cargoRoot = if ($env:CARGO_HOME) { [System.IO.Path]::GetFullPath($env:CARGO_HOME) } else { Join-Path ([Environment]::GetFolderPath('UserProfile')) '.cargo' }
+    $rustPathMappings = @(
+        "--remap-path-prefix=$PSScriptRoot=source"
+        "--remap-path-prefix=$($PSScriptRoot.Replace('\', '/'))=source"
+        "--remap-path-prefix=$cargoRoot=cargo"
+        "--remap-path-prefix=$($cargoRoot.Replace('\', '/'))=cargo"
+    )
+    $env:CARGO_ENCODED_RUSTFLAGS = $rustPathMappings -join [char]0x1f
     if (-not $env:CC) { $env:CC = (Get-Command gcc).Source }
     if (-not $env:CXX) { $env:CXX = (Get-Command g++).Source }
     $moduleMode = 'mod'
     if (Test-Path -LiteralPath 'vendor/modules.txt') { $moduleMode = 'vendor' }
+    & go run "-mod=$moduleMode" ./cmd/bundlepreviews
+    if ($LASTEXITCODE -ne 0) { throw 'Preview runtime packaging failed.' }
     Push-Location third_party/sdmmparser/src
     try {
         $cargoArgs = @('build', '--release', '--locked')
@@ -27,7 +36,7 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Rust parser build failed.' }
     } finally { Pop-Location }
     if ($Test) {
-        & go test "-mod=$moduleMode" ./...
+        & go test "-mod=$moduleMode" -tags bundled_previews ./...
         if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
     }
     $sharedFlags = "-s -w -X sdmm/internal/env.Version=$Version -X sdmm/internal/env.Revision=$Revision -extldflags=-static"
@@ -38,7 +47,7 @@ try {
     & windres -i dst/version.rc -o resource_windows_amd64.syso -O coff --target=pe-x86-64
     if ($LASTEXITCODE -ne 0) { throw 'Windows resource build failed.' }
     try {
-        & go build "-mod=$moduleMode" -buildvcs=false -trimpath "-ldflags=$sharedFlags -H windowsgui" -o dst/StrongDMM.exe .
+        & go build "-mod=$moduleMode" -tags bundled_previews -buildvcs=false -trimpath "-ldflags=$sharedFlags -H windowsgui" -o dst/StrongDMM.exe .
         if ($LASTEXITCODE -ne 0) { throw 'Editor build failed.' }
     } finally { Remove-Item -LiteralPath (Join-Path $PSScriptRoot 'resource_windows_amd64.syso') -ErrorAction SilentlyContinue }
     & go build "-mod=$moduleMode" -buildvcs=false -trimpath "-ldflags=$sharedFlags" -o dst/shipcheck.exe ./cmd/shipcheck

@@ -104,7 +104,7 @@ func (c *Client) launch(folder, root, environment string) error {
 	if !Available(root) {
 		return fmt.Errorf("%s is missing from this project", Script)
 	}
-	executable, args, err := python()
+	executable, args, environmentVars, err := c.previewCommand()
 	if err != nil {
 		return err
 	}
@@ -140,6 +140,7 @@ func (c *Client) launch(folder, root, environment string) error {
 	defer log.Close()
 	args = append(args, "-B", "-u", helper, folder, root, environment)
 	cmd := exec.Command(executable, args...)
+	cmd.Env = environmentVars
 	cmd.Dir, cmd.Stdout, cmd.Stderr = root, log, log
 	configureProcess(cmd)
 	if err = cmd.Start(); err != nil {
@@ -191,7 +192,7 @@ func (c *Client) Status(root string) Status {
 	case "starting":
 		status.Message = "Starting preview generation..."
 		if time.Since(c.requested[folder]) > 20*time.Second {
-			status.Phase, status.Message = "failed", "Python did not start the preview helper. Check your Python installation and retry."
+			status.Phase, status.Message = "failed", "The preview helper did not start. Open the preview log, then retry."
 			status.Log = filepath.Join(folder, "launcher.log")
 		}
 	}
