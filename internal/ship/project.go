@@ -54,6 +54,9 @@ type Project struct {
 	draftAreaPaths map[string]bool
 	rooms          *roomEditing
 	savedRooms     []byte
+	Crew           *CrewConfig
+	savedCrew      []byte
+	crewOriginal   map[string][]CrewJob
 }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
@@ -124,6 +127,9 @@ func OpenProject(c *Catalog, dme *dmenv.Dme, h Hull) (*Project, error) {
 		return nil, err
 	}
 	p.savedRooms = p.roomBytes()
+	if err = p.openCrew(); err != nil {
+		return nil, err
+	}
 	return p, nil
 }
 
@@ -389,6 +395,9 @@ func (p *Project) settingsBytes() []byte {
 	return append(b, '\n')
 }
 func (p *Project) Modified() bool {
+	if !bytes.Equal(p.crewBytes(), p.savedCrew) {
+		return true
+	}
 	if !bytes.Equal(p.roomBytes(), p.savedRooms) {
 		return true
 	}
@@ -445,7 +454,7 @@ func (p *Project) Changes() ([]FileChange, error) {
 		}
 		changes = append(changes, FileChange{Path: path, Before: d.Before, Existed: d.Existed, After: data.EncodeTGM()})
 	}
-	if p.Settings != nil && !bytes.Equal(p.settingsBytes(), p.savedSettings) {
+	if p.Settings != nil && (!bytes.Equal(p.settingsBytes(), p.savedSettings) || !bytes.Equal(p.crewBytes(), p.savedCrew)) {
 		paths := p.outputPaths()
 		hull, modules, err := p.registration()
 		if err != nil {
@@ -485,6 +494,10 @@ func (p *Project) Changes() ([]FileChange, error) {
 	if err != nil {
 		return nil, err
 	}
+	changes, err = p.crewChanges(changes)
+	if err != nil {
+		return nil, err
+	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Path < changes[j].Path })
 	return changes, nil
 }
@@ -511,6 +524,7 @@ func (p *Project) accept(changes []FileChange) error {
 		}
 	}
 	p.savedSettings = p.settingsBytes()
+	p.savedCrew = p.crewBytes()
 	p.savedAreas = p.areaBytes()
 	p.savedRooms = p.roomBytes()
 	return nil

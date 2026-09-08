@@ -32,6 +32,7 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	}
 	catalog := &ship.Catalog{Root: root, ModuleDir: "_maps/voidcrew/ship_modules/"}
 	ws.catalog = catalog
+	ws.projects = map[string]*ship.Project{}
 	ws.app.(*previewApp).dme = &draftEnv
 	ws.BeginNewShip()
 	ws.newName = "Workshop Fixture"
@@ -325,5 +326,7 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 		t.Fatal("review screen exposes map tools")
 	}
 	capture("review-save")
+	exerciseCrew(t, ws, render, false)
 	exerciseLoadedShipRooms(t, ws, render)
+	exerciseCrew(t, ws, render, true)
 }

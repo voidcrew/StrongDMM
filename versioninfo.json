@@ -2,14 +2,14 @@
     "FixedFileInfo":  {
                           "FileVersion":  {
                                               "Major":  0,
-                                              "Minor":  3,
-                                              "Patch":  3,
+                                              "Minor":  4,
+                                              "Patch":  0,
                                               "Build":  0
                                           },
                           "ProductVersion":  {
                                                  "Major":  0,
-                                                 "Minor":  3,
-                                                 "Patch":  3,
+                                                 "Minor":  4,
+                                                 "Patch":  0,
                                                  "Build":  0
                                              },
                           "FileFlagsMask":  "3f",
@@ -22,14 +22,14 @@
                            "Comments":  "",
                            "CompanyName":  "Voidcrew",
                            "FileDescription":  "StrongDMM - Voidcrew",
-                           "FileVersion":  "0.3.3",
+                           "FileVersion":  "0.4.0",
                            "InternalName":  "StrongDMM",
                            "LegalCopyright":  "Copyright (C) 2019-2024",
                            "LegalTrademarks":  "",
                            "OriginalFilename":  "StrongDMM.exe",
                            "PrivateBuild":  "",
                            "ProductName":  "StrongDMM Voidcrew",
-                           "ProductVersion":  "0.3.3",
+                           "ProductVersion":  "0.4.0",
                            "SpecialBuild":  ""
                        },
     "VarFileInfo":  {

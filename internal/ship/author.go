@@ -68,7 +68,24 @@ func (p *Project) registration() ([]byte, []byte, error) {
 		}
 		fmt.Fprintf(&modules, "\n/datum/ship_upgrade_module/%s_%s\n\tid = %s\n\tname = %s\n\tslot = %s\n\tfor_ship = %s\n\tfor_theme = %s\n\tmap_file = %s\n\tis_default = %s\n", s.ID, m.ID, dmQuote(m.ID), dmQuote(m.Name), dmQuote(m.Slot), h.Type, dmList(m.Themes), dmQuote(m.File), def)
 	}
-	return []byte(hull), []byte(modules.String()), nil
+	hullBytes, moduleBytes := []byte(hull), []byte(modules.String())
+	if p.Crew != nil {
+		for key, jobs := range p.Crew.Rosters {
+			scope, err := p.crewScope(key)
+			if err != nil {
+				return nil, nil, err
+			}
+			if key == "ship" {
+				hullBytes, err = rewriteCrewList(hullBytes, scope.Type, scope.Field, renderCrew(jobs, p))
+			} else {
+				moduleBytes, err = rewriteCrewList(moduleBytes, scope.Type, scope.Field, renderCrew(jobs, p))
+			}
+			if err != nil {
+				return nil, nil, err
+			}
+		}
+	}
+	return hullBytes, moduleBytes, nil
 }
 
 func permanent(path string) bool {
@@ -271,11 +288,23 @@ func (p *Project) AddTheme(baseIndex int, id, name string) error {
 		}
 	}
 	p.Hull.Themes = append(p.Hull.Themes, theme)
+	if p.Crew != nil {
+		if jobs, ok := p.Crew.Rosters["theme/"+base.ID]; ok {
+			jobs = CloneCrewJobs(jobs)
+			for i := range jobs {
+				jobs[i].ID = ""
+			}
+			if err := p.SetCrewJobs("theme/"+id, jobs); err != nil {
+				return err
+			}
+		}
+	}
 	return nil
 }
 
 // State stores authoring changes as a single history entry across every file.
 type State struct {
+	Crew      *CrewConfig
 	Hull      Hull
 	RoomAreas []RoomArea
 	Settings  *Settings
@@ -284,6 +313,7 @@ type State struct {
 
 func (p *Project) Capture() State {
 	state := State{Maps: map[string]dmmap.Dmm{}}
+	state.Crew = cloneCrew(p.Crew)
 	// JSON round-trip deep-copies nested registration slices.
 	state.Hull = cloneHull(p.Hull)
 	state.RoomAreas = append([]RoomArea(nil), p.RoomAreas...)
@@ -299,6 +329,7 @@ func (p *Project) Capture() State {
 	return state
 }
 func (p *Project) Restore(state State) {
+	p.Crew = cloneCrew(state.Crew)
 	p.Hull = cloneHull(state.Hull)
 	p.RoomAreas = append([]RoomArea(nil), state.RoomAreas...)
 	if state.Settings != nil {

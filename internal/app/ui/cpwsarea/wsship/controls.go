@@ -124,6 +124,9 @@ func actionButton(label string, primary bool) bool {
 }
 
 func (ws *WsShip) setStage(stage int) {
+	if !ws.commitCrew() {
+		return
+	}
 	ws.flush()
 	ws.OnFocusChange(false)
 	ws.stage, ws.wizard = stage, false
@@ -159,6 +162,8 @@ func (ws *WsShip) Process() {
 		ws.chooseShip()
 	case ws.stage == stepReview:
 		ws.review()
+	case ws.task == taskCrew:
+		ws.crewContent()
 	case ws.pane != nil && !ws.invalid:
 		ws.canvasHeader()
 		ws.pane.Process()
@@ -257,6 +262,10 @@ func (ws *WsShip) buildControls() {
 	if ws.project == nil {
 		return
 	}
+	if ws.task == taskCrew {
+		ws.crewControls()
+		return
+	}
 	if ws.task != taskPaint {
 		ws.authorControls()
 		return
@@ -286,6 +295,9 @@ func (ws *WsShip) buildControls() {
 	}
 	space()
 	areaAction := "Ship areas..."
+	if actionButton("Crew & equipment...", false) {
+		ws.beginCrew()
+	}
 	if _, _, selected := tools.SelectionBounds(); selected {
 		areaAction = "Make or assign an area..."
 	}

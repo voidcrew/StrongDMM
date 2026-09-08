@@ -23,6 +23,7 @@ const (
 	taskResize
 	taskSettings
 	taskDocking
+	taskCrew
 )
 
 type settingsForm struct {
@@ -245,6 +246,9 @@ func (ws *WsShip) beginTask(task buildTask) {
 }
 
 func (ws *WsShip) finishTask() {
+	if !ws.commitCrew() {
+		return
+	}
 	ws.task = taskPaint
 }
 
@@ -518,7 +522,11 @@ func (ws *WsShip) settingsControls() {
 	s := &ws.settings
 	textField("Ship name", "Name shown to players", &s.name)
 	textField("Description", "What is this ship for?", &s.description)
-	numberField("Crew capacity", &s.crew)
+	if ws.project.Crew == nil {
+		numberField("Starting crew capacity", &s.crew)
+	} else {
+		hint("Crew capacity is set by the slots in Crew & equipment.")
+	}
 	numberField("Build cost (misc parts)", &s.cost)
 	imgui.Checkbox("Hide from the player ship list", &s.hidden)
 	hint("Keep this checked while your ship is a work in progress.")

@@ -46,6 +46,8 @@ type WsShip struct {
 	reviewReady                      bool
 	reviewed                         []reviewProject
 	SourceBusy                       func(string) bool
+	crew                             crewEditor
+	crewVisual                       crewVisual
 }
 
 func New(app App, busy ...func(string) bool) *WsShip {
@@ -90,13 +92,16 @@ func (ws *WsShip) Title() string {
 	return "Ship Workshop"
 }
 func (ws *WsShip) Map() *pmap.PaneMap {
-	if ws.wizard || ws.invalid || ws.stage != stepBuild {
+	if ws.wizard || ws.invalid || ws.stage != stepBuild || ws.task == taskCrew {
 		return nil
 	}
 	return ws.pane
 }
 func (ws *WsShip) CommandStackId() string { return "ship:" + ws.Id() }
 func (ws *WsShip) IsModified() bool {
+	if ws.task == taskCrew && ws.crew.dirty {
+		return true
+	}
 	for _, p := range ws.projects {
 		if p.Modified() {
 			return true
@@ -117,7 +122,7 @@ func (ws *WsShip) OnFocusChange(f bool) {
 	if !f && tools.IsSelected(tools.TNRegion) {
 		tools.SetSelected(tools.TNAdd)
 	}
-	if ws.pane != nil && !ws.wizard && ws.stage == stepBuild {
+	if ws.pane != nil && !ws.wizard && ws.stage == stepBuild && ws.task != taskCrew {
 		if f && !ws.invalid {
 			ws.pane.OnActivate()
 		} else {
@@ -218,7 +223,7 @@ func (ws *WsShip) rebuild() {
 		}
 	}
 	ws.invalid = false
-	if ws.focused && ws.stage == stepBuild && !ws.wizard {
+	if ws.focused && ws.stage == stepBuild && !ws.wizard && ws.task != taskCrew {
 		tools.SetEnabled(true)
 	}
 	ws.assembly = a
@@ -334,6 +339,9 @@ func (ws *WsShip) FocusSource(file string) {
 	}
 }
 func (ws *WsShip) Save() bool {
+	if !ws.commitCrew() {
+		return false
+	}
 	ws.flush()
 	projects := []*ship.Project{}
 	for _, p := range ws.projects {
@@ -359,6 +367,7 @@ func (ws *WsShip) change(label string, action func() error) {
 	p := ws.project
 	before := p.Capture()
 	h, t := ws.hull, ws.theme
+	crewTask, crewScope, crewSelection := ws.task == taskCrew, ws.crew.scope, ws.crew.selected
 	sel := copySelection(ws.selected)
 	if err := action(); err != nil {
 		p.Restore(before)
@@ -385,6 +394,11 @@ func (ws *WsShip) change(label string, action func() error) {
 			pane.CanvasState().SetMaxY(pane.Dmm().MaxY)
 		}
 		ws.rebuild()
+		if crewTask {
+			ws.beginCrew()
+			ws.loadCrewScope(crewScope)
+			ws.crew.selected = min(crewSelection, len(ws.crew.jobs)-1)
+		}
 		ws.OnFocusChange(true)
 		tools.RefreshGrabSelection()
 	}
