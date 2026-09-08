@@ -25,7 +25,7 @@ func TestSuggestedIdentifiers(t *testing.T) {
 func TestGuidedActionRejectsMissingSelection(t *testing.T) {
 	ws := &WsShip{task: taskRoom}
 	ws.applyRegion()
-	if ws.message != "Drag a rectangle inside the hull first." {
+	if ws.message != "Use Grab (3) to select tiles inside the hull first." {
 		t.Fatal("missing selection did not produce guidance")
 	}
 }

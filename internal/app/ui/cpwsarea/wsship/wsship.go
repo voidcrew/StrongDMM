@@ -385,6 +385,7 @@ func (ws *WsShip) change(label string, action func() error) {
 		}
 		ws.rebuild()
 		ws.OnFocusChange(true)
+		tools.RefreshGrabSelection()
 	}
 	for _, pane := range ws.panes {
 		pane.Snapshot().Sync()
@@ -394,4 +395,5 @@ func (ws *WsShip) change(label string, action func() error) {
 	ws.app.CommandStorage().PushV(ws.CommandStackId(), command.Make(label, func() { restore(before) }, func() { restore(after) }))
 	ws.catalog.Hulls[h] = p.Hull
 	ws.rebuild()
+	tools.RefreshGrabSelection()
 }

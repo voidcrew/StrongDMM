@@ -259,7 +259,11 @@ func (ws *WsShip) buildControls() {
 		imgui.EndCombo()
 	}
 	space()
-	if actionButton("Ship areas...", false) {
+	areaAction := "Ship areas..."
+	if _, _, selected := tools.SelectionBounds(); selected {
+		areaAction = "Make or assign an area..."
+	}
+	if actionButton(areaAction, false) {
 		ws.beginTask(taskArea)
 	}
 	if ws.project.Settings != nil {
@@ -317,13 +321,13 @@ func (ws *WsShip) canvasHeader() {
 	}
 	tooltip("Show area markers. This is the same setting as View > Areas (Ctrl+1).")
 	imgui.SameLine()
-	if tools.IsSelected(tools.TNRegion) && (ws.task == taskArea || ws.task == taskRoom) {
+	if tools.IsSelected(tools.TNGrab) && (ws.task == taskArea || ws.task == taskRoom) {
 		imgui.Text("Select tiles in the part being edited")
 	} else if ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
 		imgui.Text("Editing: " + ws.assembly.Sources[ws.source].Name)
 	}
-	if tools.IsSelected(tools.TNRegion) && (ws.task == taskArea || ws.task == taskRoom) {
-		hint("Release to select. Apply the change in the left panel.")
+	if tools.IsSelected(tools.TNGrab) && (ws.task == taskArea || ws.task == taskRoom) {
+		hint("Grab selection (3) is used by the action in the left panel.")
 	} else {
 		instruction := "Scroll to zoom  |  Middle mouse to pan  |  Ctrl+Z to undo"
 		if p, ok := ws.app.SelectedPrefab(); ok && tools.IsSelected(tools.TNAdd) {

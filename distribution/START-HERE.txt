@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.3.0
+Version: 0.3.1
 
 START
 1. Extract the whole ZIP into a writable folder.
@@ -20,8 +20,10 @@ SHIP WORKSHOP
    File identifiers and the docking port are created automatically.
 2. Build: choose the Part to edit, then place pieces on the assembled map.
    Use the normal StrongDMM tools for floors, walls, objects and utilities.
-   Ship areas creates named room areas and their DM definitions. Select an
-   existing area or create one, then paint it or assign it to selected tiles.
+   Use Grab (3) to select tiles, then choose Make an upgrade room or
+   Make or assign an area. The selection carries into the action.
+   Creating an area with a selection assigns it in the same undoable action.
+   Ship areas also lets you create definitions for normal area painting.
    Area assignment preserves floors, walls and objects. New and existing ships
    are supported. The selected hull or module receives the area edits.
    Make an upgrade room keeps walls and flooring in the hull and moves

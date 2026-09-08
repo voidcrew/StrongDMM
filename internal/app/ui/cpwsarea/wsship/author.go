@@ -210,16 +210,23 @@ func (ws *WsShip) beginTask(task buildTask) {
 	ws.task, ws.itemName, ws.itemID, ws.message = task, "", "", ""
 	ws.customID, ws.emptyModule = false, false
 	if task == taskRoom {
+		lo, hi, selected := tools.SelectionBounds()
+		if selected && ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
+			offset := ws.assembly.Sources[ws.source].Offset
+			lo.X, lo.Y = lo.X+offset.X, lo.Y+offset.Y
+			hi.X, hi.Y = hi.X+offset.X, hi.Y+offset.Y
+		}
 		ws.source, ws.isolated = 0, false
 		ws.rebuild()
-		tools.SetSelected(tools.TNRegion).OnDeselect()
+		if selected {
+			tools.SetGrabSelection(lo, hi)
+		}
 	}
 	if task == taskArea {
 		ws.areaPath, ws.areaIcon = "", "station"
 		if !ws.app.PathsFilter().IsVisiblePath("/area") {
 			ws.app.PathsFilter().TogglePath("/area")
 		}
-		tools.SetSelected(tools.TNRegion).OnDeselect()
 	}
 	if task == taskSettings {
 		s := ws.project.Settings
@@ -233,7 +240,6 @@ func (ws *WsShip) beginTask(task buildTask) {
 
 func (ws *WsShip) finishTask() {
 	ws.task = taskPaint
-	tools.SetSelected(tools.TNAdd)
 }
 
 func (ws *WsShip) authorControls() {
@@ -274,21 +280,15 @@ func (ws *WsShip) authorControls() {
 func (ws *WsShip) regionControls() {
 	heading("MAKE AN UPGRADE ROOM")
 	hint("Turn a furnished room into a swappable upgrade. Its walls and floor stay in the hull.")
-	heading("1. Select the area")
-	hint("Drag a rectangle over the hull. Drag again to change the selection.")
-	if !tools.IsSelected(tools.TNRegion) && actionButton("Select an area on the map", false) {
-		tools.SetSelected(tools.TNRegion)
-	}
-	lo, hi, ready := tools.RegionBounds()
+	lo, hi, ready := tools.SelectionBounds()
 	if ready {
 		imgui.Text(fmt.Sprintf("Selected: %d x %d tiles", hi.X-lo.X+1, hi.Y-lo.Y+1))
 	} else {
-		hint("No area selected yet.")
+		hint("Use Grab (3) to select the room's tiles.")
 	}
 	label := "Make this an upgrade room"
 	valid := ready && ws.source == 0
 	if ws.task == taskRoom {
-		heading("2. Name the room")
 		textField("Room name", "e.g. Cargo bay", &ws.itemName)
 		ws.itemIdentifier()
 		valid = valid && strings.TrimSpace(ws.itemName) != "" && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
@@ -304,9 +304,9 @@ func (ws *WsShip) regionControls() {
 }
 
 func (ws *WsShip) applyRegion() {
-	lo, hi, ready := tools.RegionBounds()
+	lo, hi, ready := tools.SelectionBounds()
 	if !ready || ws.source != 0 || ws.pane == nil || !ws.pane.Dmm().HasTile(lo) || !ws.pane.Dmm().HasTile(hi) {
-		ws.message = "Drag a rectangle inside the hull first."
+		ws.message = "Use Grab (3) to select tiles inside the hull first."
 		return
 	}
 	{
@@ -356,14 +356,14 @@ func (ws *WsShip) areaControls() {
 	if actionButton("Paint selected area", false) {
 		ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial(ws.areaPath))
 		ws.finishTask()
+		tools.SetSelected(tools.TNAdd)
 	}
 	imgui.EndDisabled()
-	if !tools.IsSelected(tools.TNRegion) && actionButton("Select tiles...", false) {
-		tools.SetSelected(tools.TNRegion).OnDeselect()
-	}
-	lo, hi, ready := tools.RegionBounds()
+	lo, hi, ready := tools.SelectionBounds()
 	if ready {
 		imgui.Text(fmt.Sprintf("Selected: %d x %d tiles", hi.X-lo.X+1, hi.Y-lo.Y+1))
+	} else {
+		hint("Use Grab (3) to select tiles for area assignment.")
 	}
 	imgui.BeginDisabledV(!ready || ws.areaPath == "")
 	if actionButton("Assign area to selected tiles", true) {
@@ -402,7 +402,11 @@ func (ws *WsShip) areaControls() {
 	}
 	valid := strings.TrimSpace(ws.itemName) != "" && ship.ValidID(ws.itemID) == nil && !ws.project.AreaIDUsed(root, ws.itemID)
 	imgui.BeginDisabledV(!valid)
-	if actionButton("Create area", true) {
+	createLabel := "Create area"
+	if ready {
+		createLabel = "Create area for selection"
+	}
+	if actionButton(createLabel, true) {
 		ws.createArea()
 	}
 	imgui.EndDisabled()
@@ -410,9 +414,16 @@ func (ws *WsShip) areaControls() {
 }
 
 func (ws *WsShip) createArea() {
+	lo, hi, selected := tools.SelectionBounds()
 	ws.change("Create ship area", func() error {
 		var err error
 		ws.areaPath, err = ws.project.AddArea(ws.currentTheme(), ws.itemID, ws.itemName, ws.areaIcon)
+		if err == nil && selected {
+			if ws.assembly == nil || ws.source >= len(ws.assembly.Sources) {
+				return fmt.Errorf("select a ship part first")
+			}
+			err = ws.project.AssignArea(ws.currentTheme(), ws.assembly.Sources[ws.source].File, ws.areaPath, lo, hi)
+		}
 		return err
 	})
 	if ws.message == "" {

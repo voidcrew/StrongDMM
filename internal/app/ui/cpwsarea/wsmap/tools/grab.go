@@ -57,6 +57,40 @@ func (t *ToolGrab) HasSelectedArea() bool {
 	return t.fillStart != util.Point{}
 }
 
+// SelectionBounds exposes the completed Grab selection, in source coordinates.
+// Hovering a tile or dragging an unfinished selection does not count.
+func SelectionBounds() (util.Point, util.Point, bool) {
+	t, ok := Selected().(*ToolGrab)
+	if !ok || t.dragging || !t.HasSelectedArea() || len(t.initTiles) == 0 || ed == nil {
+		return util.Point{}, util.Point{}, false
+	}
+	lo := util.Point{X: int(t.fillArea.X1), Y: int(t.fillArea.Y1), Z: t.fillStart.Z}
+	hi := util.Point{X: int(t.fillArea.X2), Y: int(t.fillArea.Y2), Z: t.fillStart.Z}
+	return lo, hi, ed.Dmm().HasTile(lo) && ed.Dmm().HasTile(hi)
+}
+
+// SetGrabSelection transfers a selection when a workshop action changes sources.
+// It only selects tiles; it never paints or moves them.
+func SetGrabSelection(lo, hi util.Point) bool {
+	if ed == nil || lo.Z != hi.Z || lo.X > hi.X || lo.Y > hi.Y || !ed.Dmm().HasTile(lo) || !ed.Dmm().HasTile(hi) {
+		return false
+	}
+	t := SetSelected(TNGrab).(*ToolGrab)
+	t.Reset()
+	t.fillStart = lo
+	t.selectArea(float64(lo.X), float64(lo.Y), float64(lo.X), float64(lo.Y), hi)
+	t.stopSelectArea()
+	return true
+}
+
+// A workshop action can change selected tiles without going through Grab.
+// Refresh its cached contents so the next move preserves those changes.
+func RefreshGrabSelection() {
+	if _, _, ready := SelectionBounds(); ready {
+		Selected().(*ToolGrab).stopSelectArea()
+	}
+}
+
 func (t *ToolGrab) Reset() {
 	t.fillStart = util.Point{}
 	t.fillAreaInit = util.Bounds{}

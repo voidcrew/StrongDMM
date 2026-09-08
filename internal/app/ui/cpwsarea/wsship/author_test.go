@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/dmapi/dmmap/dmmdata"
@@ -82,7 +83,14 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	ws.finishTask()
 	lo, hi := util.Point{X: 4, Y: 5, Z: 1}, util.Point{X: 12, Y: 13, Z: 1}
 	ws.change("Lay permanent deck", func() error { return project.Deck(ws.currentTheme(), lo, hi) })
+	if !tools.SetGrabSelection(lo, hi) {
+		t.Fatal("could not select hull")
+	}
+	beforeArea := ship.RawData(ws.pane.Dmm()).EncodeTGM()
 	ws.beginTask(taskArea)
+	if gotLo, gotHi, ready := tools.SelectionBounds(); !ready || gotLo != lo || gotHi != hi {
+		t.Fatal("opening areas lost Grab selection")
+	}
 	ws.itemName, ws.areaIcon = "Bridge", "bridge"
 	capture("ship-areas-create")
 	ws.createArea()
@@ -90,8 +98,22 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 		t.Fatal(ws.message)
 	}
 	bridgeArea := ws.areaPath
+	for _, point := range []util.Point{lo, hi} {
+		found := false
+		for _, inst := range ws.pane.Dmm().GetTile(point).Instances() {
+			if inst.Prefab().Path() == bridgeArea {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatal("create area did not assign selected tiles")
+		}
+	}
 	ws.app.DoSelectPrefab(dmmap.PrefabStorage.Initial(bridgeArea))
 	ws.app.CommandStorage().Undo()
+	if !bytes.Equal(beforeArea, ship.RawData(ws.pane.Dmm()).EncodeTGM()) {
+		t.Fatal("one undo did not restore selected tiles")
+	}
 	if project.AreaActive(bridgeArea) {
 		t.Fatal("undo kept created area")
 	}
@@ -99,6 +121,9 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 		t.Fatal("undo kept an invalid area brush")
 	}
 	ws.app.CommandStorage().Redo()
+	if !tools.SetGrabSelection(util.Point{X: 8, Y: 5, Z: 1}, hi) {
+		t.Fatal("could not select cargo area")
+	}
 	ws.beginTask(taskArea)
 	ws.itemName, ws.areaIcon = "Cargo bay", "quart"
 	capture("ship-areas-second")
@@ -115,7 +140,16 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	})
 	capture("ship-areas-assigned")
 	ws.finishTask()
-	ws.change("Extract cargo", func() error { return project.AddSlot(0, "cargo", "Cargo", lo, hi) })
+	if !tools.SetGrabSelection(lo, hi) {
+		t.Fatal("could not select room")
+	}
+	ws.beginTask(taskRoom)
+	if gotLo, gotHi, ready := tools.SelectionBounds(); !ready || gotLo != lo || gotHi != hi {
+		t.Fatal("opening room action lost Grab selection")
+	}
+	ws.itemID, ws.itemName = "cargo", "Cargo"
+	capture("grab-create-room")
+	ws.applyRegion()
 	if ws.message != "" {
 		t.Fatal(ws.message)
 	}
@@ -124,6 +158,23 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	ws.source = 1
 	ws.rebuild()
 	ws.OnFocusChange(true)
+	moduleLo, moduleHi := util.Point{X: 2, Y: 2, Z: 1}, util.Point{X: 3, Y: 3, Z: 1}
+	if !tools.SetGrabSelection(moduleLo, moduleHi) {
+		t.Fatal("could not select placed module")
+	}
+	ws.beginTask(taskArea)
+	if ws.source != 1 {
+		t.Fatal("area action switched away from selected module")
+	}
+	if gotLo, gotHi, ready := tools.SelectionBounds(); !ready || gotLo != moduleLo || gotHi != moduleHi {
+		t.Fatal("area action lost module-local selection")
+	}
+	ws.areaPath = cargoArea
+	ws.change("Assign module area", func() error {
+		return project.AssignArea(ws.currentTheme(), ws.assembly.Sources[1].File, cargoArea, moduleLo, moduleHi)
+	})
+	ws.finishTask()
+	tools.SetSelected(tools.TNAdd)
 	native := ws.pane.Dmm()
 	hull := ws.assembly.Sources[0].Live
 	beforeHull := ship.RawData(hull).EncodeTGM()
