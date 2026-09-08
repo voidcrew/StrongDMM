@@ -176,6 +176,20 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	ws.finishTask()
 	tools.SetSelected(tools.TNAdd)
 	native := ws.pane.Dmm()
+	ws.selectRoomOption("cargo", "")
+	if ws.source != 0 || len(ws.assembly.Sources) != 1 {
+		t.Fatal("empty room did not select hull")
+	}
+	ws.selectRoomOption("cargo", "cargo_basic")
+	if ws.source != 1 || ws.pane.Dmm() != native {
+		t.Fatal("choosing a room option did not select it for editing")
+	}
+	ws.change("Create alternate room", func() error { return project.AddModule(0, project.Hull.Modules[0], "medical", "Medical", true) })
+	ws.selectRoomOption("cargo", "medical")
+	if ws.source != 1 || ws.assembly.Sources[ws.source].Name != "Medical" || ws.pane.Dmm() == native {
+		t.Fatal("choosing a different option did not activate its map")
+	}
+	ws.selectRoomOption("cargo", "cargo_basic")
 	hull := ws.assembly.Sources[0].Live
 	beforeHull := ship.RawData(hull).EncodeTGM()
 	coord := util.Point{X: 2, Y: 3, Z: 1}

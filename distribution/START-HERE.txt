@@ -32,6 +32,9 @@ SHIP WORKSHOP
    New ships stay hidden from the player ship list while under development.
 
 Room options & ship variants contains alternative room layouts and ship themes.
+Choosing a room option also selects that module as the Part to edit.
+Names must be unique within the fleet's ship list and each ship's room options,
+themes and areas. Capitalization and extra spaces do not make a name unique.
 Ship details & canvas size contains names, crew, cost, docking and resizing.
 Advanced view & source files contains the isolated source view and file paths.
 Show whole ship centers the map and adjusts the zoom to fit it on screen.

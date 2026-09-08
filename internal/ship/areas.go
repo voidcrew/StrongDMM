@@ -154,6 +154,9 @@ func (p *Project) AreaActive(path string) bool {
 }
 
 func (p *Project) AddArea(theme Theme, id, name, icon string) (string, error) {
+	if err := p.AreaNameError(theme, name); err != nil {
+		return "", err
+	}
 	if err := ValidID(id); err != nil {
 		return "", err
 	}

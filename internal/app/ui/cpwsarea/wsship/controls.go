@@ -364,17 +364,11 @@ func (ws *WsShip) loadoutControls() {
 		}
 		if combo("Room: "+slot, label) {
 			if imgui.Selectable("Empty room") {
-				ws.flush()
-				ws.selected[slot] = ""
-				ws.source = 0
-				ws.rebuild()
+				ws.selectRoomOption(slot, "")
 			}
 			for _, m := range h.Modules {
 				if m.Slot == slot && m.Available(ws.currentTheme().ID) && imgui.SelectableV(m.Name, ws.selected[slot] == m.ID, 0, imgui.Vec2{}) {
-					ws.flush()
-					ws.selected[slot] = m.ID
-					ws.source = 0
-					ws.rebuild()
+					ws.selectRoomOption(slot, m.ID)
 				}
 			}
 			imgui.EndCombo()
@@ -389,6 +383,23 @@ func (ws *WsShip) loadoutControls() {
 	if ws.source > 0 {
 		if actionButton("Create another room option...", false) {
 			ws.beginTask(taskModule)
+		}
+	}
+}
+
+func (ws *WsShip) selectRoomOption(slot, id string) {
+	ws.flush()
+	ws.selected[slot] = id
+	ws.source = 0
+	ws.rebuild()
+	if id == "" || ws.invalid || ws.assembly == nil {
+		return
+	}
+	for i, source := range ws.assembly.Sources {
+		if source.Slot == slot {
+			ws.source = i
+			ws.rebuild()
+			return
 		}
 	}
 }

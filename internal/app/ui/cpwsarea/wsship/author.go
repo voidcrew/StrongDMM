@@ -133,7 +133,11 @@ func (ws *WsShip) newShip() {
 			}
 			hint("Used for generated file names. The automatic value is usually all you need.")
 		}
-		valid := strings.TrimSpace(ws.newName) != "" && ship.ValidID(ws.newID) == nil && !ws.shipIDUsed(ws.newID)
+		nameErr := ship.ShipNameError(ws.catalog, ws.app.LoadedEnvironment(), ws.newName, "")
+		valid := nameErr == nil && ship.ValidID(ws.newID) == nil && !ws.shipIDUsed(ws.newID)
+		if strings.TrimSpace(ws.newName) != "" && nameErr != nil {
+			hint(nameErr.Error())
+		}
 		if ws.customID && !valid {
 			hint("Use a unique lowercase identifier starting with a letter.")
 		}
@@ -291,7 +295,11 @@ func (ws *WsShip) regionControls() {
 	if ws.task == taskRoom {
 		textField("Room name", "e.g. Cargo bay", &ws.itemName)
 		ws.itemIdentifier()
-		valid = valid && strings.TrimSpace(ws.itemName) != "" && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
+		nameErr := ws.project.ModuleNameError(ws.itemName)
+		valid = valid && nameErr == nil && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
+		if strings.TrimSpace(ws.itemName) != "" && nameErr != nil {
+			hint(nameErr.Error())
+		}
 		label = "Make this an upgrade room"
 	}
 	space()
@@ -400,7 +408,11 @@ func (ws *WsShip) areaControls() {
 		}
 		hint(root + "/" + ws.itemID)
 	}
-	valid := strings.TrimSpace(ws.itemName) != "" && ship.ValidID(ws.itemID) == nil && !ws.project.AreaIDUsed(root, ws.itemID)
+	nameErr := ws.project.AreaNameError(ws.currentTheme(), ws.itemName)
+	valid := nameErr == nil && ship.ValidID(ws.itemID) == nil && !ws.project.AreaIDUsed(root, ws.itemID)
+	if strings.TrimSpace(ws.itemName) != "" && nameErr != nil {
+		hint(nameErr.Error())
+	}
 	imgui.BeginDisabledV(!valid)
 	createLabel := "Create area"
 	if ready {
@@ -459,7 +471,14 @@ func (ws *WsShip) copyControls() {
 		label = "Create room option"
 	}
 	ws.itemIdentifier()
-	valid := strings.TrimSpace(ws.itemName) != "" && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
+	nameErr := ws.project.ModuleNameError(ws.itemName)
+	if ws.task == taskTheme {
+		nameErr = ws.project.ThemeNameError(ws.itemName)
+	}
+	valid := nameErr == nil && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
+	if strings.TrimSpace(ws.itemName) != "" && nameErr != nil {
+		hint(nameErr.Error())
+	}
 	imgui.BeginDisabledV(!valid)
 	if actionButton(label, true) {
 		if ws.task == taskTheme {
@@ -517,7 +536,11 @@ func (ws *WsShip) settingsControls() {
 	}
 	imgui.Checkbox("Hide from the player ship list", &s.hidden)
 	hint("Keep this checked while your ship is a work in progress.")
-	valid := strings.TrimSpace(s.name) != "" && s.crew >= 1 && s.crew <= 32 && s.cost >= 0
+	nameErr := ship.ShipNameError(ws.catalog, ws.app.LoadedEnvironment(), s.name, ws.project.Hull.Type)
+	valid := nameErr == nil && s.crew >= 1 && s.crew <= 32 && s.cost >= 0
+	if strings.TrimSpace(s.name) != "" && nameErr != nil {
+		hint(nameErr.Error())
+	}
 	if !valid {
 		hint("Enter a name, 1 to 32 crew, and a cost of zero or more.")
 	}

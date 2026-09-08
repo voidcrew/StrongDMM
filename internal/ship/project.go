@@ -262,8 +262,8 @@ func NewProject(c *Catalog, dme *dmenv.Dme, id, name string, width, height int) 
 	if err := ValidID(id); err != nil {
 		return nil, err
 	}
-	if strings.TrimSpace(name) == "" {
-		return nil, fmt.Errorf("enter a ship name")
+	if err := ShipNameError(c, dme, name, ""); err != nil {
+		return nil, err
 	}
 	if width < 5 || height < 5 || width > 128 || height > 128 {
 		return nil, fmt.Errorf("canvas dimensions must be between 5 and 128")

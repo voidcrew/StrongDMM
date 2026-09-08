@@ -32,6 +32,9 @@ func dmList(ids []string) string {
 func (p *Project) registration() ([]byte, []byte, error) {
 	s := p.Settings
 	h := p.Hull
+	if err := ShipNameError(p.Catalog, p.Dme, h.Name, h.Type); err != nil {
+		return nil, nil, err
+	}
 	if err := ValidID(s.ID); err != nil {
 		return nil, nil, err
 	}
@@ -78,6 +81,9 @@ func permanent(path string) bool {
 }
 
 func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) error {
+	if err := p.ModuleNameError(name); err != nil {
+		return err
+	}
 	if p.Settings == nil {
 		return fmt.Errorf("slot creation requires an authored ship project")
 	}
@@ -143,6 +149,9 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 }
 
 func (p *Project) AddModule(themeIndex int, base Module, id, name string, empty bool) error {
+	if err := p.ModuleNameError(name); err != nil {
+		return err
+	}
 	if p.Settings == nil {
 		return fmt.Errorf("module creation requires an authored ship project")
 	}
@@ -185,6 +194,9 @@ func (p *Project) AddModule(themeIndex int, base Module, id, name string, empty 
 }
 
 func (p *Project) AddTheme(baseIndex int, id, name string) error {
+	if err := p.ThemeNameError(name); err != nil {
+		return err
+	}
 	if p.Settings == nil {
 		return fmt.Errorf("theme creation requires an authored ship project")
 	}
