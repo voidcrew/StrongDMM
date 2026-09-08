@@ -7,6 +7,7 @@ import (
 
 	"sdmm/internal/app/ui/cpwsarea/workspace"
 	"sdmm/internal/app/ui/shortcut"
+	"sdmm/internal/app/ui/workshop"
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/imguiext"
@@ -146,20 +147,44 @@ func (ws *WsEmpty) showContent() {
 			},
 		)
 	} else {
-		if ws.app.HasVoidcrewProject() {
-			imgui.Text("VOIDCREW PROJECT")
-			imgui.TextDisabled(ws.app.LoadedEnvironment().RootDir)
-			imgui.NewLine()
-			w.Button("Ship Workshop", ws.app.DoOpenShipWorkspace).Style(style.ButtonGreen{}).Build()
-			imgui.SameLine()
-			w.Button("New Ship...", ws.app.DoNewShip).Build()
-			imgui.NewLine()
-		}
-		if ws.app.HasRuinProject() {
-			w.Button("Ruin Workshop", ws.app.DoOpenRuinWorkspace).Style(style.ButtonGreen{}).Build()
-			imgui.SameLine()
-			w.Button("New Ruin...", ws.app.DoNewRuin).Build()
-			imgui.NewLine()
+		if ws.app.HasVoidcrewProject() || ws.app.HasRuinProject() {
+			workshop.PushStyle()
+			workshop.Banner("Voidcrew", "Project workspace", style.Teal)
+			available := imgui.ContentRegionAvail().X
+			both := ws.app.HasVoidcrewProject() && ws.app.HasRuinProject()
+			sideBySide := both && available >= 640*window.PointSize()
+			width := available
+			if sideBySide {
+				width = (available - 12*window.PointSize()) / 2
+			}
+			if ws.app.HasVoidcrewProject() {
+				imgui.BeginGroup()
+				imgui.PushItemWidth(width)
+				imgui.BeginChildV("ship-launcher", imgui.Vec2{X: width, Y: 144 * window.PointSize()}, false, 0)
+				if workshop.Row("ships", "Ship Workshop", "Hulls, upgrade rooms & crew", ">", false, style.Teal, 0) {
+					ws.app.DoOpenShipWorkspace()
+				}
+				if workshop.Button("+ New ship", false) {
+					ws.app.DoNewShip()
+				}
+				imgui.EndChild()
+				imgui.PopItemWidth()
+				imgui.EndGroup()
+			}
+			if sideBySide {
+				imgui.SameLine()
+			}
+			if ws.app.HasRuinProject() {
+				imgui.BeginChildV("ruin-launcher", imgui.Vec2{X: width, Y: 144 * window.PointSize()}, false, 0)
+				if workshop.Row("ruins", "Ruin Workshop", "Locations, maps & encounters", ">", false, style.Amber, 0) {
+					ws.app.DoOpenRuinWorkspace()
+				}
+				if workshop.Button("+ New ruin", false) {
+					ws.app.DoNewRuin()
+				}
+				imgui.EndChild()
+			}
+			workshop.PopStyle()
 		}
 		w.Button("Open Map...", func() { ws.app.DoOpenV(ws.Root()) }).Build()
 		imgui.SameLine()

@@ -8,7 +8,10 @@ import (
 
 	"github.com/SpaiR/imgui-go"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
+	"sdmm/internal/app/ui/workshop"
 	"sdmm/internal/app/window"
+	"sdmm/internal/imguiext/icon"
+	"sdmm/internal/imguiext/style"
 )
 
 const (
@@ -49,32 +52,16 @@ func (ws *WsShip) prepareReview() {
 	ws.reviewReady = true
 }
 
-func space() { imgui.Dummy(imgui.Vec2{Y: 6 * window.PointSize()}) }
-func heading(text string) {
-	space()
-	imgui.TextColored(imgui.Vec4{X: .45, Y: .81, Z: .83, W: 1}, text)
-}
-func title(text string) {
-	space()
-	imgui.PushFont(window.FontH2)
-	imgui.TextWrapped(text)
-	imgui.PopFont()
-	space()
-}
-func hint(text string) {
-	imgui.PushStyleColor(imgui.StyleColorText, imgui.CurrentStyle().Color(imgui.StyleColorTextDisabled))
-	imgui.TextWrapped(text)
-	imgui.PopStyleColor()
-}
-func tooltip(text string) {
-	if imgui.IsItemHovered() {
-		imgui.BeginTooltip()
-		imgui.PushTextWrapPosV(300 * window.PointSize())
-		imgui.TextWrapped(text)
-		imgui.PopTextWrapPos()
-		imgui.EndTooltip()
-	}
-}
+func space() { workshop.Gap() }
+
+func heading(text string) { workshop.Section(text, style.Teal) }
+
+func title(text string) { workshop.Title(text) }
+
+func hint(text string) { workshop.Muted(text) }
+
+func tooltip(text string) { workshop.Tooltip(text) }
+
 func textField(label, placeholder string, value *string) bool {
 	imgui.Text(label)
 	imgui.PushItemWidth(-1)
@@ -110,18 +97,7 @@ func comboHelp(label, preview, help string) bool {
 	}
 	return open
 }
-func actionButton(label string, primary bool) bool {
-	if primary {
-		imgui.PushStyleColor(imgui.StyleColorButton, imgui.Vec4{X: .12, Y: .39, Z: .41, W: 1})
-		imgui.PushStyleColor(imgui.StyleColorButtonHovered, imgui.Vec4{X: .16, Y: .49, Z: .51, W: 1})
-		imgui.PushStyleColor(imgui.StyleColorButtonActive, imgui.Vec4{X: .09, Y: .32, Z: .34, W: 1})
-	}
-	clicked := imgui.ButtonV(label, imgui.Vec2{X: -1, Y: 30 * window.PointSize()})
-	if primary {
-		imgui.PopStyleColorV(3)
-	}
-	return clicked
-}
+func actionButton(label string, primary bool) bool { return workshop.Button(label, primary) }
 
 func (ws *WsShip) setStage(stage int) {
 	if !ws.commitCrew() {
@@ -141,14 +117,22 @@ func (ws *WsShip) setStage(stage int) {
 }
 
 func (ws *WsShip) Process() {
+	workshop.PushStyle()
+	defer workshop.PopStyle()
 	scale := window.PointSize()
-	imgui.PushStyleVarVec2(imgui.StyleVarWindowPadding, imgui.Vec2{X: 14 * scale, Y: 12 * scale})
-	imgui.PushStyleVarVec2(imgui.StyleVarItemSpacing, imgui.Vec2{X: 8 * scale, Y: 7 * scale})
-	imgui.PushStyleVarVec2(imgui.StyleVarFramePadding, imgui.Vec2{X: 8 * scale, Y: 5 * scale})
-	imgui.PushStyleVarFloat(imgui.StyleVarFrameRounding, 3*scale)
-	imgui.BeginChildV("ship-controls", imgui.Vec2{X: 320 * scale}, true, imgui.WindowFlagsAlwaysUseWindowPadding)
+	context := "Fleet library"
+	if ws.project != nil && ws.stage != stepChoose {
+		context = ws.project.Hull.Name
+	}
+	if ws.wizard {
+		context = "New ship / Create a starting canvas"
+	}
+	workshop.Banner("Ship Workshop", context, style.Teal)
+	available := imgui.ContentRegionAvail().X
+	rail := min(276*scale, max(210*scale, available*.23))
+	workshop.Panel("ship-controls", imgui.Vec2{X: rail}, false)
 	ws.controls()
-	imgui.EndChild()
+	workshop.EndPanel()
 	imgui.SameLine()
 	flags := imgui.WindowFlagsAlwaysUseWindowPadding
 	if ws.stage == stepBuild && !ws.wizard {
@@ -171,42 +155,43 @@ func (ws *WsShip) Process() {
 		imgui.TextWrapped(ws.message)
 	}
 	imgui.EndChild()
-	imgui.PopStyleVarV(4)
 }
 
 func (ws *WsShip) controls() {
-	heading("SHIP WORKSHOP")
-	if ws.project != nil && ws.stage != stepChoose && !ws.wizard {
-		imgui.TextWrapped(ws.project.Hull.Name)
-	} else {
-		hint("Ships, modules, themes and areas.")
-	}
-	space()
-	for i, label := range []string{"1   Choose a ship", "2   Build", "3   Review & save"} {
+	imgui.TextColored(style.Muted, "WORKSPACE")
+	labels := []string{"Choose a ship", "Build", "Review & save"}
+	details := []string{"Your fleet & new ships", "Map, rooms & crew", "Checks & project changes"}
+	for i, label := range labels {
+		if ws.stage != stepChoose {
+			details[i] = ""
+		}
 		imgui.BeginDisabledV(i != stepChoose && (ws.project == nil || ws.wizard))
-		if actionButton(label, ws.stage == i) {
+		if workshop.Row(fmt.Sprintf("stage-%d", i), label, details[i], fmt.Sprintf("0%d", i+1), ws.stage == i, style.Teal, 0, i != stepChoose && (ws.project == nil || ws.wizard)) {
 			ws.setStage(i)
 		}
 		imgui.EndDisabled()
 	}
-	space()
-	imgui.Separator()
 	if ws.catalog == nil {
 		imgui.TextWrapped(ws.message)
 		return
 	}
 	if ws.wizard {
 		heading("NEW SHIP")
-		hint("Name your ship, then choose its starting canvas.")
+		hint("Name your ship, then choose a starting canvas.")
 		return
 	}
 	switch ws.stage {
 	case stepChoose:
-		heading("START HERE")
-		hint("Create a ship from scratch, or open an existing ship to work on it.")
+		heading("FLEET OVERVIEW")
+		imgui.PushFont(window.FontH1)
+		imgui.Text(fmt.Sprintf("%02d", len(ws.catalog.Hulls)))
+		imgui.PopFont()
+		hint("Ships in this project")
+		space()
+		hint("Open a ship to build its hull, configure rooms, or equip its crew.")
 	case stepReview:
-		heading("READY TO SAVE?")
-		hint("Review the checks and changed ships. Saving writes your work to the project.")
+		heading("SAVE YOUR WORK")
+		hint("Check your changes, then save them to the project.")
 		space()
 		if actionButton("Back to building", false) {
 			ws.setStage(stepBuild)
@@ -222,26 +207,29 @@ func (ws *WsShip) controls() {
 }
 
 func (ws *WsShip) chooseShip() {
-	title("What would you like to work on?")
-	hint("Open a ship to edit it on the map. You can return here at any time.")
+	imgui.PushFont(window.FontH1)
+	imgui.TextWrapped("Your fleet")
+	imgui.PopFont()
+	hint("Choose a ship. Make it your own.")
 	space()
-	if actionButton("Create a new ship...", true) {
+	if workshop.Row("create-ship", icon.Add+"  Create a new ship", "Start with a blank hull and build from there.", "+", false, style.Teal, 0) {
 		ws.BeginNewShip()
 	}
-	space()
-	heading("EXISTING SHIPS")
-	textField("Find a ship", "Search by name", &ws.shipFilter)
+	heading("SHIP LIBRARY")
+	textField("Find a ship", "Search the fleet...", &ws.shipFilter)
 	if ws.catalog == nil {
 		return
 	}
+	space()
 	imgui.BeginChild("ship-list")
-	imgui.PushStyleVarVec2(imgui.StyleVarSelectableTextAlign, imgui.Vec2{X: 0, Y: .5})
+	count := 0
 	for i, h := range ws.catalog.Hulls {
-		if !strings.Contains(strings.ToLower(h.Name), strings.ToLower(ws.shipFilter)) {
+		if !strings.Contains(strings.ToLower(h.Name), strings.ToLower(strings.TrimSpace(ws.shipFilter))) {
 			continue
 		}
-		imgui.PushID(h.Type)
-		if imgui.SelectableV(h.Name, i == ws.hull, 0, imgui.Vec2{Y: 32 * window.PointSize()}) {
+		count++
+		detail := fmt.Sprintf("%d room options   /   %d variants", len(h.Modules), len(h.Themes))
+		if workshop.Row(h.Type, h.Name, detail, "Open  >", ws.project != nil && i == ws.hull, style.Teal, 0) {
 			ws.flush()
 			ws.hull, ws.theme = i, 0
 			ws.isolated = false
@@ -252,9 +240,14 @@ func (ws *WsShip) chooseShip() {
 				ws.pane.FitView()
 			}
 		}
-		imgui.PopID()
 	}
-	imgui.PopStyleVar()
+	if count == 0 {
+		title("No ships found")
+		hint("Try another name or clear the search to see the fleet.")
+		if imgui.Button("Clear search") {
+			ws.shipFilter = ""
+		}
+	}
 	imgui.EndChild()
 }
 
@@ -270,7 +263,7 @@ func (ws *WsShip) buildControls() {
 		ws.authorControls()
 		return
 	}
-	heading("EDIT SHIP")
+	heading("MAP EDITING")
 	if ws.assembly != nil && ws.source < len(ws.assembly.Sources) && comboHelp("Part to edit", ws.assembly.Sources[ws.source].Name, "Choose where your map edits go: the hull or a displayed room option. The displayed room options stay the same.") {
 		for i, s := range ws.assembly.Sources {
 			if imgui.SelectableV(s.Name, i == ws.source, 0, imgui.Vec2{}) {
@@ -294,24 +287,26 @@ func (ws *WsShip) buildControls() {
 		}
 	}
 	space()
-	areaAction := "Ship areas..."
-	if actionButton("Crew & equipment...", false) {
+	workshop.Section("SHIP SYSTEMS", style.Violet)
+	areaAction := "Ship areas"
+	if workshop.Row("open-crew", "Crew & equipment", "", ">", false, style.Violet, 0) {
 		ws.beginCrew()
 	}
 	if _, _, selected := tools.SelectionBounds(); selected {
 		areaAction = "Make or assign an area..."
 	}
-	if actionButton(areaAction, false) {
+	if workshop.Row("open-areas", areaAction, "", ">", false, style.Teal, 0) {
 		ws.beginTask(taskArea)
 	}
-	if actionButton("Set up docking port...", false) {
+	if workshop.Row("open-docking", "Docking port", "", ">", false, style.Amber, 0) {
 		ws.beginTask(taskDocking)
 	}
 	tooltip("Select an entrance with Grab (3), then place or move this ship's mobile docking port there.")
-	if actionButton("Make an upgrade room...", false) {
+	if workshop.Row("open-room", "Upgrade rooms", "", ">", false, style.Amber, 0) {
 		ws.beginTask(taskRoom)
 	}
 	space()
+	heading("CONFIGURATION")
 	if imgui.CollapsingHeader("Room options & ship variants") {
 		ws.loadoutControls()
 	}

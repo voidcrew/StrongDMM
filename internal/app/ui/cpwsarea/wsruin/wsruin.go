@@ -10,8 +10,10 @@ import (
 	"sdmm/internal/app/ui/cpwsarea/workspace"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
 	"sdmm/internal/app/ui/dialog"
+	"sdmm/internal/app/ui/workshop"
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmenv"
+	"sdmm/internal/imguiext/style"
 	"sdmm/internal/ruin"
 )
 
@@ -265,10 +267,9 @@ func (ws *WsRuin) Save() bool {
 
 func (ws *WsRuin) Process() {
 	scale := window.PointSize()
-	imgui.PushStyleVarVec2(imgui.StyleVarWindowPadding, imgui.Vec2{X: 16 * scale, Y: 14 * scale})
-	imgui.PushStyleVarVec2(imgui.StyleVarItemSpacing, imgui.Vec2{X: 10 * scale, Y: 8 * scale})
-	imgui.PushStyleVarVec2(imgui.StyleVarFramePadding, imgui.Vec2{X: 8 * scale, Y: 5 * scale})
-	defer imgui.PopStyleVarV(3)
+	workshop.PushStyle()
+	defer workshop.PopStyle()
+	workshop.Banner("Ruin Workshop", "Locations, maps & encounters", style.Amber)
 	if ws.catalog == nil {
 		imgui.TextWrapped(ws.message)
 		return
@@ -277,20 +278,19 @@ func (ws *WsRuin) Process() {
 	if avail := imgui.ContentRegionAvail().X; width > avail*.4 {
 		width = avail * .4
 	}
-	imgui.BeginChildV("ruin-library", imgui.Vec2{X: width}, true, imgui.WindowFlagsAlwaysUseWindowPadding)
+	workshop.Panel("ruin-library", imgui.Vec2{X: width}, false)
 	ws.library()
 	imgui.EndChild()
 	imgui.SameLine()
-	imgui.BeginChildV("ruin-details", imgui.Vec2{}, false, imgui.WindowFlagsAlwaysUseWindowPadding)
+	workshop.Panel("ruin-details", imgui.Vec2{}, false)
 	if ws.creating {
 		ws.wizard()
 	} else if ws.selected != nil {
 		ws.details()
 	} else {
-		heading("Ruin Workshop")
-		imgui.TextWrapped("Choose a ruin to open its map or edit its properties.")
-		imgui.Spacing()
-		imgui.TextWrapped("Choose where a new ruin belongs. Its map and registration are created automatically, using the project's existing areas.")
+		workshop.Title("Build a place to discover")
+		hint("Choose a ruin from the library, or create a new encounter.")
+		workshop.Gap()
 		if button("Create a ruin") {
 			ws.BeginNewRuin()
 		}
@@ -301,32 +301,25 @@ func (ws *WsRuin) Process() {
 	}
 	imgui.EndChild()
 }
-func heading(s string) {
-	imgui.TextColored(imgui.Vec4{X: .45, Y: .81, Z: .83, W: 1}, s)
-	imgui.Spacing()
-}
+func heading(s string) { workshop.Section(s, style.Amber) }
+
 func field(label string, value *string) {
 	imgui.Text(label)
 	imgui.SetNextItemWidth(-1)
 	imgui.InputText("##"+label, value)
 }
-func button(label string) bool {
-	return imgui.ButtonV(label, imgui.Vec2{X: -1, Y: 32 * window.PointSize()})
-}
+func button(label string) bool { return workshop.Button(label, false) }
+
 func combo(label, preview string) bool {
 	imgui.Text(label)
 	imgui.SetNextItemWidth(-1)
 	return imgui.BeginCombo("##"+label, preview)
 }
-func hint(s string) {
-	imgui.PushStyleColor(imgui.StyleColorText, imgui.CurrentStyle().Color(imgui.StyleColorTextDisabled))
-	imgui.TextWrapped(s)
-	imgui.PopStyleColor()
-}
+func hint(s string) { workshop.Muted(s) }
 
 func (ws *WsRuin) library() {
-	heading("Ruins")
-	if button("New ruin...") {
+	workshop.Title("Ruin library")
+	if workshop.Button("+ Create a ruin", true) {
 		ws.BeginNewRuin()
 	}
 	field("Search ruins", &ws.filter)
@@ -361,13 +354,9 @@ func (ws *WsRuin) library() {
 		count++
 		selected := ws.selected != nil && ws.selected.Type == t.Type && !ws.creating
 		imgui.PushID(t.Type)
-		if imgui.SelectableV(t.Name, selected, 0, imgui.Vec2{}) {
+		if workshop.Row("ruin", t.Name, t.Location, ">", selected, style.Amber, 0) {
 			ws.selectRuin(t)
 		}
-		if imgui.IsItemHovered() {
-			imgui.SetTooltip(t.Name)
-		}
-		hint(t.Location)
 		imgui.PopID()
 	}
 	if count == 0 {

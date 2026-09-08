@@ -4,7 +4,7 @@ const Undefined = "undefined"
 
 var (
 	Title    = "StrongDMM - Voidcrew"
-	Version  = "0.5.0"
+	Version  = "0.5.1"
 	Revision = Undefined
 	GitHub   = "https://github.com/voidcrew/StrongDMM"
 	// A fork must not replace itself with an upstream release.

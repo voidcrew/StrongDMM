@@ -12,6 +12,7 @@ import (
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/dmapi/dmicon"
+	"sdmm/internal/imguiext/style"
 	"sdmm/internal/ship"
 )
 
@@ -203,7 +204,7 @@ func (ws *WsShip) crewMannequin() {
 		if i > 0 {
 			imgui.SameLine()
 		}
-		if imgui.SmallButton(d.name) {
+		if crewTab(d.name, c.direction == d.dir, max(1, (imgui.ContentRegionAvail().X-float32(3-i)*12*window.PointSize())/float32(4-i))) {
 			c.direction = d.dir
 		}
 	}
@@ -214,24 +215,38 @@ func (ws *WsShip) crewMannequin() {
 		ws.crewVisual = buildCrewVisual(ws.project, j, c.direction)
 		ws.crewVisual.key = key
 	}
-	size := min(224*window.PointSize(), imgui.ContentRegionAvail().X)
+	previewSize := float32(160)
+	if imgui.ContentRegionAvail().Y < 600*window.PointSize() {
+		previewSize = 120
+	}
+	if imgui.ContentRegionAvail().Y < 440*window.PointSize() {
+		previewSize = 80
+	}
+	size := min(previewSize*window.PointSize(), imgui.ContentRegionAvail().X)
+	left := imgui.CursorPos()
+	left.X += max(0, (imgui.ContentRegionAvail().X-size)/2)
+	imgui.SetCursorPos(left)
 	pos := imgui.CursorScreenPos()
 	imgui.Dummy(imgui.Vec2{X: size, Y: size})
 	draw := imgui.WindowDrawList()
-	draw.AddRectFilled(pos, imgui.Vec2{X: pos.X + size, Y: pos.Y + size}, 0xff252321)
+	draw.AddRectFilledV(pos, imgui.Vec2{X: pos.X + size, Y: pos.Y + size}, imgui.PackedColorFromVec4(style.Background), 6*window.PointSize(), 0)
+	for n := float32(0); n <= size; n += 16 * window.PointSize() {
+		col := imgui.PackedColorFromVec4(style.Surface)
+		draw.AddLine(imgui.Vec2{X: pos.X + n, Y: pos.Y}, imgui.Vec2{X: pos.X + n, Y: pos.Y + size}, col)
+		draw.AddLine(imgui.Vec2{X: pos.X, Y: pos.Y + n}, imgui.Vec2{X: pos.X + size, Y: pos.Y + n}, col)
+	}
 	pixel := size / 40
 	origin := imgui.Vec2{X: pos.X + 4*pixel, Y: pos.Y + 4*pixel}
 	for _, l := range ws.crewVisual.layers {
 		s := l.sprite
 		draw.AddImageV(imgui.TextureID(s.Texture()), origin, imgui.Vec2{X: origin.X + float32(s.IconWidth())*pixel, Y: origin.Y + float32(s.IconHeight())*pixel}, imgui.Vec2{X: s.U1, Y: s.V1}, imgui.Vec2{X: s.U2, Y: s.V2}, imgui.PackedColor(l.color))
 	}
-	hint("Live human preview")
-	tooltip("Uses the game's worn sprites. Species, animated equipment, runtime overlays and post-equip effects can change the in-game appearance. Bag contents and pockets are not visible.")
+	label := "Live outfit preview"
+	help := "Uses the game's worn sprites. Species, animated equipment and runtime effects can change the in-game appearance."
 	if len(ws.crewVisual.warnings) > 0 {
-		if imgui.CollapsingHeader(fmt.Sprintf("%d preview details", len(ws.crewVisual.warnings))) {
-			for _, w := range ws.crewVisual.warnings {
-				hint(w)
-			}
-		}
+		label += fmt.Sprintf(" / %d notes", len(ws.crewVisual.warnings))
+		help += "\n\n" + strings.Join(ws.crewVisual.warnings, "\n")
 	}
+	hint(label)
+	tooltip(help)
 }

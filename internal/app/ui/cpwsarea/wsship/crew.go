@@ -7,13 +7,17 @@ import (
 
 	"github.com/SpaiR/imgui-go"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
+	"sdmm/internal/app/ui/workshop"
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmicon"
 	"sdmm/internal/dmapi/dmmap"
+	"sdmm/internal/imguiext/style"
 	"sdmm/internal/ship"
 )
 
 type crewEditor struct {
+	group                                   int
+	settings, picking                       bool
 	scope                                   string
 	jobs                                    []ship.CrewJob
 	scopes                                  []ship.CrewScope
@@ -95,14 +99,14 @@ func (ws *WsShip) crewControls() {
 		ws.OnFocusChange(true)
 		return
 	}
-	heading("CREW & EQUIPMENT")
+	workshop.Section("CREW ROSTER", style.Violet)
 	preview := "Ship crew"
 	for _, s := range c.scopes {
 		if s.ID == c.scope {
 			preview = s.Name
 		}
 	}
-	if comboHelp("Jobs belong to", preview, "Ship crew is the base roster. A variant can replace it. Room options add jobs when installed.") {
+	if comboHelp("Roster", preview, "Ship crew is the base roster. A variant can replace it. Room options add jobs when installed.") {
 		for _, s := range c.scopes {
 			if imgui.SelectableV(s.Name, c.scope == s.ID, 0, imgui.Vec2{}) && ws.commitCrew() {
 				ws.loadCrewScope(s.ID)
@@ -121,7 +125,7 @@ func (ws *WsShip) crewControls() {
 	for _, j := range c.jobs {
 		total += j.Slots
 	}
-	imgui.Text(fmt.Sprintf("%d jobs · %d slots", len(c.jobs), total))
+	imgui.TextColored(style.Violet, fmt.Sprintf("%d jobs / %d slots", len(c.jobs), total))
 	if actionButton("+ Create job", true) && ws.commitCrew() {
 		name := "New job"
 		for n := 2; ; n++ {
@@ -160,7 +164,7 @@ func (ws *WsShip) crewControls() {
 	imgui.BeginChildV("crew-job-list", imgui.Vec2{Y: max(100, imgui.ContentRegionAvail().Y-90*window.PointSize())}, false, 0)
 	for i, j := range c.jobs {
 		imgui.PushIDInt(i)
-		if imgui.SelectableV(fmt.Sprintf("%s  × %d", j.Name, j.Slots), c.selected == i, 0, imgui.Vec2{Y: 32 * window.PointSize()}) && ws.commitCrew() {
+		if workshop.Row("job", j.Name, j.Category, fmt.Sprintf("%d", j.Slots), c.selected == i, crewCategoryColor(j.Category), 0) && ws.commitCrew() {
 			c.selected = i
 			ws.armCrewPicker()
 		}
@@ -168,9 +172,11 @@ func (ws *WsShip) crewControls() {
 	}
 	imgui.EndChild()
 	if c.error != "" {
+		imgui.PushStyleColor(imgui.StyleColorText, style.Danger)
 		imgui.TextWrapped(c.error)
+		imgui.PopStyleColor()
 	} else {
-		hint("Changes join the ship's undo history. Review & save writes the files.")
+		hint("Save from Review & save.")
 	}
 }
 func (ws *WsShip) crewItemName(path string) string {
@@ -187,8 +193,8 @@ func (ws *WsShip) crewItemName(path string) string {
 func (ws *WsShip) crewContent() {
 	c := &ws.crew
 	if c.selected < 0 || c.selected >= len(c.jobs) {
-		title("Set up your crew")
-		hint("Create a job on the left, then choose its number of slots and starting equipment.")
+		title("Build your crew")
+		hint("Create a job in the roster to set its role and starting equipment.")
 		return
 	}
 	if p, ok := ws.app.SelectedPrefab(); ok && p.Path() != c.lastPrefab {
@@ -197,43 +203,181 @@ func (ws *WsShip) crewContent() {
 			ws.chooseCrewItem(p.Path())
 		}
 	}
+	j := c.jobs[c.selected]
+	title(j.Name)
+	slotLabel := "crew slots"
+	if j.Slots == 1 {
+		slotLabel = "crew slot"
+	}
+	hint(fmt.Sprintf("%s  /  %d %s", j.Category, j.Slots, slotLabel))
+	space()
 	scale := window.PointSize()
 	available := imgui.ContentRegionAvail().X
-	imgui.BeginChildV("crew-details", imgui.Vec2{X: min(255*scale, available*.29)}, false, 0)
-	ws.crewDetails()
-	imgui.EndChild()
-	if c.selected < 0 || c.selected >= len(c.jobs) {
+	// Keep usable form and picker widths before adding a third column.
+	if available >= 1040*scale {
+		workshop.Panel("crew-details", imgui.Vec2{X: 260 * scale}, false)
+		ws.crewDetails()
+		workshop.EndPanel()
+		if c.selected < 0 || c.selected >= len(c.jobs) {
+			return
+		}
+		imgui.SameLine()
+		imgui.BeginChildV("crew-loadout", imgui.Vec2{}, false, imgui.WindowFlagsNoScrollbar|imgui.WindowFlagsNoScrollWithMouse)
+		ws.crewLoadout()
+		imgui.EndChild()
 		return
 	}
+	// These controls also work with keyboard navigation and preserve each view's scroll.
+	if available < 610*scale {
+		width := max(1, (available-24*scale)/3)
+		if crewTab("Loadout", !c.settings && !c.picking, width) {
+			c.settings, c.picking = false, false
+		}
+		imgui.SameLine()
+		if crewTab("Items", !c.settings && c.picking, width) {
+			c.settings, c.picking = false, true
+		}
+		imgui.SameLine()
+		if crewTab("Job settings", c.settings, width) {
+			c.settings = true
+		}
+	} else {
+		width := min(190*scale, (available-12*scale)/2)
+		if crewTab("Equipment", !c.settings, width) {
+			c.settings = false
+		}
+		imgui.SameLine()
+		if crewTab("Job settings", c.settings, width) {
+			c.settings = true
+		}
+	}
+	space()
+	if c.settings {
+		workshop.Panel("crew-details", imgui.Vec2{}, false)
+		ws.crewDetails()
+		workshop.EndPanel()
+	} else {
+		ws.crewLoadout()
+	}
+}
+
+func crewTab(label string, selected bool, width float32) bool {
+	if selected {
+		imgui.PushStyleColor(imgui.StyleColorButton, style.RGB(0x3c3556))
+		imgui.PushStyleColor(imgui.StyleColorText, style.Violet)
+	}
+	clicked := imgui.ButtonV(label, imgui.Vec2{X: width, Y: 34 * window.PointSize()})
+	if selected {
+		imgui.PopStyleColorV(2)
+	}
+	return clicked
+}
+
+func crewCategoryColor(category string) imgui.Vec4 {
+	switch category {
+	case "Engineering":
+		return style.Amber
+	case "Medical":
+		return style.Teal
+	case "Security":
+		return style.Danger
+	case "Command":
+		return style.Violet
+	default:
+		return style.Muted
+	}
+}
+
+func (ws *WsShip) crewLoadout() {
+	c := &ws.crew
+	scale := window.PointSize()
+	available := imgui.ContentRegionAvail().X
+	if available < 610*scale {
+		if c.picking {
+			workshop.Panel("crew-item-picker", imgui.Vec2{}, false)
+			ws.crewPicker()
+		} else {
+			workshop.Panel("crew-mannequin", imgui.Vec2{}, false)
+			ws.crewEquipment()
+		}
+		workshop.EndPanel()
+		return
+	}
+	workshop.Panel("crew-mannequin", imgui.Vec2{X: min(340*scale, available*.46)}, false)
+	ws.crewEquipment()
+	workshop.EndPanel()
 	imgui.SameLine()
-	imgui.BeginChildV("crew-mannequin", imgui.Vec2{X: min(265*scale, available*.29)}, false, 0)
-	title("Equipment")
+	workshop.Panel("crew-item-picker", imgui.Vec2{}, false)
+	ws.crewPicker()
+	workshop.EndPanel()
+}
+
+func (ws *WsShip) crewEquipment() {
+	c := &ws.crew
+	imgui.TextColored(style.Violet, "LOADOUT")
 	ws.crewMannequin()
 	space()
-	hint("Choose a slot to change its item.")
+	width := max(1, (imgui.ContentRegionAvail().X-24*window.PointSize())/3)
+	for i, label := range []string{"Clothing", "Gear", "Carry"} {
+		if i > 0 {
+			imgui.SameLine()
+		}
+		if crewTab(label, c.group == i, width) {
+			c.group = i
+		}
+	}
+	imgui.BeginChild(fmt.Sprintf("crew-slots-%d", c.group))
 	equipment := ws.project.CrewEquipment(c.jobs[c.selected])
-	imgui.BeginChild("crew-slots")
-	for i, s := range ship.EquipmentSlots {
-		imgui.PushID(s.ID)
-		if imgui.SelectableV(s.Name+": "+ws.crewItemName(equipment[s.ID]), c.contents == 0 && c.slot == i, 0, imgui.Vec2{Y: 26 * scale}) {
-			c.slot = i
-			c.contents = 0
+	groups := []struct {
+		name string
+		ids  []string
+	}{
+		{"CLOTHING", []string{"uniform", "suit", "head", "mask", "glasses", "gloves", "shoes", "neck", "accessory"}},
+		{"GEAR & STORAGE", []string{"ears", "back", "belt", "id", "suit_store", "box"}},
+		{"POCKETS & HANDS", []string{"l_pocket", "r_pocket", "l_hand", "r_hand"}},
+	}
+	for groupIndex, group := range groups {
+		if groupIndex != c.group {
+			continue
+		}
+		workshop.Section(group.name, style.Muted)
+		for _, id := range group.ids {
+			for i, slot := range ship.EquipmentSlots {
+				if slot.ID != id {
+					continue
+				}
+				path := equipment[id]
+				name := ws.crewItemName(path)
+				badge := ""
+				if c.contents == 0 && c.slot == i {
+					badge = "Edit"
+				}
+				if workshop.Row(id, slot.Name, name, badge, c.contents == 0 && c.slot == i, style.Violet, 0) {
+					c.slot, c.contents = i, 0
+					c.picking = true
+					ws.armCrewPicker()
+				}
+			}
+		}
+	}
+	if c.group == 2 {
+		workshop.Section("CONTAINER CONTENTS", style.Amber)
+		if actionButton("Backpack contents", c.contents == 1) {
+			c.contents, c.picking = 1, true
 			ws.armCrewPicker()
 		}
-		tooltip(equipment[s.ID])
-		imgui.PopID()
+		if actionButton("Belt contents", c.contents == 2) {
+			c.contents, c.picking = 2, true
+			ws.armCrewPicker()
+		}
 	}
 	imgui.EndChild()
-	imgui.EndChild()
-	imgui.SameLine()
-	imgui.BeginChild("crew-item-picker")
-	ws.crewPicker()
-	imgui.EndChild()
 }
+
 func (ws *WsShip) crewDetails() {
 	c := &ws.crew
 	j := &c.jobs[c.selected]
-	title("Job slot")
+	workshop.Section("JOB SETTINGS", style.Violet)
 	if textField("Job name", "e.g. Salvage Engineer", &j.Name) {
 		c.dirty = true
 	}
@@ -297,16 +441,16 @@ func (ws *WsShip) crewDetails() {
 		hint("Job: " + ws.crewItemName(o.Vars.ValueV("jobtype", "")))
 	}
 	space()
-	heading("CARRIED ITEMS")
+	workshop.Section("CARRIED ITEMS", style.Amber)
 	if actionButton("Backpack contents...", c.contents == 1) {
-		c.contents = 1
+		c.contents, c.settings, c.picking = 1, false, true
 		ws.armCrewPicker()
 	}
 	if actionButton("Belt contents...", c.contents == 2) {
-		c.contents = 2
+		c.contents, c.settings, c.picking = 2, false, true
 		ws.armCrewPicker()
 	}
-	hint("Pockets and hands are equipment slots. Bag contents are extra items placed inside the selected container.")
+	tooltip("Extra items placed inside the backpack or belt.")
 	space()
 	if c.dirty {
 		if actionButton("Apply changes", true) {
@@ -316,7 +460,11 @@ func (ws *WsShip) crewDetails() {
 			ws.loadCrewScope(c.scope)
 		}
 	}
-	if actionButton("Delete this job...", false) {
+	space()
+	imgui.PushStyleColor(imgui.StyleColorText, style.Danger)
+	deleting := actionButton("Delete job...", false)
+	imgui.PopStyleColor()
+	if deleting {
 		imgui.OpenPopup("Delete crew job")
 	}
 	if imgui.BeginPopupModal("Delete crew job") {
@@ -393,6 +541,7 @@ func (ws *WsShip) crewPicker() {
 	if c.contents > 0 {
 		label = []string{"", "Backpack contents", "Belt contents"}[c.contents]
 	}
+	imgui.TextColored(style.Violet, "ITEM LIBRARY")
 	title(label)
 	if c.contents == 0 {
 		equipment := ws.project.CrewEquipment(*j)
@@ -455,30 +604,36 @@ func (ws *WsShip) crewPicker() {
 	}
 	space()
 	textField("Find an item", "Search item names or type paths", &c.filter)
-	hint("Or select an item in the Environment panel. It goes into the highlighted slot immediately.")
+	tooltip("You can also equip an item by selecting it in the Environment panel.")
 	if p, ok := ws.app.SelectedPrefab(); ok && ws.crewItemFits(p.Path()) {
-		if actionButton("Use selected: "+ws.crewItemName(p.Path()), false) {
+		if actionButton("Equip selected item", false) {
 			ws.chooseCrewItem(p.Path())
 		}
 	}
 	space()
 	imgui.BeginChild("crew-search-results")
+	currentItem := ws.project.CrewEquipment(*j)[ship.EquipmentSlots[c.slot].ID]
 	count := 0
 	for _, path := range c.items {
 		if !ws.crewItemFits(path) || !strings.Contains(strings.ToLower(ws.crewItemName(path)+" "+path), strings.ToLower(c.filter)) {
 			continue
 		}
+
 		o := ws.project.Dme.Objects[path]
 		sprite := dmicon.Cache.GetSpriteOrPlaceholder(o.Vars.TextV("icon", ""), o.Vars.TextV("icon_state", ""))
-		imgui.ImageV(imgui.TextureID(sprite.Texture()), imgui.Vec2{X: 32 * window.PointSize(), Y: 32 * window.PointSize()}, imgui.Vec2{X: sprite.U1, Y: sprite.V1}, imgui.Vec2{X: sprite.U2, Y: sprite.V2}, imgui.Vec4{X: 1, Y: 1, Z: 1, W: 1}, imgui.Vec4{})
-		imgui.SameLine()
-		imgui.BeginGroup()
-		if imgui.SelectableV(ws.crewItemName(path)+"##"+path, false, 0, imgui.Vec2{}) {
-			ws.chooseCrewItem(path)
+		pos := imgui.CursorScreenPos()
+		selected := c.contents == 0 && currentItem == path
+		badge := ""
+		if selected {
+			badge = "On"
 		}
-		tooltip(path)
-		imgui.TextDisabled(strings.TrimPrefix(path, "/obj/item/"))
-		imgui.EndGroup()
+		if workshop.Row(path, ws.crewItemName(path), strings.TrimPrefix(path, "/obj/item/"), badge, selected, style.Teal, 40) {
+			ws.chooseCrewItem(path)
+			j = &c.jobs[c.selected]
+		}
+		s := window.PointSize()
+		imgui.WindowDrawList().AddImageV(imgui.TextureID(sprite.Texture()), imgui.Vec2{X: pos.X + 10*s, Y: pos.Y + 13*s}, imgui.Vec2{X: pos.X + 42*s, Y: pos.Y + 45*s}, imgui.Vec2{X: sprite.U1, Y: sprite.V1}, imgui.Vec2{X: sprite.U2, Y: sprite.V2}, 0xffffffff)
+
 		count++
 		if count == 200 {
 			hint("Type more to narrow the results.")

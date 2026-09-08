@@ -72,13 +72,15 @@ func TestRenderShipWorkspace(t *testing.T) {
 	if ws.message != "" {
 		t.Fatal(ws.message)
 	}
+	viewWidth, viewHeight := width, height
 	render := func() {
+		io.SetDisplaySize(imgui.Vec2{X: float32(viewWidth), Y: float32(viewHeight)})
 		gl.BindFramebuffer(gl.FRAMEBUFFER, 0)
 		gl.Viewport(0, 0, width, height)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 		imgui.NewFrame()
 		imgui.SetNextWindowPos(imgui.Vec2{})
-		imgui.SetNextWindowSize(imgui.Vec2{X: width, Y: height})
+		imgui.SetNextWindowSize(imgui.Vec2{X: float32(viewWidth), Y: float32(viewHeight)})
 		imgui.BeginV("Voidcrew Ship Workspace", nil, imgui.WindowFlagsNoResize|imgui.WindowFlagsNoMove|imgui.WindowFlagsNoCollapse)
 		ws.Process()
 		imgui.End()
@@ -186,6 +188,8 @@ func TestRenderShipWorkspace(t *testing.T) {
 			t.Fatalf("preview changed source %s", path)
 		}
 	}
+	exerciseResponsiveCrew(t, ws, render, func(w, h int) { viewWidth, viewHeight = w, h })
+	viewWidth, viewHeight = width, height
 	exerciseAuthoring(t, ws, dme, render)
 	if code := gl.GetError(); code != gl.NO_ERROR {
 		t.Fatalf("OpenGL error: %x", code)
