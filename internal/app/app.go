@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,6 +22,7 @@ import (
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/dmapi/dmmclip"
 	"sdmm/internal/env"
+	"sdmm/internal/startup"
 
 	"github.com/SpaiR/imgui-go"
 	"github.com/matishsiao/goInfo"
@@ -85,7 +87,9 @@ type app struct {
 
 	// ...omae wa mou shindeiru...
 	// Should be modified only in the CloseCheck method. Ensures we made everything before the closing.
-	closed bool
+	closed  bool
+	closing bool
+	updates updateState
 
 	shortcutsEnabled bool
 
@@ -127,8 +131,9 @@ func (a *app) initialize() {
 
 	a.checkProgramArgs()
 
+	a.updates.ctx, a.updates.cancel = context.WithCancel(context.Background())
 	if a.preferencesConfig().Application.CheckForUpdates {
-		go a.checkForUpdates()
+		a.checkForUpdatesV(false)
 	}
 }
 
@@ -150,8 +155,26 @@ func (a *app) PostProcess() {
 }
 
 func (a *app) CloseCheck() {
+	if a.closing {
+		return
+	}
+	a.closing = true
+	var restartArgs []string
+	if a.updates.restartRequested {
+		restartArgs = a.updateRestartArgs()
+	}
 	log.Print("run close check")
 	a.layout.WsArea.CloseAllMaps(func(closed bool) {
+		a.closing = false
+		if closed && a.updates.restartRequested {
+			if err := startup.ScheduleUpdate(*a.updates.downloaded, restartArgs); err != nil {
+				a.menu.SetRestartError(err.Error())
+				closed = false
+			} else {
+				a.updates.restarting = true
+			}
+		}
+		a.updates.restartRequested = false
 		a.closed = closed
 	})
 }
@@ -165,6 +188,7 @@ func (a *app) LayoutIniPath() string {
 }
 
 func (a *app) dispose() {
+	a.disposeUpdates()
 	brush.Dispose()
 	a.configSave()
 	a.masterWindow.Dispose()

@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.1
+Version: 0.5.2
 
 START
 1. Extract the whole ZIP into a writable folder.
@@ -13,6 +13,14 @@ The game repository and its icons/maps are required and are not included.
 No Go, Rust, BYOND or existing StrongDMM installation is needed to run the
 editor. Compiling and playing the game still require the game's usual tools.
 This build needs 64-bit Windows and a graphics driver supporting OpenGL 3.3.
+
+UPDATES
+StrongDMM checks for new Voidcrew releases and downloads verified updates in
+the background. Choose Update & restart when ready; unsaved work prompts you
+to save, discard, or cancel. Your project reopens after the update.
+Use Help > Check for Updates at any time. Automatic checks and downloads can
+be changed in Preferences > Application. Keep the installation folder writable.
+Builds before 0.5.2 need this ZIP downloaded and extracted once.
 
 SHIP WORKSHOP
 1. Choose a ship: open an existing ship or choose Create a new ship.

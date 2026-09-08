@@ -226,6 +226,10 @@ func (w *WsArea) closeWorkspacesGentlyV(wsToClose []*workspace.Workspace, callba
 		return
 	}
 
+	dialog.Open(w.makeCloseWorkspacesDialog(wsToClose, unsavedWorkspaces, callback))
+}
+
+func (w *WsArea) makeCloseWorkspacesDialog(wsToClose, unsavedWorkspaces []*workspace.Workspace, callback func(bool)) dialog.TypeConfirmation {
 	var dType dialog.TypeConfirmation
 	if len(unsavedWorkspaces) > 1 {
 		dType = makeSaveMultipleWorkspacesDialogType(unsavedWorkspaces)
@@ -262,7 +266,7 @@ func (w *WsArea) closeWorkspacesGentlyV(wsToClose []*workspace.Workspace, callba
 		}
 	}
 
-	dialog.Open(dType)
+	return dType
 }
 
 func (w *WsArea) closeWorkspaces(wsToClose []*workspace.Workspace) {

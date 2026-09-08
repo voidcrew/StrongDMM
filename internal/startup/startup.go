@@ -23,6 +23,9 @@ func Run(start func()) int {
 	if len(os.Args) > 1 && os.Args[1] == editorArgument {
 		os.Args = append(os.Args[:1], os.Args[2:]...)
 		start()
+		if updateScheduled {
+			return updateExitCode
+		}
 		return 0
 	}
 	if runtime.GOOS != "windows" {
@@ -38,8 +41,22 @@ func Run(start func()) int {
 	executable, err := os.Executable()
 	code := 1
 	if err == nil {
-		args := append([]string{editorArgument}, os.Args[1:]...)
-		code, err = runEditor(executable, args, file)
+		cleanupUpdate(executable)
+		requestDir, requestErr := os.MkdirTemp("", "StrongDMM-restart-")
+		if requestErr != nil {
+			err = requestErr
+		} else {
+			defer os.RemoveAll(requestDir)
+			requestPath := filepath.Join(requestDir, "update.json")
+			args := append([]string{editorArgument}, os.Args[1:]...)
+			code, err = runEditor(executable, args, file, requestEnvironment+"="+requestPath)
+			if code == updateExitCode {
+				err = applyUpdateRequest(requestPath, executable, file)
+				if err == nil {
+					code = 0
+				}
+			}
+		}
 	}
 	fmt.Fprintf(file, "\nExit code: %d (0x%08X)\n", code, uint32(code))
 	if err != nil {
@@ -52,8 +69,9 @@ func Run(start func()) int {
 	return code
 }
 
-func runEditor(executable string, args []string, file *os.File) (int, error) {
+func runEditor(executable string, args []string, file *os.File, extraEnv ...string) (int, error) {
 	cmd := exec.Command(executable, args...)
+	cmd.Env = updateEnvironment(extraEnv...)
 	configureProcess(cmd)
 	// Native file handles avoid pipe buffering and retain output even if the
 	// editor aborts from another goroutine or inside a native dependency.

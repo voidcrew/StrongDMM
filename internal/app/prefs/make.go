@@ -99,8 +99,8 @@ func Make(app App, prefs *Prefs) wsprefs.Prefs {
 				value: &prefs.Application.CheckForUpdates,
 			},
 			boolPrefPrefab{
-				name:  "Auto Update",
-				desc:  "Enables automatic self-update, when a new update is available.",
+				name:  "Download Updates Automatically",
+				desc:  "Downloads and verifies new releases in the background. You choose when to restart.",
 				label: "##auto_update",
 				value: &prefs.Application.AutoUpdate,
 			},

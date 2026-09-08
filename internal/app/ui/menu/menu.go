@@ -2,11 +2,11 @@ package menu
 
 import (
 	"sdmm/internal/app/command"
+	"sdmm/internal/app/selfupdate"
 	"sdmm/internal/app/ui/shortcut"
 	"sdmm/internal/dmapi/dm"
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/dmapi/dmmclip"
-	"sdmm/internal/env"
 	"sdmm/internal/imguiext/icon"
 	"sdmm/internal/imguiext/style"
 	w "sdmm/internal/imguiext/widget"
@@ -62,6 +62,7 @@ type app interface {
 	DoOpenLogs()
 	DoOpenSourceCode()
 	DoCheckForUpdates()
+	DoOpenUpdateDownload()
 	DoOpenSupport()
 
 	// Other
@@ -99,6 +100,8 @@ const (
 	upStatusUpdating
 	upStatusUpdated
 	upStatusError
+	upStatusChecking
+	upStatusCurrent
 )
 
 type Menu struct {
@@ -109,6 +112,8 @@ type Menu struct {
 	updateStatus      upStatus
 	updateVersion     string
 	updateDescription string
+	updateError       string
+	updateOpen        bool
 }
 
 func New(app app) *Menu {
@@ -267,7 +272,7 @@ func (m *Menu) Process() {
 			w.MenuItem("Source Code", m.app.DoOpenSourceCode).
 				Icon(icon.GitHub),
 			w.MenuItem("Check for Updates", m.app.DoCheckForUpdates).
-				Enabled(env.Manifest != "").
+				Enabled(selfupdate.Supported()).
 				Icon(icon.SystemUpdate),
 			w.Separator(),
 			w.MenuItem("Open Logs Folder", m.app.DoOpenLogs).
@@ -294,18 +299,21 @@ func (m *Menu) SetUpdateAvailable(version, description string) {
 	m.updateStatus = upStatusAvailable
 	m.updateVersion = version
 	m.updateDescription = description
+	m.updateError = ""
 }
 
 func (m *Menu) SetUpdating() {
 	m.updateStatus = upStatusUpdating
+	m.updateError = ""
 }
 
 func (m *Menu) SetUpdated() {
 	m.updateStatus = upStatusUpdated
 }
 
-func (m *Menu) SetUpdateError() {
+func (m *Menu) SetUpdateError(message string) {
 	m.updateStatus = upStatusError
+	m.updateError = message
 }
 
 func (m *Menu) doToggleArea() {

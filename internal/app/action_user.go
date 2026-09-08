@@ -8,7 +8,6 @@ import (
 	"sdmm/internal/app/ui/cpwsarea/workspace"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/pmap"
 	"sdmm/internal/app/ui/layout/lnode"
-	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/dmapi/dmmap/dmmdata/dmmprefab"
 	"sdmm/internal/dmapi/dmmap/dmminstance"
@@ -344,13 +343,13 @@ func (a *app) DoSelfUpdate() {
 // DoRestart restarts the application.
 func (a *app) DoRestart() {
 	log.Print("do restart")
-	window.Restart()
+	a.restartForUpdate()
 }
 
 // DoIgnoreUpdate adds currently available update to to ignore list.
 func (a *app) DoIgnoreUpdate() {
-	log.Print("do ignore update:", remoteManifest.Version)
-	a.config().UpdateIgnore = slice.StrPushUnique(a.config().UpdateIgnore, remoteManifest.Version)
+	log.Print("do ignore update:", a.updates.release.Version)
+	a.config().UpdateIgnore = slice.StrPushUnique(a.config().UpdateIgnore, a.updates.release.Version)
 }
 
 // DoCheckForUpdates checks for available update.
@@ -358,6 +357,8 @@ func (a *app) DoCheckForUpdates() {
 	log.Print("do check for updates")
 	a.checkForUpdatesV(true)
 }
+
+func (a *app) DoOpenUpdateDownload() { _ = open.Run(env.GitHub + "/releases/latest") }
 
 // DoOpenJumpWindow opens a window where the user can jump to the inputted coordinates.
 func (a *app) DoOpenJumpWindow() {
