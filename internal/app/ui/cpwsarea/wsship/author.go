@@ -22,12 +22,13 @@ const (
 	taskModule
 	taskResize
 	taskSettings
+	taskDocking
 )
 
 type settingsForm struct {
-	name, description     string
-	crew, cost, direction int32
-	hidden                bool
+	name, description string
+	crew, cost        int32
+	hidden            bool
 }
 
 // IDs are a storage detail. Names remain unrestricted; generated IDs are valid,
@@ -213,7 +214,7 @@ func (ws *WsShip) beginTask(task buildTask) {
 	ws.flush()
 	ws.task, ws.itemName, ws.itemID, ws.message = task, "", "", ""
 	ws.customID, ws.emptyModule = false, false
-	if task == taskRoom {
+	if task == taskRoom || task == taskDocking {
 		lo, hi, selected := tools.SelectionBounds()
 		if selected && ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
 			offset := ws.assembly.Sources[ws.source].Offset
@@ -225,6 +226,7 @@ func (ws *WsShip) beginTask(task buildTask) {
 		if selected {
 			tools.SetGrabSelection(lo, hi)
 		}
+		ws.dockOutward = 0
 	}
 	if task == taskArea {
 		ws.areaPath, ws.areaIcon = "", "station"
@@ -234,7 +236,7 @@ func (ws *WsShip) beginTask(task buildTask) {
 	}
 	if task == taskSettings {
 		s := ws.project.Settings
-		ws.settings = settingsForm{ws.project.Hull.Name, s.Description, int32(s.Crew), int32(s.Cost), int32(s.PortDirection), s.Hidden}
+		ws.settings = settingsForm{ws.project.Hull.Name, s.Description, int32(s.Crew), int32(s.Cost), s.Hidden}
 	}
 	if task == taskResize && ws.assembly != nil {
 		s := ws.assembly.Sources[0]
@@ -256,6 +258,8 @@ func (ws *WsShip) authorControls() {
 		ws.areaControls()
 	case taskRoom:
 		ws.regionControls()
+	case taskDocking:
+		ws.dockingControls()
 	case taskTheme, taskModule:
 		ws.copyControls()
 	case taskSettings:
@@ -516,24 +520,6 @@ func (ws *WsShip) settingsControls() {
 	textField("Description", "What is this ship for?", &s.description)
 	numberField("Crew capacity", &s.crew)
 	numberField("Build cost (misc parts)", &s.cost)
-	directions := []struct {
-		name  string
-		value int32
-	}{{"North", 1}, {"South", 2}, {"East", 4}, {"West", 8}}
-	current := "Choose a direction"
-	for _, d := range directions {
-		if d.value == s.direction {
-			current = d.name
-		}
-	}
-	if combo("Docking direction", current) {
-		for _, d := range directions {
-			if imgui.SelectableV(d.name, d.value == s.direction, 0, imgui.Vec2{}) {
-				s.direction = d.value
-			}
-		}
-		imgui.EndCombo()
-	}
 	imgui.Checkbox("Hide from the player ship list", &s.hidden)
 	hint("Keep this checked while your ship is a work in progress.")
 	nameErr := ship.ShipNameError(ws.catalog, ws.app.LoadedEnvironment(), s.name, ws.project.Hull.Type)
@@ -551,7 +537,7 @@ func (ws *WsShip) settingsControls() {
 			ws.project.Hull.Name = strings.TrimSpace(s.name)
 			settings := ws.project.Settings
 			settings.Description, settings.Crew, settings.Cost = s.description, int(s.crew), int(s.cost)
-			settings.PortDirection, settings.Hidden = int(s.direction), s.hidden
+			settings.Hidden = s.hidden
 			return nil
 		})
 		if ws.message == "" {

@@ -12,7 +12,7 @@ func exerciseDropdowns(t *testing.T) {
 	t.Helper()
 	io := imgui.CurrentIO()
 	defer io.SetMousePosition(imgui.Vec2{X: -1000, Y: -1000})
-	for _, label := range []string{"Part to edit", "Ship variant", "Room: cargo", "Docking direction"} {
+	for _, label := range []string{"Part to edit", "Ship variant", "Room: cargo", "Airlock opens to space"} {
 		selected := 0
 		var button, option imgui.Vec2
 		frame := func() bool {
@@ -22,7 +22,7 @@ func exerciseDropdowns(t *testing.T) {
 			imgui.BeginV("Workshop dropdown regression", nil, imgui.WindowFlagsNoSavedSettings|imgui.WindowFlagsNoResize|imgui.WindowFlagsNoMove)
 			imgui.BeginChild("dropdown-host")
 			choices := []string{"First option", "Second option"}
-			open := combo(label, choices[selected])
+			open := comboHelp(label, choices[selected], "Choose an option to edit. Hover for more help.")
 			if open {
 				for i, choice := range choices {
 					if imgui.SelectableV(choice, selected == i, 0, imgui.Vec2{}) {

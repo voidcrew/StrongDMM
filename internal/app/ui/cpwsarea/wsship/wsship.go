@@ -42,6 +42,7 @@ type WsShip struct {
 	emptyModule                      bool
 	shipFilter                       string
 	settings                         settingsForm
+	dockOutward                      int
 	reviewReady                      bool
 	reviewed                         []reviewProject
 	SourceBusy                       func(string) bool

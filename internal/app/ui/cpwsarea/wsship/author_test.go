@@ -140,6 +140,34 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	})
 	capture("ship-areas-assigned")
 	ws.finishTask()
+	// Place the existing mobile port on a real entrance, with one undo entry.
+	entrance := util.Point{X: 7, Y: lo.Y, Z: 1}
+	ws.change("Map entrance", func() error {
+		ws.assembly.Sources[0].Live.GetTile(entrance).InstancesAdd(dmmap.PrefabStorage.Initial("/obj/machinery/door/airlock"))
+		return nil
+	})
+	beforeDock := ship.RawData(ws.pane.Dmm()).EncodeTGM()
+	if !tools.SetGrabSelection(entrance, entrance) {
+		t.Fatal("could not select airlock")
+	}
+	ws.beginTask(taskDocking)
+	capture("docking-port-setup")
+	ws.applyDocking()
+	if ws.message != "" {
+		t.Fatal(ws.message)
+	}
+	afterDock := ship.RawData(ws.pane.Dmm()).EncodeTGM()
+	if bytes.Equal(beforeDock, afterDock) {
+		t.Fatal("port placement did not change map")
+	}
+	ws.app.CommandStorage().Undo()
+	if !bytes.Equal(beforeDock, ship.RawData(ws.pane.Dmm()).EncodeTGM()) {
+		t.Fatal("port undo did not restore hull")
+	}
+	ws.app.CommandStorage().Redo()
+	if !bytes.Equal(afterDock, ship.RawData(ws.pane.Dmm()).EncodeTGM()) {
+		t.Fatal("port redo did not restore placement")
+	}
 	if !tools.SetGrabSelection(lo, hi) {
 		t.Fatal("could not select room")
 	}
@@ -155,6 +183,18 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	}
 	ws.defaults()
 	ws.rebuild()
+	ws.source = 1
+	ws.rebuild()
+	ws.OnFocusChange(true)
+	moduleEntrance := util.Point{X: entrance.X - lo.X + 1, Y: 1, Z: 1}
+	if !tools.SetGrabSelection(moduleEntrance, moduleEntrance) {
+		t.Fatal("could not select entrance through module")
+	}
+	ws.beginTask(taskDocking)
+	if a, b, ok := tools.SelectionBounds(); !ok || ws.source != 0 || a != entrance || b != entrance {
+		t.Fatal("docking action lost module-to-hull selection")
+	}
+	ws.finishTask()
 	ws.source = 1
 	ws.rebuild()
 	ws.OnFocusChange(true)

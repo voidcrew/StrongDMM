@@ -17,7 +17,7 @@ func authorEnvironment(t *testing.T) (*Catalog, *dmenv.Dme) {
 	t.Helper()
 	root := t.TempDir()
 	d := &dmenv.Dme{RootDir: root, RootFile: filepath.Join(root, "test.dme"), Objects: map[string]*dmenv.Object{}}
-	paths := []string{"/world", "/area", "/area/space", "/area/template_noop", "/area/shuttle/voidcrew", "/turf", "/turf/open/space", "/turf/template_noop", "/turf/open/floor/plating", "/obj/docking_port/mobile/voidcrew", SlotMarker, Connector, "/obj/item/test", "/obj/machinery/power/apc", HullType}
+	paths := []string{"/world", "/area", "/area/space", "/area/template_noop", "/area/shuttle/voidcrew", "/turf", "/turf/open/space", "/turf/template_noop", "/turf/open/floor/plating", "/obj/docking_port/mobile/voidcrew", "/obj/machinery/door/airlock", SlotMarker, Connector, "/obj/item/test", "/obj/machinery/power/apc", HullType}
 	for _, path := range paths {
 		v := dmvars.MutableVariables{}
 		if path == "/world" {

@@ -89,11 +89,26 @@ func numberField(label string, value *int32) {
 	imgui.PopItemWidth()
 }
 func combo(label, preview string) bool {
+	return comboHelp(label, preview, "")
+}
+func comboHelp(label, preview, help string) bool {
 	imgui.Text(label)
+	if help != "" {
+		tooltip(help)
+	}
 	// An open combo switches to the popup window. Set the next item's width
 	// without leaving a width-stack entry to pop from the wrong window.
 	imgui.SetNextItemWidth(-1)
-	return imgui.BeginCombo("##"+label, preview)
+	open := imgui.BeginCombo("##"+label, preview)
+	if help != "" {
+		if open {
+			hint(help)
+			imgui.Separator()
+		} else {
+			tooltip(help)
+		}
+	}
+	return open
 }
 func actionButton(label string, primary bool) bool {
 	if primary {
@@ -247,16 +262,27 @@ func (ws *WsShip) buildControls() {
 		return
 	}
 	heading("EDIT SHIP")
-	hint("Edits write to the selected part of the assembled ship.")
-	if ws.assembly != nil && ws.source < len(ws.assembly.Sources) && combo("Part to edit", ws.assembly.Sources[ws.source].Name) {
+	if ws.assembly != nil && ws.source < len(ws.assembly.Sources) && comboHelp("Part to edit", ws.assembly.Sources[ws.source].Name, "Choose where your map edits go: the hull or a displayed room option. The displayed room options stay the same.") {
 		for i, s := range ws.assembly.Sources {
 			if imgui.SelectableV(s.Name, i == ws.source, 0, imgui.Vec2{}) {
 				ws.flush()
 				ws.source = i
 				ws.rebuild()
 			}
+			if i == 0 {
+				tooltip("Edit the hull, including its floors, walls and permanent equipment.")
+			} else {
+				tooltip("Edit " + s.Name + ". Changes are saved to this room option.")
+			}
 		}
 		imgui.EndCombo()
+	}
+	if ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
+		if ws.source == 0 {
+			hint("Your edits affect the hull: floors, walls and permanent equipment.")
+		} else {
+			hint("Your edits affect the " + ws.assembly.Sources[ws.source].Name + " room option.")
+		}
 	}
 	space()
 	areaAction := "Ship areas..."
@@ -266,6 +292,10 @@ func (ws *WsShip) buildControls() {
 	if actionButton(areaAction, false) {
 		ws.beginTask(taskArea)
 	}
+	if actionButton("Set up docking port...", false) {
+		ws.beginTask(taskDocking)
+	}
+	tooltip("Select an entrance with Grab (3), then place or move this ship's mobile docking port there.")
 	if ws.project.Settings != nil {
 		if actionButton("Make an upgrade room...", false) {
 			ws.beginTask(taskRoom)
@@ -321,12 +351,12 @@ func (ws *WsShip) canvasHeader() {
 	}
 	tooltip("Show area markers. This is the same setting as View > Areas (Ctrl+1).")
 	imgui.SameLine()
-	if tools.IsSelected(tools.TNGrab) && (ws.task == taskArea || ws.task == taskRoom) {
+	if tools.IsSelected(tools.TNGrab) && (ws.task == taskArea || ws.task == taskRoom || ws.task == taskDocking) {
 		imgui.Text("Select tiles in the part being edited")
 	} else if ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
 		imgui.Text("Editing: " + ws.assembly.Sources[ws.source].Name)
 	}
-	if tools.IsSelected(tools.TNGrab) && (ws.task == taskArea || ws.task == taskRoom) {
+	if tools.IsSelected(tools.TNGrab) && (ws.task == taskArea || ws.task == taskRoom || ws.task == taskDocking) {
 		hint("Grab selection (3) is used by the action in the left panel.")
 	} else {
 		instruction := "Scroll to zoom  |  Middle mouse to pan  |  Ctrl+Z to undo"
@@ -362,14 +392,19 @@ func (ws *WsShip) loadoutControls() {
 				label = m.Name
 			}
 		}
-		if combo("Room: "+slot, label) {
+		if comboHelp("Room: "+slot, label, "Choose which room option is shown here. Choosing it also makes it the part you edit.") {
 			if imgui.Selectable("Empty room") {
 				ws.selectRoomOption(slot, "")
 			}
+			tooltip("Remove the room option from this preview and switch editing to the hull.")
 			for _, m := range h.Modules {
-				if m.Slot == slot && m.Available(ws.currentTheme().ID) && imgui.SelectableV(m.Name, ws.selected[slot] == m.ID, 0, imgui.Vec2{}) {
+				if m.Slot != slot || !m.Available(ws.currentTheme().ID) {
+					continue
+				}
+				if imgui.SelectableV(m.Name, ws.selected[slot] == m.ID, 0, imgui.Vec2{}) {
 					ws.selectRoomOption(slot, m.ID)
 				}
+				tooltip("Show and edit " + m.Name + " in this room.")
 			}
 			imgui.EndCombo()
 		}
