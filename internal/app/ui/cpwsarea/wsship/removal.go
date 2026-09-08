@@ -45,6 +45,7 @@ func (ws *WsShip) requestRemoval(h ship.Hull) *workshop.RemovalConfirmation {
 				ws.message = err.Error()
 				return
 			}
+			ws.notifySaved()
 			ws.requestRemoval(h)
 		}, ActionCancel: func() {}})
 		return nil
@@ -108,6 +109,7 @@ func (ws *WsShip) finishRemoval(plan *ship.RemovalPlan, backup string) {
 		ws.app.SyncPrefabs()
 	}
 	ws.message = "Removed " + plan.Name + "."
+	ws.notifySaved()
 	ws.removalBackup = backup
 	tools.SetEnabled(false)
 	ws.app.OnWorkspaceSwitched()

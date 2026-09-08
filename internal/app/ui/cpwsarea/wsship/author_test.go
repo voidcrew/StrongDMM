@@ -9,6 +9,7 @@ import (
 	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/dmapi/dmmap/dmmdata"
 	"sdmm/internal/ship"
+	"sdmm/internal/shippreview"
 	"sdmm/internal/util"
 	"testing"
 )
@@ -332,5 +333,49 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	exerciseLoadedShipRooms(t, ws, render)
 	exerciseCrew(t, ws, render, true)
 	exerciseCosts(t, ws, render, true)
+	exercisePreviewSaveHook(t, ws, render)
 	exerciseRemoval(t, ws, render)
+}
+
+func exercisePreviewSaveHook(t *testing.T, ws *WsShip, render func()) {
+	t.Helper()
+	app := ws.app.(*previewApp)
+	count := app.previewRequests
+	if !ws.Save() || app.previewRequests != count+1 {
+		t.Fatal("successful save did not request previews")
+	}
+	before := ws.project.Capture()
+	if err := ws.project.SetPartCosts("ship", ship.PartCosts{"trade": 23}); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(ws.catalog.Root, "voidcrew/mapping/shuttles/workshop_fixture.dm")
+	source, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(path, append(source, []byte("\n// external change\n")...), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if ws.Save() || app.previewRequests != count+1 {
+		t.Fatal("failed save requested preview generation")
+	}
+	if err = os.WriteFile(path, source, 0600); err != nil {
+		t.Fatal(err)
+	}
+	ws.project.Restore(before)
+	ws.message = "Saved. Your ship files are up to date."
+	ws.setStage(stepReview)
+	for _, phase := range []string{"running", "failed"} {
+		app.previewStatus = shippreview.Status{Phase: phase, Message: "Generating purchase previews... Another refresh is queued.\nhull workshop_fixture: 24x24, slots [cargo loaded_bay]"}
+		if phase == "failed" {
+			app.previewStatus.Message = "Ship saved. Preview generation failed. Check the log, then retry."
+		}
+		for i := 0; i < 3; i++ {
+			render()
+		}
+		if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
+			captureFrame(t, filepath.Join(dst, "preview-status-"+phase+".png"), 1400, 960)
+		}
+	}
+	app.previewStatus = shippreview.Status{}
 }

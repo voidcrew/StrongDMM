@@ -12,6 +12,7 @@ import (
 	"sdmm/internal/app/window"
 	"sdmm/internal/imguiext/icon"
 	"sdmm/internal/imguiext/style"
+	"sdmm/internal/shippreview"
 )
 
 const (
@@ -207,6 +208,9 @@ func (ws *WsShip) controls() {
 		imgui.TextWrapped(ws.message)
 	}
 	ws.removalRecovery()
+	if app, ok := ws.app.(interface{ ShipPreviewStatus() shippreview.Status }); ok {
+		workshop.PreviewStatus(app.ShipPreviewStatus(), ws.notifySaved)
+	}
 }
 
 func (ws *WsShip) chooseShip() {
@@ -511,5 +515,5 @@ func (ws *WsShip) review() {
 		hint("All changes are saved.")
 	}
 	space()
-	hint("Before using a new ship in-game: compile the project, generate purchase previews, and playtest.")
+	hint("Purchase previews regenerate after saving. Before using a new ship in-game, compile the project and playtest.")
 }

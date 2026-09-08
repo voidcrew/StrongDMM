@@ -22,6 +22,7 @@ import (
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/dmapi/dmmclip"
 	"sdmm/internal/env"
+	"sdmm/internal/shippreview"
 	"sdmm/internal/startup"
 
 	"github.com/SpaiR/imgui-go"
@@ -87,9 +88,10 @@ type app struct {
 
 	// ...omae wa mou shindeiru...
 	// Should be modified only in the CloseCheck method. Ensures we made everything before the closing.
-	closed  bool
-	closing bool
-	updates updateState
+	closed   bool
+	closing  bool
+	updates  updateState
+	previews *shippreview.Client
 
 	shortcutsEnabled bool
 
@@ -106,6 +108,7 @@ type app struct {
 }
 
 func (a *app) initialize() {
+	a.previews = shippreview.New(a.internalDir)
 	a.deleteOldLogs()
 	a.deleteOldBackups()
 

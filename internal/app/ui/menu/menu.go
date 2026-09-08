@@ -12,6 +12,7 @@ import (
 	w "sdmm/internal/imguiext/widget"
 	"sdmm/internal/platform"
 	"sdmm/internal/rsc"
+	"sdmm/internal/shippreview"
 
 	"github.com/SpaiR/imgui-go"
 )
@@ -60,6 +61,8 @@ type app interface {
 	DoOpenChangelog()
 	DoOpenAbout()
 	DoOpenLogs()
+	DoShipPreviews()
+	ShipPreviewStatus() shippreview.Status
 	DoOpenSourceCode()
 	DoCheckForUpdates()
 	DoOpenUpdateDownload()
@@ -277,6 +280,8 @@ func (m *Menu) Process() {
 			w.Separator(),
 			w.MenuItem("Open Logs Folder", m.app.DoOpenLogs).
 				IconEmpty(),
+			w.MenuItem("Ship Purchase Previews", m.app.DoShipPreviews).
+				Enabled(m.app.HasVoidcrewProject()).IconEmpty(),
 			w.MenuItem("About", m.app.DoOpenAbout).
 				IconEmpty(),
 			w.Separator(),
@@ -288,6 +293,16 @@ func (m *Menu) Process() {
 		}),
 
 		w.Custom(func() {
+			status := m.app.ShipPreviewStatus()
+			if status.Phase == "running" || status.Phase == "starting" || status.Phase == "failed" || status.Phase == "error" {
+				label := "Generating previews..."
+				if status.Phase == "failed" || status.Phase == "error" {
+					label = "Previews need attention"
+				}
+				if imgui.Button(label) {
+					m.app.DoShipPreviews()
+				}
+			}
 			if m.updateStatus != upStatusNone {
 				m.showUpdateMenu()
 			}

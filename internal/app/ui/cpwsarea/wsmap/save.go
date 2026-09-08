@@ -22,11 +22,16 @@ func (ws *WsMap) Save() bool {
 		saveFormat = dmmsave.FormatDM
 	}
 
-	dmmsave.Save(ws.app.LoadedEnvironment(), ws.paneMap.Dmm(), dmmsave.Config{
+	if !dmmsave.Save(ws.app.LoadedEnvironment(), ws.paneMap.Dmm(), dmmsave.Config{
 		Format:            saveFormat,
 		SanitizeVariables: editorPrefs.SanitizeVariables,
-	})
+	}) {
+		return false
+	}
 
 	ws.app.CommandStorage().ForceBalance(ws.CommandStackId())
+	if app, ok := ws.app.(interface{ MapFileSaved(string) }); ok {
+		app.MapFileSaved(ws.paneMap.Dmm().Path.Absolute)
+	}
 	return true
 }

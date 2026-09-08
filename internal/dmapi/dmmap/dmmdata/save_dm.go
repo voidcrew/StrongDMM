@@ -12,13 +12,13 @@ import (
 )
 
 // SaveDM writes DmmData in DM format to a file with the provided path.
-func (d DmmData) SaveDM(path string) {
+func (d DmmData) SaveDM(path string) error {
 	log.Print("saving dmm data in format...")
 
 	f, err := os.Create(path)
 	if err != nil {
 		log.Printf("unable to save as [%s]: %v", d, err)
-		return
+		return err
 	}
 	defer f.Close()
 
@@ -55,9 +55,14 @@ func (d DmmData) SaveDM(path string) {
 
 	if err = w.Flush(); err != nil {
 		log.Printf("unable to write to [%s]: %v", path, err)
+		return err
+	}
+	if err = f.Close(); err != nil {
+		return err
 	}
 
 	log.Printf("[%s] saved in format to: %s", d, path)
+	return nil
 }
 
 func toDMStr(key Key, prefabs Prefabs) string {

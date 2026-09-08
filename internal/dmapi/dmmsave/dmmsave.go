@@ -9,18 +9,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-func Save(dme *dmenv.Dme, dmm *dmmap.Dmm, cfg Config) {
-	SaveV(dme, dmm, dmm.Path.Absolute, cfg)
+func Save(dme *dmenv.Dme, dmm *dmmap.Dmm, cfg Config) bool {
+	return SaveV(dme, dmm, dmm.Path.Absolute, cfg)
 }
 
-func SaveV(dme *dmenv.Dme, dmm *dmmap.Dmm, path string, cfg Config) {
+func SaveV(dme *dmenv.Dme, dmm *dmmap.Dmm, path string, cfg Config) bool {
 	log.Printf("save started [%s]...", path)
 
 	sp, err := makeSaveProcess(cfg, dme, dmm, path)
 	if err != nil {
 		log.Print("unable to start save process")
 		util.ShowErrorDialog("Unable to start save process")
-		return
+		return false
 	}
 
 	if cfg.SanitizeVariables {
@@ -31,9 +31,14 @@ func SaveV(dme *dmenv.Dme, dmm *dmmap.Dmm, path string, cfg Config) {
 	if err = sp.handleLocationsWithoutKeys(); err != nil {
 		log.Print("unable to handle locations without keys:", err)
 		util.ShowErrorDialog("Unable to save the map: " + err.Error())
-		return
+		return false
 	}
-	sp.output.Save()
+	if err = sp.output.Save(); err != nil {
+		log.Print("unable to write map:", err)
+		util.ShowErrorDialog("Unable to save the map: " + err.Error())
+		return false
+	}
 
 	log.Print("save finished")
+	return true
 }

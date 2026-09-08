@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.4
+Version: 0.5.5
 
 START
 1. Extract the whole ZIP into a writable folder.
@@ -54,6 +54,19 @@ Scroll to zoom, middle mouse to pan, and Ctrl+Z to undo.
 Use View or Ctrl+1/2/3/4 to toggle areas, turfs, objects and mobs.
 Ctrl+2 hides floors to reveal piping underneath. Areas starts off in the
 workshop; its checkbox and the normal View shortcut control the same setting.
+
+PURCHASE PREVIEWS
+Saving ships automatically runs the project's tools/ship_previews generator.
+This also applies to hull and module maps saved in normal map tabs. The full
+fleet renders in the background; further saves queue another refresh. You can
+keep editing or close the editor while it finishes. Failed generation preserves
+the previous images and does not undo your ship save.
+Status and Retry previews appear in Ship Workshop. Help > Ship Purchase Previews
+also shows status, logs and a manual regeneration action.
+Requires Python 3.10+, Pillow (python -m pip install Pillow), and dmm-tools.
+Put dmm-tools on PATH or set DMM_TOOLS to its executable, then restart StrongDMM.
+The generator's own dmm-tools fallback is supported. STRONGDMM_PYTHON can specify
+a Python executable when it is not on PATH.
 
 REMOVING SHIPS AND RUINS
 Use Remove ship in Ship Workshop, or right-click its fleet entry. In Ruin

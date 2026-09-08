@@ -414,7 +414,14 @@ func (ws *WsShip) Save() bool {
 	}
 	ws.app.CommandStorage().ForceBalance(ws.CommandStackId())
 	ws.message = "Saved. Your ship files are up to date."
+	ws.notifySaved()
 	return true
+}
+
+func (ws *WsShip) notifySaved() {
+	if app, ok := ws.app.(interface{ ShipFilesSaved() }); ok {
+		app.ShipFilesSaved()
+	}
 }
 func (ws *WsShip) flush() {
 	ws.reviewReady = false

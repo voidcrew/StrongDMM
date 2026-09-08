@@ -9,16 +9,23 @@ import (
 	"sdmm/internal/dmapi/dmmap/dmmdata/dmmprefab"
 	"sdmm/internal/dmapi/dmmap/dmminstance"
 	"sdmm/internal/dmapi/dmmclip"
+	"sdmm/internal/shippreview"
 )
 
 type previewApp struct {
-	dme       *dmenv.Dme
-	commands  *command.Storage
-	filter    *dm.PathsFilter
-	clipboard dmmclip.Clipboard
-	prefab    *dmmprefab.Prefab
-	instance  *dmminstance.Instance
+	dme             *dmenv.Dme
+	commands        *command.Storage
+	filter          *dm.PathsFilter
+	clipboard       dmmclip.Clipboard
+	prefab          *dmmprefab.Prefab
+	instance        *dmminstance.Instance
+	previewRequests int
+	previewStatus   shippreview.Status
 }
+
+func (a *previewApp) ShipFilesSaved() { a.previewRequests++ }
+
+func (a *previewApp) ShipPreviewStatus() shippreview.Status { return a.previewStatus }
 
 func (a *previewApp) LoadedEnvironment() *dmenv.Dme { return a.dme }
 func (a *previewApp) CommandStorage() *command.Storage {

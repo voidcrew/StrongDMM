@@ -27,11 +27,11 @@ type DmmData struct {
 	Grid       DataGrid
 }
 
-func (d DmmData) Save() {
+func (d DmmData) Save() error {
 	if d.IsTgm {
-		d.SaveTGM(d.Filepath)
+		return d.SaveTGM(d.Filepath)
 	} else {
-		d.SaveDM(d.Filepath)
+		return d.SaveDM(d.Filepath)
 	}
 }
 
