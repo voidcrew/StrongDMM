@@ -103,6 +103,17 @@ func (w *WsArea) OpenRuin() *wsruin.WsRuin {
 		}
 	}
 	content := wsruin.New(w.app)
+	content.SourceBusy = func(file string) bool {
+		for _, ws := range w.workspaces {
+			if m, ok := ws.Content().(*wsmap.WsMap); ok && util.SamePath(m.Map().Dmm().Path.Absolute, file) {
+				return true
+			}
+			if s, ok := ws.Content().(*wsship.WsShip); ok && s.Owns(file) {
+				return true
+			}
+		}
+		return false
+	}
 	ws := workspace.New(content)
 	w.addWorkspace(ws)
 	ws.SetTriggerFocus(true)

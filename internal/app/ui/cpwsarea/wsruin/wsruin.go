@@ -59,6 +59,8 @@ type WsRuin struct {
 	width, height                             int32
 	filter, locationFilter, id, message       string
 	customID                                  bool
+	SourceBusy                                func(string) bool
+	removalBackup                             string
 }
 
 func New(app App) *WsRuin {
@@ -299,6 +301,7 @@ func (ws *WsRuin) Process() {
 		imgui.Spacing()
 		imgui.TextWrapped(ws.message)
 	}
+	ws.removalRecovery()
 	imgui.EndChild()
 }
 func heading(s string) { workshop.Section(s, style.Amber) }
@@ -569,6 +572,12 @@ func (ws *WsRuin) filePreview(p *ruin.Project) {
 func (ws *WsRuin) details() {
 	heading(ws.selected.Name)
 	hint(ws.selected.Location)
+	defer func() {
+		workshop.Gap()
+		if workshop.DangerButton("Remove ruin...") {
+			ws.requestRemoval()
+		}
+	}()
 	imgui.BeginDisabledV(ws.selected.Problem != "")
 	if button("Open map for editing") {
 		ws.app.DoLoadResource(ws.selected.File)

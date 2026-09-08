@@ -330,4 +330,5 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	exerciseTransitions(t, ws, render)
 	exerciseLoadedShipRooms(t, ws, render)
 	exerciseCrew(t, ws, render, true)
+	exerciseRemoval(t, ws, render)
 }

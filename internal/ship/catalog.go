@@ -313,8 +313,5 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 		}
 	}
 	sort.Slice(c.Hulls, func(i, j int) bool { return c.Hulls[i].Name < c.Hulls[j].Name })
-	if len(c.Hulls) == 0 {
-		return nil, fmt.Errorf("no registered modular hulls found")
-	}
 	return c, nil
 }

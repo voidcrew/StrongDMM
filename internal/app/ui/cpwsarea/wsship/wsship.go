@@ -41,6 +41,7 @@ type WsShip struct {
 	areaPath, areaIcon               string
 	emptyModule                      bool
 	shipFilter                       string
+	removalBackup                    string
 	settings                         settingsForm
 	dockOutward                      int
 	reviewReady                      bool

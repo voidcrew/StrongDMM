@@ -13,6 +13,7 @@ type FileChange struct {
 	Path          string
 	Before, After []byte
 	Existed       bool
+	Delete        bool
 }
 
 func (c FileChange) unchanged() error {
@@ -68,7 +69,10 @@ func writeChanges(root string, changes []FileChange, rename func(string, string)
 		if err := c.unchanged(); err != nil {
 			return err
 		}
-		if c.Existed && bytes.Equal(c.Before, c.After) {
+		if c.Delete && (!c.Existed || len(c.After) != 0) {
+			return fmt.Errorf("invalid deletion: %s", path)
+		}
+		if !c.Delete && c.Existed && bytes.Equal(c.Before, c.After) {
 			continue
 		}
 		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
@@ -140,6 +144,9 @@ func writeChanges(root string, changes []FileChange, rename func(string, string)
 				return rollback(err)
 			}
 			f.moved = true
+		}
+		if f.change.Delete {
+			continue
 		}
 		if err := rename(f.temp, f.change.Path); err != nil {
 			return rollback(err)

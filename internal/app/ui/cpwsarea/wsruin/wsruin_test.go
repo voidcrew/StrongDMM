@@ -8,10 +8,12 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/SpaiR/imgui-go"
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+	"sdmm/internal/app/ui/dialog"
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/dmapi/dmmap"
@@ -60,6 +62,9 @@ func TestNativeRuinWorkshop(t *testing.T) {
 	path := os.Getenv("RUIN_TEST_DME")
 	if path == "" {
 		t.Skip("set RUIN_TEST_DME for native UI and project integration")
+	}
+	if runtime.GOOS == "windows" {
+		t.Setenv("APPDATA", t.TempDir())
 	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -129,6 +134,7 @@ func TestNativeRuinWorkshop(t *testing.T) {
 		imgui.BeginV("Ruin Workshop", nil, imgui.WindowFlagsNoResize|imgui.WindowFlagsNoMove|imgui.WindowFlagsNoCollapse)
 		ws.Process()
 		imgui.End()
+		dialog.Process()
 		imgui.Render()
 		platform.Render(imgui.RenderedDrawData())
 		gl.Finish()
@@ -276,6 +282,50 @@ func TestNativeRuinWorkshop(t *testing.T) {
 		}
 	}
 	capture("ruin-anywhere-properties")
+	removed := *ws.selected
+	r := ws.requestRemoval()
+	deadline := time.Now().Add(2 * time.Minute)
+	for r.Pending() && time.Now().Before(deadline) {
+		render()
+		time.Sleep(10 * time.Millisecond)
+	}
+	if r.Pending() || r.Error != "" || r.Plan == nil {
+		t.Fatal("removal preview failed", r.Error)
+	}
+	capture("remove-ruin")
+	ws.SourceBusy = func(string) bool { return true }
+	if err := r.Confirm(); err == nil {
+		t.Fatal("removed an open map")
+	}
+	ws.SourceBusy = nil
+	if err := r.Confirm(); err != nil {
+		t.Fatal(err)
+	}
+	dialog.Close(r)
+	if ws.selected != nil || ws.project != nil || ws.IsModified() {
+		t.Fatal("removed ruin remains active")
+	}
+	if _, err := os.Stat(removed.File); !os.IsNotExist(err) {
+		t.Fatal("ruin map still exists")
+	}
+	if _, err := os.Stat(ws.removalBackup); err != nil {
+		t.Fatal("recovery missing", err)
+	}
+	parsed, err = dmenv.New(copyEnv.RootFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, variant := range removed.Variants {
+		if parsed.Objects[variant.Type] != nil {
+			t.Fatal("variant still registered", variant.Type)
+		}
+	}
+	for _, file := range []string{first, space} {
+		if _, err := os.Stat(file); err != nil {
+			t.Fatal("unrelated ruin was removed", err)
+		}
+	}
+	capture("ruin-after-removal")
 	t.Logf("Created and reloaded fixtures in %s", fixture)
 }
 

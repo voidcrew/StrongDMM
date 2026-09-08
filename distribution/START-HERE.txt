@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.2
+Version: 0.5.3
 
 START
 1. Extract the whole ZIP into a writable folder.
@@ -50,6 +50,15 @@ Scroll to zoom, middle mouse to pan, and Ctrl+Z to undo.
 Use View or Ctrl+1/2/3/4 to toggle areas, turfs, objects and mobs.
 Ctrl+2 hides floors to reveal piping underneath. Areas starts off in the
 workshop; its checkbox and the normal View shortcut control the same setting.
+
+REMOVING SHIPS AND RUINS
+Use Remove ship in Ship Workshop, or right-click its fleet entry. In Ruin
+Workshop, select a ruin and choose Remove ruin below its properties.
+Review the affected files, then confirm. Shared maps and definitions stay.
+Close any affected map tabs first. Linked entries may need their source
+references resolved before removal. Anywhere ruins include all their variants.
+A recovery ZIP is saved first; use Open recovery folder after removal.
+Removal clears Ship Workshop undo history and cannot be undone with Ctrl+Z.
 
 SAVE BEHAVIOR
 Saving writes into the checkout you selected. A new ship creates .dmm maps,

@@ -13,6 +13,7 @@ import (
 	"github.com/SpaiR/imgui-go"
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+	"sdmm/internal/app/ui/dialog"
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/dmapi/dmicon"
@@ -25,6 +26,9 @@ func TestRenderShipWorkspace(t *testing.T) {
 	path := os.Getenv("SHIP_RENDER_TEST_DME")
 	if path == "" {
 		t.Skip("set SHIP_RENDER_TEST_DME for the native rendering test")
+	}
+	if runtime.GOOS == "windows" {
+		t.Setenv("APPDATA", t.TempDir())
 	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -84,6 +88,7 @@ func TestRenderShipWorkspace(t *testing.T) {
 		imgui.BeginV("Voidcrew Ship Workspace", nil, imgui.WindowFlagsNoResize|imgui.WindowFlagsNoMove|imgui.WindowFlagsNoCollapse)
 		ws.Process()
 		imgui.End()
+		dialog.Process()
 		imgui.Render()
 		platform.Render(imgui.RenderedDrawData())
 		gl.Finish()

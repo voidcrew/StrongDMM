@@ -204,6 +204,7 @@ func (ws *WsShip) controls() {
 		imgui.Separator()
 		imgui.TextWrapped(ws.message)
 	}
+	ws.removalRecovery()
 }
 
 func (ws *WsShip) chooseShip() {
@@ -217,6 +218,7 @@ func (ws *WsShip) chooseShip() {
 	}
 	heading("SHIP LIBRARY")
 	textField("Find a ship", "Search the fleet...", &ws.shipFilter)
+	hint("Right-click a ship for removal.")
 	if ws.catalog == nil {
 		return
 	}
@@ -239,6 +241,12 @@ func (ws *WsShip) chooseShip() {
 			if ws.pane != nil {
 				ws.pane.FitView()
 			}
+		}
+		if imgui.BeginPopupContextItemV("ship-actions-"+h.Type, 1) {
+			if imgui.Selectable("Remove ship...") {
+				ws.requestRemoval(h)
+			}
+			imgui.EndPopup()
 		}
 	}
 	if count == 0 {
@@ -307,6 +315,9 @@ func (ws *WsShip) buildControls() {
 	}
 	space()
 	heading("CONFIGURATION")
+	if workshop.DangerButton("Remove ship...") {
+		ws.requestRemoval(ws.project.Hull)
+	}
 	if imgui.CollapsingHeader("Room options & ship variants") {
 		ws.loadoutControls()
 	}
