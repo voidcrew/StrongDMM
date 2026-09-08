@@ -373,10 +373,7 @@ func (ws *WsShip) Process() {
 func (ws *WsShip) controls() {
 	imgui.Text("SHIP WORKSHOP")
 	if imgui.Button("New ship...") {
-		ws.flush()
-		ws.OnFocusChange(false)
-		ws.wizard = true
-		tools.SetEnabled(false)
+		ws.BeginNewShip()
 	}
 	imgui.SameLine()
 	if imgui.Button("Save all ships") {
@@ -505,4 +502,14 @@ func (ws *WsShip) controls() {
 		imgui.TextWrapped(ws.message)
 	}
 	imgui.PopItemWidth()
+}
+
+func (ws *WsShip) BeginNewShip() {
+	if ws.catalog == nil {
+		return
+	}
+	ws.flush()
+	ws.OnFocusChange(false)
+	ws.wizard = true
+	tools.SetEnabled(false)
 }

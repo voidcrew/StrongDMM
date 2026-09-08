@@ -1,6 +1,6 @@
-# StrongDMM - Voidcrew &middot; [![GitHub release](https://img.shields.io/github/v/release/voidcrew/StrongDMM?include_prereleases&label=Ship%20Workshop)](https://github.com/voidcrew/StrongDMM/releases) [![Github All Releases](https://img.shields.io/github/downloads/voidcrew/StrongDMM/total.svg?logo=github)](https://github.com/voidcrew/StrongDMM/releases)
+# StrongDMM - Voidcrew &middot; [![GitHub release](https://img.shields.io/github/v/release/voidcrew/StrongDMM?label=StrongDMM%20Voidcrew)](https://github.com/voidcrew/StrongDMM/releases) [![Github All Releases](https://img.shields.io/github/downloads/voidcrew/StrongDMM/total.svg?logo=github)](https://github.com/voidcrew/StrongDMM/releases)
 
-<p align="center"><b>Download Voidcrew Ship Workshop</b></p>
+<p align="center"><b>Download StrongDMM Voidcrew</b></p>
 <p align="center">
   <a href="https://github.com/voidcrew/StrongDMM/releases">
     <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows download link"/>
@@ -13,7 +13,7 @@
 
 Voidcrew's maintained fork of [StrongDMM](https://github.com/SpaiR/StrongDMM), a map editor for BYOND.
 
-Ship Workshop lets mappers edit assembled modular ships and create new ships. Edits save back to the hull and module source files. The normal mapping tools, undo/redo, and visibility shortcuts remain available.
+Open Voidcrew projects, browse maps, and access project tools from the Voidcrew menu. Ship Workshop adds assembled modular ship editing and new ship creation, with edits saved to the hull and module source files. The normal mapping tools, undo/redo, and visibility shortcuts remain available.
 
 ## Features
 
@@ -38,7 +38,7 @@ The editor offers a range of new features:
 
 ## How to Use
 
-Extract the entire Windows x64 ZIP, run **START.cmd**, and select `tgstation.dme` in a test Voidcrew checkout. See the included `START-HERE.txt` for editing, new ship creation, and feedback instructions.
+Extract the Windows x64 ZIP and run **StrongDMM.exe**. Choose **Open Project** and select your Voidcrew checkout's `tgstation.dme`. The project page offers map browsing, Ship Workshop, and new ship creation; project tools also live in the **Voidcrew** menu. See `START-HERE.txt` for details.
 
 **Download Links:**
 

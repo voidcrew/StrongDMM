@@ -4,9 +4,9 @@ import (
 	"os"
 
 	"sdmm/internal/app"
+	"sdmm/internal/startup"
 )
 
 func main() {
-	app.Start()
-	os.Exit(0)
+	os.Exit(startup.Run(app.Start))
 }

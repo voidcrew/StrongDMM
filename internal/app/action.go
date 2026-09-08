@@ -100,8 +100,15 @@ func (a *app) AvailableMaps() (availableMaps []string) {
 		return availableMaps
 	}
 
-	err := filepath.Walk(a.LoadedEnvironment().RootDir, func(path string, f os.FileInfo, err error) error {
-		if filepath.Ext(path) == ".dmm" {
+	root := a.LoadedEnvironment().RootDir
+	if a.HasVoidcrewProject() {
+		root = filepath.Join(root, "_maps")
+	}
+	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if !entry.IsDir() && strings.EqualFold(filepath.Ext(path), ".dmm") {
 			availableMaps = append(availableMaps, path)
 		}
 		return err

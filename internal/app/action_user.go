@@ -58,11 +58,7 @@ func (a *app) DoOpenV(ws *workspace.Workspace) {
 		Load(); err == nil {
 		log.Print("resource to load selected:", file)
 
-		if a.HasLoadedEnvironment() {
-			a.loadMap(file, ws)
-		} else {
-			a.DoLoadResourceV(file, ws)
-		}
+		a.DoLoadResourceV(file, ws)
 	}
 }
 
@@ -102,7 +98,7 @@ func (a *app) DoNewMap() {
 }
 
 func (a *app) DoOpenShipWorkspace() {
-	if a.HasLoadedEnvironment() {
+	if a.HasVoidcrewProject() {
 		a.layout.WsArea.OpenShip()
 	}
 }

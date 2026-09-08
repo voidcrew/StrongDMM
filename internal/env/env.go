@@ -4,9 +4,9 @@ const Undefined = "undefined"
 
 var (
 	Title    = "StrongDMM - Voidcrew"
- Version  = "voidcrew-workshop.2"
+	Version  = "0.1.0"
 	Revision = Undefined
-	GitHub   = "https://github.com/SpaiR/StrongDMM"
+	GitHub   = "https://github.com/voidcrew/StrongDMM"
 	// A fork must not replace itself with an upstream release.
 	Manifest = ""
 	Support  = "https://ko-fi.com/spair"

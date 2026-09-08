@@ -22,6 +22,8 @@ type app interface {
 	DoNewWorkspace()
 	DoNewMap()
 	DoOpenShipWorkspace()
+	DoNewShip()
+	DoOpenProject()
 	DoOpen()
 	DoLoadResource(path string)
 	DoClearRecentMaps()
@@ -72,6 +74,7 @@ type app interface {
 
 	LoadedEnvironment() *dmenv.Dme
 	HasLoadedEnvironment() bool
+	HasVoidcrewProject() bool
 
 	HasActiveMap() bool
 
@@ -119,9 +122,6 @@ func (m *Menu) Process() {
 			w.MenuItem("New Map", m.app.DoNewMap).
 				IconEmpty().
 				Enabled(m.app.HasLoadedEnvironment()),
-			w.MenuItem("Voidcrew Ship Workspace", m.app.DoOpenShipWorkspace).
-				IconEmpty().
-				Enabled(m.app.HasLoadedEnvironment()),
 			w.Separator(),
 			w.MenuItem("Open...", m.app.DoOpen).
 				Icon(icon.FolderOpen).
@@ -166,6 +166,13 @@ func (m *Menu) Process() {
 			w.MenuItem("Exit", m.app.DoExit).
 				IconEmpty().
 				Shortcut(shortcut.Combine(platform.KeyModName(), "Q")),
+		}),
+
+		w.Menu("Voidcrew", w.Layout{
+			w.MenuItem("Open Project...", m.app.DoOpenProject).Icon(icon.FolderOpen),
+			w.Separator(),
+			w.MenuItem("Ship Workshop", m.app.DoOpenShipWorkspace).IconEmpty().Enabled(m.app.HasVoidcrewProject()),
+			w.MenuItem("New Ship...", m.app.DoNewShip).IconEmpty().Enabled(m.app.HasVoidcrewProject()),
 		}),
 
 		w.Menu("Edit", w.Layout{

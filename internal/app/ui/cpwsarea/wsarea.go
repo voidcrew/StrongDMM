@@ -55,9 +55,6 @@ func (w *WsArea) Init(app App) {
 	w.app = app
 	w.loadConfig()
 	w.AddEmptyWorkspaceIfNone()
-	if w.isChangelogHashModified() {
-		w.OpenChangelog()
-	}
 }
 
 func (w *WsArea) Free() {
@@ -71,11 +68,11 @@ func (w *WsArea) Free() {
 	log.Print("workspace area free")
 }
 
-func (w *WsArea) OpenShip() {
+func (w *WsArea) OpenShip() *wsship.WsShip {
 	for _, ws := range w.workspaces {
-		if _, ok := ws.Content().(*wsship.WsShip); ok {
+		if content, ok := ws.Content().(*wsship.WsShip); ok {
 			ws.SetTriggerFocus(true)
-			return
+			return content
 		}
 	}
 	content := wsship.New(w.app, func(file string) bool {
@@ -89,6 +86,7 @@ func (w *WsArea) OpenShip() {
 	ws := workspace.New(content)
 	w.addWorkspace(ws)
 	ws.SetTriggerFocus(true)
+	return content
 }
 
 func (w *WsArea) OpenPreferences(prefsView wsprefs.Prefs) {

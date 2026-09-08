@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -170,21 +171,14 @@ func (a *app) dispose() {
 }
 
 func getOrCreateInternalDir() string {
-	var internalDir string
-
-	userHomeDir, err := os.UserHomeDir()
+	internalDir, err := env.ProfileDir()
 	if err != nil {
-		panic("unable to find user home dir")
+		panic(fmt.Errorf("unable to find editor profile: %w", err))
 	}
-
-	if runtime.GOOS == "windows" {
-		internalDir = userHomeDir + "/AppData/Roaming/StrongDMM-Voidcrew"
-	} else {
-		internalDir = userHomeDir + "/.strongdmm-voidcrew"
+	if err := os.MkdirAll(internalDir, 0700); err != nil {
+		panic(fmt.Errorf("unable to create editor profile: %w", err))
 	}
-	_ = os.MkdirAll(internalDir, os.ModePerm)
-
-	return filepath.FromSlash(internalDir)
+	return internalDir
 }
 
 func (a *app) checkShouldClose() {

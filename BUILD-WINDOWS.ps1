@@ -1,13 +1,13 @@
 [CmdletBinding()]
 param(
-    [string]$Version = 'voidcrew-workshop.2-test.2',
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.1.0',
     [string]$Revision = 'source',
     [switch]$Test
 )
 $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {
-    foreach ($tool in @('go', 'cargo', 'rustc', 'gcc', 'g++')) {
+    foreach ($tool in @('go', 'cargo', 'rustc', 'gcc', 'g++', 'windres')) {
         if (-not (Get-Command $tool -ErrorAction SilentlyContinue)) {
             throw "Install $tool and add it to PATH; see BUILDING.txt."
         }
@@ -31,9 +31,17 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Tests failed.' }
     }
     $sharedFlags = "-s -w -X sdmm/internal/env.Version=$Version -X sdmm/internal/env.Revision=$Revision -extldflags=-static"
-    & go build "-mod=$moduleMode" -buildvcs=false -trimpath "-ldflags=$sharedFlags -H windowsgui" -o dst/StrongDMM-Voidcrew.exe .
-    if ($LASTEXITCODE -ne 0) { throw 'Editor build failed.' }
+    [void][System.IO.Directory]::CreateDirectory((Join-Path $PSScriptRoot 'dst'))
+    $resourceText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'distribution/StrongDMM.rc.in'))
+    $resourceText = $resourceText.Replace('@VERSION@', $Version).Replace('@VERSION_NUMBERS@', (($Version -split '\.') -join ',') + ',0')
+    [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'dst/version.rc'), $resourceText)
+    & windres -i dst/version.rc -o resource_windows_amd64.syso -O coff --target=pe-x86-64
+    if ($LASTEXITCODE -ne 0) { throw 'Windows resource build failed.' }
+    try {
+        & go build "-mod=$moduleMode" -buildvcs=false -trimpath "-ldflags=$sharedFlags -H windowsgui" -o dst/StrongDMM.exe .
+        if ($LASTEXITCODE -ne 0) { throw 'Editor build failed.' }
+    } finally { Remove-Item -LiteralPath (Join-Path $PSScriptRoot 'resource_windows_amd64.syso') -ErrorAction SilentlyContinue }
     & go build "-mod=$moduleMode" -buildvcs=false -trimpath "-ldflags=$sharedFlags" -o dst/shipcheck.exe ./cmd/shipcheck
     if ($LASTEXITCODE -ne 0) { throw 'Checker build failed.' }
-    Write-Host 'Built dst/StrongDMM-Voidcrew.exe and dst/shipcheck.exe.'
+    Write-Host 'Built dst/StrongDMM.exe and dst/shipcheck.exe.'
 } finally { Pop-Location }

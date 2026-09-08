@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"sdmm/internal/util"
@@ -20,7 +21,7 @@ func initializeLogs(internalDir string) string {
 	logFile := logDir + "/" + formattedDate + ".log"
 	file, err := os.OpenFile(logFile, os.O_CREATE|os.O_APPEND|os.O_WRONLY, os.ModePerm)
 	if err != nil {
-		panic("unable to open log file")
+		panic(fmt.Errorf("unable to open editor log: %w", err))
 	}
 
 	// Attach log output to the log file and an application terminal.

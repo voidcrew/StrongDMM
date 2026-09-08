@@ -1,6 +1,6 @@
-SHIP WORKSHOP SOURCE
+STRONGDMM VOIDCREW SOURCE
 
-Modified StrongDMM sources for voidcrew-workshop.2-test.2 (2026-09-07).
+Modified StrongDMM sources for 0.1.0 (2026-09-07).
 Upstream commit: 5241698aeca9e83fd61048d835e9318d3610c16a
 Upstream repository: https://github.com/SpaiR/StrongDMM
 
@@ -11,7 +11,7 @@ GPL-3.0 terms are in LICENSE; existing source notices are retained.
 
 BUILD ON WINDOWS X64
 Install Go, Rust with the x86_64-pc-windows-gnu host toolchain, and a MinGW-w64
-POSIX/SEH x64 GCC toolchain. Put go, cargo, rustc, gcc and g++ on PATH.
+POSIX/SEH x64 GCC toolchain. Put go, cargo, rustc, gcc, g++ and windres on PATH.
 Do not substitute the Rust MSVC host toolchain for the GNU one.
 
 The tested toolchains are:
@@ -41,5 +41,5 @@ then run:
 This test requires a working OpenGL 3.3 desktop session. It creates a hidden
 window and temporary ship fixtures. Without that variable it is skipped.
 
-The launchers and tester instructions are included under distribution/.
-They are for the binary distribution, not required for compilation.
+The Windows resource template and user instructions are under distribution/.
+The editor is dst/StrongDMM.exe; launch it directly to open a project.

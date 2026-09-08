@@ -3,40 +3,50 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 )
 
-// Check program arguments to load dme/dmm files passed by.
+type startupArgs struct {
+	project       string
+	maps          []string
+	shipWorkspace bool
+}
+
+func parseStartupArgs(args []string) startupArgs {
+	var parsed startupArgs
+	for _, arg := range args {
+		if arg == "--ship-workspace" {
+			parsed.shipWorkspace = true
+			continue
+		}
+		path := projectArgument(arg)
+		switch strings.ToLower(filepath.Ext(path)) {
+		case ".dme":
+			parsed.project = path
+		case ".dmm":
+			parsed.maps = append(parsed.maps, path)
+		}
+	}
+	return parsed
+}
+
 func (a *app) checkProgramArgs() {
-	// The first argument is always a path to the executable.
-	if len(os.Args) < 2 {
+	args := parseStartupArgs(os.Args[1:])
+	if args.project == "" && len(args.maps) > 0 {
+		args.project, _ = findEnvironmentFileFromBase(args.maps[0])
+	}
+	if args.project != "" {
+		a.loadEnvironmentV(args.project, func() {
+			if args.shipWorkspace {
+				a.DoOpenShipWorkspace()
+			}
+			for _, path := range args.maps {
+				a.loadMap(path, nil)
+			}
+		})
 		return
 	}
-
-	var envPath string
-	var mapPaths []string
-	var shipWorkspace bool
-
-	for _, arg := range os.Args {
-		if arg == "--ship-workspace" {
-			shipWorkspace = true
-		}
-		switch filepath.Ext(arg) {
-		case ".dme":
-			envPath = arg
-		case ".dmm":
-			mapPaths = append(mapPaths, arg)
-		}
-	}
-
-	if len(envPath) > 0 {
-		if shipWorkspace {
-			a.loadEnvironmentV(envPath, a.DoOpenShipWorkspace)
-		} else {
-			a.loadResource(envPath)
-		}
-	}
-
-	for _, mapPath := range mapPaths {
-		a.loadResource(mapPath)
+	for _, path := range args.maps {
+		a.loadResource(path)
 	}
 }

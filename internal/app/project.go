@@ -6,8 +6,9 @@ import (
 	"path/filepath"
 	"runtime"
 	"sdmm/third_party/sdmmparser"
-	"time"
 	"sort"
+	"strings"
+	"time"
 
 	"sdmm/internal/app/ui/cpwsarea/workspace"
 	"sdmm/internal/app/ui/dialog"
@@ -40,12 +41,12 @@ func (a *app) loadResourceV(path string, ws *workspace.Workspace) {
 		return
 	}
 
-	if filepath.Ext(path) == ".dme" {
+	if strings.EqualFold(filepath.Ext(path), ".dme") {
 		a.loadEnvironment(path)
 		return
 	}
 
-	if filepath.Ext(path) != ".dmm" {
+	if !strings.EqualFold(filepath.Ext(path), ".dmm") {
 		log.Print("invalid resource to load:", path)
 		return
 	}
@@ -88,7 +89,7 @@ func findEnvironmentFileFromBase(path string) (string, error) {
 		}
 
 		for _, file := range files {
-			if filepath.Ext(file.Name()) == ".dme" {
+			if strings.EqualFold(filepath.Ext(file.Name()), ".dme") {
 				return filepath.Join(dir, file.Name()), nil
 			}
 		}

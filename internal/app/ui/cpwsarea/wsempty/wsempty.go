@@ -23,6 +23,11 @@ import (
 
 type App interface {
 	DoOpenV(*workspace.Workspace)
+	DoOpenProject()
+	DoOpenShipWorkspace()
+	DoNewShip()
+	DoNewMap()
+	HasVoidcrewProject() bool
 
 	DoLoadResource(string)
 	DoLoadResourceV(string, *workspace.Workspace)
@@ -63,6 +68,7 @@ type WsEmpty struct {
 	shortcuts shortcut.Shortcuts
 
 	availableMaps []string
+	environment   *dmenv.Dme
 	selectedMaps  []string
 
 	isDoSelectAllMaps bool
@@ -75,11 +81,11 @@ func New(app App) *WsEmpty {
 }
 
 func (ws *WsEmpty) Name() string {
-	return icon.File + " Workspace"
+	return icon.File + " Project"
 }
 
 func (ws *WsEmpty) Title() string {
-	return "Workspace"
+	return "Project"
 }
 
 func (ws *WsEmpty) Initialize() {
@@ -87,6 +93,11 @@ func (ws *WsEmpty) Initialize() {
 }
 
 func (ws *WsEmpty) PreProcess() {
+	if current := ws.app.LoadedEnvironment(); current != ws.environment {
+		ws.environment = current
+		ws.availableMaps = nil
+		ws.selectedMaps = nil
+	}
 	if ws.app.HasLoadedEnvironment() {
 		if ws.availableMaps == nil {
 			ws.availableMaps = ws.app.AvailableMaps()
@@ -115,9 +126,12 @@ func (ws *WsEmpty) OnFocusChange(focused bool) {
 
 func (ws *WsEmpty) showContent() {
 	if !ws.app.HasLoadedEnvironment() {
-		showOpenButton("environment (.dme) or map (.dmm) file to proceed", func() {
-			ws.app.DoOpenV(ws.Root())
-		})
+		imgui.Text("StrongDMM - Voidcrew")
+		imgui.TextDisabled("Open your project to start mapping.")
+		imgui.NewLine()
+		w.Button("Open Project...", ws.app.DoOpenProject).Style(style.ButtonGreen{}).Build()
+		imgui.SameLine()
+		w.Button("Open Map...", func() { ws.app.DoOpenV(ws.Root()) }).Build()
 		imgui.NewLine()
 		showFilter(&filter)
 		imgui.NewLine()
@@ -129,9 +143,18 @@ func (ws *WsEmpty) showContent() {
 			},
 		)
 	} else {
-		showOpenButton("map (.dmm) file to proceed", func() {
-			ws.app.DoOpenV(ws.Root())
-		})
+		if ws.app.HasVoidcrewProject() {
+			imgui.Text("VOIDCREW PROJECT")
+			imgui.TextDisabled(ws.app.LoadedEnvironment().RootDir)
+			imgui.NewLine()
+			w.Button("Ship Workshop", ws.app.DoOpenShipWorkspace).Style(style.ButtonGreen{}).Build()
+			imgui.SameLine()
+			w.Button("New Ship...", ws.app.DoNewShip).Build()
+			imgui.NewLine()
+		}
+		w.Button("Open Map...", func() { ws.app.DoOpenV(ws.Root()) }).Build()
+		imgui.SameLine()
+		w.Button("New Map...", ws.app.DoNewMap).Build()
 		imgui.NewLine()
 		showFilter(&filter)
 		imgui.NewLine()
@@ -148,10 +171,10 @@ func (ws *WsEmpty) showContent() {
 func (ws *WsEmpty) showRecentEnvironments() {
 	recentEnvs := ws.app.RecentEnvironments()
 
-	showHeaderRecent(len(recentEnvs) == 0, "Recent Environments", ws.app.DoClearRecentEnvironments)
+	showHeaderRecent(len(recentEnvs) == 0, "Recent Projects", ws.app.DoClearRecentEnvironments)
 
 	if len(recentEnvs) == 0 {
-		imgui.TextDisabled("No recent environments")
+		imgui.TextDisabled("No recent projects")
 	}
 
 	if imgui.BeginChild("recent_environments") {

@@ -1,21 +1,18 @@
-VOIDCREW SHIP WORKSHOP - WINDOWS X64 TEST BUILD
-Build: voidcrew-workshop.2-test.2
+STRONGDMM VOIDCREW - WINDOWS X64
+Version: 0.1.0
 
 START
 1. Extract the whole ZIP into a writable folder.
 2. Use a test branch or separate copy of your Voidcrew repository.
-3. Double-click START.cmd and select that checkout's tgstation.dme.
-   You can also drag the .dme file or repository folder onto START.cmd.
-4. Wait for the environment to load. Ship Workshop opens automatically.
-   Keep the command window open while using the editor; you can minimize it.
+3. Double-click StrongDMM.exe, click Open Project, and select tgstation.dme.
+   You can also drag a project folder, .dme, or .dmm onto StrongDMM.exe.
+4. Open Ship Workshop or New Ship from the project page or Voidcrew menu.
+   Open Map and New Map use the normal StrongDMM editor.
 
 The game repository and its icons/maps are required and are not included.
 No Go, Rust, BYOND or existing StrongDMM installation is needed to run the
 editor. Compiling and playing the game still require the game's usual tools.
 This build needs 64-bit Windows and a graphics driver supporting OpenGL 3.3.
-The launchers use the Windows PowerShell included with Windows.
-Alternatively, open StrongDMM-Voidcrew.exe, load tgstation.dme, then choose
-File > Voidcrew Ship Workspace.
 
 TRY AN EXISTING SHIP
 - Pick a hull, theme and module loadout.
@@ -56,12 +53,13 @@ Single-deck prototype. Existing hand-authored ships support source-map editing;
 the Build and Ship settings authoring controls apply to workshop-created ships.
 Preview PNG generation, BYOND compilation and gameplay tests are separate.
 The editor's static checks do not establish that a ship is playable.
-This is an unsigned test build.
+The executable is unsigned.
 
 CHECK SAVED MAPS
-Run Check-Ships.cmd and choose the same .dme. It checks default loadouts and
+The optional shipcheck.exe command-line utility checks default loadouts and
 each alternative module against the other defaults, not every permutation.
-It only reads saved maps and puts JSON results in the reports folder here.
+It only reads saved maps. From a terminal, run:
+  shipcheck.exe -dme "path\to\tgstation.dme" -all > shipcheck.json
 Static warnings may already exist in the current fleet; compare before/after.
 
 SEND FEEDBACK
@@ -73,18 +71,15 @@ Include:
 - Steps, expected result, actual result, and a screenshot if useful.
 - Relevant .dmm/.dm/.ship.json diff and any checker report.
 - Latest editor log from:
-  %USERPROFILE%\AppData\Roaming\StrongDMM-Voidcrew\logs
+  %APPDATA%\StrongDMM-Voidcrew\logs
   Review logs before sharing; they can contain local paths.
 
 IF IT CLOSES AT STARTUP
-Use START.cmd from the extracted folder. If the editor crashes, the command
-window stays open and shows its exit code and the last error output.
-The reports folder beside START.cmd contains three matching files:
-startup-*.txt (launch details and exit code), editor-*.log, and crash-*.log.
-Send those files for the failed attempt to the person who supplied this build.
-If this folder is not writable, the launcher prints the fallback report path
-in the Windows temporary folder. Reports are local and are never uploaded.
-If the file picker was cancelled, the launcher exits without starting the editor.
+StrongDMM.exe reports startup failures in a Windows dialog with the location
+of a session log. That log captures the editor output and crash details.
+Logs are local and are never uploaded automatically. You can also open the
+log folder from Help > Open Logs Folder. Cancelling project selection returns
+you to the editor's project page.
 
 SOURCE AND LICENSE
 This is a modified StrongDMM build. Upstream: https://github.com/SpaiR/StrongDMM

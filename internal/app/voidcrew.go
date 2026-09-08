@@ -1,0 +1,41 @@
+package app
+
+import (
+	"os"
+	"path/filepath"
+
+	"github.com/sqweek/dialog"
+)
+
+func (a *app) HasVoidcrewProject() bool {
+	if !a.HasLoadedEnvironment() {
+		return false
+	}
+	_, ok := a.loadedEnvironment.Objects["/datum/map_template/shuttle/voidcrew"]
+	return ok
+}
+
+func (a *app) DoOpenProject() {
+	startDir := ""
+	if a.HasLoadedEnvironment() {
+		startDir = a.loadedEnvironment.RootDir
+	}
+	path, err := dialog.File().Title("Open Voidcrew project").Filter("BYOND project", "dme").SetStartDir(startDir).Load()
+	if err == nil {
+		a.loadEnvironment(path)
+	}
+}
+
+func (a *app) DoNewShip() {
+	if a.HasVoidcrewProject() {
+		a.layout.WsArea.OpenShip().BeginNewShip()
+	}
+}
+
+// Project directories may be dropped directly onto StrongDMM.exe.
+func projectArgument(path string) string {
+	if info, err := os.Stat(path); err == nil && info.IsDir() {
+		return filepath.Join(path, "tgstation.dme")
+	}
+	return path
+}
