@@ -165,7 +165,11 @@ func (ws *WsShip) crewControls() {
 	for i, j := range c.jobs {
 		imgui.PushIDInt(i)
 		if workshop.Row("job", j.Name, j.Category, fmt.Sprintf("%d", j.Slots), c.selected == i, crewCategoryColor(j.Category), 0) && ws.commitCrew() {
-			c.selected = i
+			if c.selected == i {
+				c.selected = -1
+			} else {
+				c.selected = i
+			}
 			ws.armCrewPicker()
 		}
 		imgui.PopID()
@@ -193,8 +197,13 @@ func (ws *WsShip) crewItemName(path string) string {
 func (ws *WsShip) crewContent() {
 	c := &ws.crew
 	if c.selected < 0 || c.selected >= len(c.jobs) {
-		title("Build your crew")
-		hint("Create a job in the roster to set its role and starting equipment.")
+		if len(c.jobs) == 0 {
+			title("Build your crew")
+			hint("Create a job in the roster to set its role and starting equipment.")
+		} else {
+			title("Select a job")
+			hint("Choose a job from the roster to edit it.")
+		}
 		return
 	}
 	if p, ok := ws.app.SelectedPrefab(); ok && p.Path() != c.lastPrefab {

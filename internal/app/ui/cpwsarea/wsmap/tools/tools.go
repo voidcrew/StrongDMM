@@ -74,6 +74,8 @@ var (
 	active   bool
 	enabled  = true
 	oldCoord util.Point
+	// Finishing a stroke early must not reuse the same held mouse press.
+	pressHandled bool
 
 	tools = map[string]Tool{
 		TNAdd:     newAdd(),
@@ -105,22 +107,25 @@ func IsSelected(toolName string) bool {
 }
 
 func SetEditor(editor editor) {
+	// Regaining focus can rebind the same editor after a stroke has started.
+	if ed == editor {
+		return
+	}
 	FinishStroke()
 	ed = editor
 }
 
 func FinishStroke() {
 	if active {
-		startedTool.onStop(oldCoord)
 		active = false
+		startedTool.onStop(oldCoord)
 	}
 }
 
 // SetEnabled pauses tools while a read-only canvas owns focus.
 func SetEnabled(value bool) {
-	if !value && active {
-		startedTool.onStop(oldCoord)
-		active = false
+	if !value {
+		FinishStroke()
 	}
 	enabled = value
 }
@@ -142,6 +147,9 @@ func Tools() map[string]Tool {
 }
 
 func process(altBehaviour bool) {
+	if cc != nil && !cc.Dragging() {
+		pressHandled = false
+	}
 	if !enabled {
 		return
 	}
@@ -179,7 +187,8 @@ func processSelectedToolStart() {
 	if cs == nil || cc == nil || cs.HoverOutOfBounds() && !Selected().IgnoreBounds() {
 		return
 	}
-	if cc.Dragging() && !active {
+	if cc.Dragging() && !active && !pressHandled {
+		pressHandled = true
 		startedTool = Selected()
 		Selected().onStart(cs.HoveredTile())
 		active = true
@@ -199,7 +208,6 @@ func processSelectedToolMove() {
 
 func processSelectedToolsStop() {
 	if cc != nil && !cc.Dragging() && active {
-		Selected().onStop(oldCoord)
-		active = false
+		FinishStroke()
 	}
 }

@@ -198,13 +198,6 @@ func New(app App, dmm *dmmap.Dmm) *PaneMap {
 }
 
 func (p *PaneMap) Process() {
-	// Enforce a focus to the current window if the canvas was touched.
-	if p.canvasControl.Touched() && !imgui.IsWindowFocusedV(imgui.FocusedFlagsRootAndChildWindows) {
-		imgui.SetWindowFocus()
-	}
-
-	p.updateShortcutsState()
-
 	// Update properties.
 	p.pos = imgui.WindowPos().Plus(imgui.WindowContentRegionMin())
 	p.size = imgui.WindowSize()
@@ -215,7 +208,6 @@ func (p *PaneMap) Process() {
 	if p.size.X < 1 || p.size.Y < 1 {
 		return
 	}
-	p.focused = imgui.IsWindowFocusedV(imgui.FocusedFlagsRootAndChildWindows)
 
 	if !p.centered {
 		// On first load, set the camera to the center of the map, taking UI size into account.
@@ -232,6 +224,9 @@ func (p *PaneMap) Process() {
 	p.canvas.Render().SetActiveLevel(p.ViewDmm(), p.activeLevel)
 
 	p.canvasControl.Process(p.size)
+	p.focusCanvas()
+	p.updateShortcutsState()
+	p.focused = imgui.IsWindowFocusedV(imgui.FocusedFlagsRootAndChildWindows)
 	if p.context != nil {
 		mouse := imgui.MousePos()
 		p.updateCanvasMousePosition(int(mouse.X), int(mouse.Y))
@@ -313,6 +308,13 @@ func (p *PaneMap) processCanvasHoveredInstance() {
 func (p *PaneMap) updateShortcutsState() {
 	if imgui.IsWindowFocusedV(imgui.FocusedFlagsRootAndChildWindows) {
 		p.shortcuts.SetVisible(true)
+	}
+}
+
+func (p *PaneMap) focusCanvas() {
+	// Only current canvas input may take focus; never interrupt an active field.
+	if p.canvasControl.Touched() && !imgui.IsAnyItemActive() && !imgui.IsWindowFocusedV(imgui.FocusedFlagsRootAndChildWindows) {
+		imgui.SetWindowFocus()
 	}
 }
 

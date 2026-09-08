@@ -99,7 +99,8 @@ func (c *Control) processMouseMove() {
 		return
 	}
 
-	c.moving = imgui.IsMouseDown(imgui.MouseButtonMiddle) || imgui.IsKeyDown(int(glfw.KeySpace))
+	c.moving = imgui.IsMouseDown(imgui.MouseButtonMiddle) ||
+		(!imgui.CurrentIO().WantTextInput() && imgui.IsKeyDown(int(glfw.KeySpace)))
 }
 
 func (c *Control) processMouseDrag() {
@@ -125,7 +126,8 @@ func (c *Control) processMouseScroll() {
 }
 
 func (c *Control) processMouseClick() {
-	c.clicked = imgui.IsMouseClicked(imgui.MouseButtonLeft | imgui.MouseButtonMiddle | imgui.MouseButtonRight)
+	c.clicked = c.active && (imgui.IsMouseClicked(imgui.MouseButtonLeft) ||
+		imgui.IsMouseClicked(imgui.MouseButtonMiddle) || imgui.IsMouseClicked(imgui.MouseButtonRight))
 	if c.active {
 		if imgui.IsMouseClicked(imgui.MouseButtonLeft) && c.onLmbClick != nil {
 			c.onLmbClick()
