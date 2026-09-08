@@ -23,6 +23,8 @@ type app interface {
 	DoNewMap()
 	DoOpenShipWorkspace()
 	DoNewShip()
+	DoOpenRuinWorkspace()
+	DoNewRuin()
 	DoOpenProject()
 	DoOpen()
 	DoLoadResource(path string)
@@ -75,6 +77,7 @@ type app interface {
 	LoadedEnvironment() *dmenv.Dme
 	HasLoadedEnvironment() bool
 	HasVoidcrewProject() bool
+	HasRuinProject() bool
 
 	HasActiveMap() bool
 	HasSaveableWorkspace() bool
@@ -174,6 +177,9 @@ func (m *Menu) Process() {
 			w.Separator(),
 			w.MenuItem("Ship Workshop", m.app.DoOpenShipWorkspace).IconEmpty().Enabled(m.app.HasVoidcrewProject()),
 			w.MenuItem("New Ship...", m.app.DoNewShip).IconEmpty().Enabled(m.app.HasVoidcrewProject()),
+			w.Separator(),
+			w.MenuItem("Ruin Workshop", m.app.DoOpenRuinWorkspace).IconEmpty().Enabled(m.app.HasRuinProject()),
+			w.MenuItem("New Ruin...", m.app.DoNewRuin).IconEmpty().Enabled(m.app.HasRuinProject()),
 		}),
 
 		w.Menu("Edit", w.Layout{

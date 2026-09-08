@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"sdmm/internal/ruin"
 
 	"github.com/sqweek/dialog"
 )
@@ -29,6 +30,22 @@ func (a *app) DoOpenProject() {
 func (a *app) DoNewShip() {
 	if a.HasVoidcrewProject() {
 		a.layout.WsArea.OpenShip().BeginNewShip()
+	}
+}
+
+func (a *app) HasRuinProject() bool {
+	return a.HasLoadedEnvironment() && a.loadedEnvironment.Objects[ruin.Type] != nil
+}
+
+func (a *app) DoOpenRuinWorkspace() {
+	if a.HasRuinProject() {
+		a.layout.WsArea.OpenRuin()
+	}
+}
+
+func (a *app) DoNewRuin() {
+	if a.HasRuinProject() {
+		a.layout.WsArea.OpenRuin().BeginNewRuin()
 	}
 }
 

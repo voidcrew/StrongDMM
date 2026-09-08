@@ -26,6 +26,9 @@ type App interface {
 	DoOpenProject()
 	DoOpenShipWorkspace()
 	DoNewShip()
+	DoOpenRuinWorkspace()
+	DoNewRuin()
+	HasRuinProject() bool
 	DoNewMap()
 	HasVoidcrewProject() bool
 
@@ -150,6 +153,12 @@ func (ws *WsEmpty) showContent() {
 			w.Button("Ship Workshop", ws.app.DoOpenShipWorkspace).Style(style.ButtonGreen{}).Build()
 			imgui.SameLine()
 			w.Button("New Ship...", ws.app.DoNewShip).Build()
+			imgui.NewLine()
+		}
+		if ws.app.HasRuinProject() {
+			w.Button("Ruin Workshop", ws.app.DoOpenRuinWorkspace).Style(style.ButtonGreen{}).Build()
+			imgui.SameLine()
+			w.Button("New Ruin...", ws.app.DoNewRuin).Build()
 			imgui.NewLine()
 		}
 		w.Button("Open Map...", func() { ws.app.DoOpenV(ws.Root()) }).Build()

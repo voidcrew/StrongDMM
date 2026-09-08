@@ -143,7 +143,10 @@ func (a *app) HasSaveableWorkspace() bool {
 	if ws == nil {
 		return false
 	}
-	_, ok := ws.Content().(editableWorkspace)
+	if _, ok := ws.Content().(editableWorkspace); ok {
+		return true
+	}
+	_, ok := ws.Content().(interface{ IsModified() bool })
 	return ok
 }
 

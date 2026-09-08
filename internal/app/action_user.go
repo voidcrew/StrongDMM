@@ -140,13 +140,11 @@ func (a *app) DoCloseAll() {
 	a.layout.WsArea.CloseAll()
 }
 
-// DoSave saves current active map.
+// DoSave saves the active map or workshop.
 func (a *app) DoSave() {
 	log.Print("do save")
 	if ws := a.layout.WsArea.ActiveWorkspace(); ws != nil {
-		if content, ok := ws.Content().(editableWorkspace); ok {
-			content.Save()
-		}
+		ws.Save()
 	}
 }
 
