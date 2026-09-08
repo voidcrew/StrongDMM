@@ -57,6 +57,7 @@ func TestRenderShipWorkspace(t *testing.T) {
 	platform.InitImGuiGL()
 	defer platform.DisposeImGuiGL()
 	window.SetPointSize(1)
+	exerciseDropdowns(t)
 	dme, err := dmenv.New(path)
 	if err != nil {
 		t.Fatal(err)

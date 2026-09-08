@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.2.0
+Version: 0.2.1
 
 START
 1. Extract the whole ZIP into a writable folder.

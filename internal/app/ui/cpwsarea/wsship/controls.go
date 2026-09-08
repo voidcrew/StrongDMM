@@ -91,10 +91,10 @@ func numberField(label string, value *int32) {
 }
 func combo(label, preview string) bool {
 	imgui.Text(label)
-	imgui.PushItemWidth(-1)
-	open := imgui.BeginCombo("##"+label, preview)
-	imgui.PopItemWidth()
-	return open
+	// An open combo switches to the popup window. Set the next item's width
+	// without leaving a width-stack entry to pop from the wrong window.
+	imgui.SetNextItemWidth(-1)
+	return imgui.BeginCombo("##"+label, preview)
 }
 func actionButton(label string, primary bool) bool {
 	if primary {
@@ -216,6 +216,7 @@ func (ws *WsShip) chooseShip() {
 		return
 	}
 	imgui.BeginChild("ship-list")
+	imgui.PushStyleVarVec2(imgui.StyleVarSelectableTextAlign, imgui.Vec2{X: 0, Y: .5})
 	for i, h := range ws.catalog.Hulls {
 		if !strings.Contains(strings.ToLower(h.Name), strings.ToLower(ws.shipFilter)) {
 			continue
@@ -234,6 +235,7 @@ func (ws *WsShip) chooseShip() {
 		}
 		imgui.PopID()
 	}
+	imgui.PopStyleVar()
 	imgui.EndChild()
 }
 
