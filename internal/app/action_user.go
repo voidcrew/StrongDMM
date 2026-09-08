@@ -143,7 +143,7 @@ func (a *app) DoCloseAll() {
 // DoSave saves current active map.
 func (a *app) DoSave() {
 	log.Print("do save")
-	if ws, ok := a.activeWsMap(); ok {
+	if ws := a.layout.WsArea.ActiveWorkspace(); ws != nil {
 		ws.Save()
 	}
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"sdmm/internal/ruin"
 
 	"github.com/sqweek/dialog"
 )
@@ -30,6 +31,34 @@ func (a *app) DoNewShip() {
 	if a.HasVoidcrewProject() {
 		a.layout.WsArea.OpenShip().BeginNewShip()
 	}
+}
+
+func (a *app) HasRuinProject() bool {
+	return a.HasLoadedEnvironment() && a.loadedEnvironment.Objects[ruin.Type] != nil
+}
+
+func (a *app) DoOpenRuinWorkspace() {
+	if a.HasRuinProject() {
+		a.layout.WsArea.OpenRuin()
+	}
+}
+
+func (a *app) DoNewRuin() {
+	if a.HasRuinProject() {
+		a.layout.WsArea.OpenRuin().BeginNewRuin()
+	}
+}
+
+func (a *app) HasSaveableWorkspace() bool {
+	if a.HasActiveMap() {
+		return true
+	}
+	ws := a.layout.WsArea.ActiveWorkspace()
+	if ws == nil {
+		return false
+	}
+	_, ok := ws.Content().(interface{ IsModified() bool })
+	return ok
 }
 
 // Project directories may be dropped directly onto StrongDMM.exe.

@@ -11,6 +11,7 @@ import (
 	"sdmm/internal/app/ui/cpwsarea/wsempty"
 	"sdmm/internal/app/ui/cpwsarea/wsmap"
 	"sdmm/internal/app/ui/cpwsarea/wsprefs"
+	"sdmm/internal/app/ui/cpwsarea/wsruin"
 	"sdmm/internal/app/ui/cpwsarea/wsship"
 	"sdmm/internal/app/ui/dialog"
 	"sdmm/internal/rsc"
@@ -59,6 +60,10 @@ func (w *WsArea) Init(app App) {
 
 func (w *WsArea) Free() {
 	for _, ws := range append([]*workspace.Workspace(nil), w.workspaces...) {
+		if _, ok := ws.Content().(*wsruin.WsRuin); ok {
+			w.closeWorkspace(ws)
+			continue
+		}
 		if _, ok := ws.Content().(*wsship.WsShip); ok {
 			w.closeWorkspace(ws)
 		}
@@ -83,6 +88,20 @@ func (w *WsArea) OpenShip() *wsship.WsShip {
 		}
 		return false
 	})
+	ws := workspace.New(content)
+	w.addWorkspace(ws)
+	ws.SetTriggerFocus(true)
+	return content
+}
+
+func (w *WsArea) OpenRuin() *wsruin.WsRuin {
+	for _, ws := range w.workspaces {
+		if content, ok := ws.Content().(*wsruin.WsRuin); ok {
+			ws.SetTriggerFocus(true)
+			return content
+		}
+	}
+	content := wsruin.New(w.app)
 	ws := workspace.New(content)
 	w.addWorkspace(ws)
 	ws.SetTriggerFocus(true)
@@ -363,6 +382,10 @@ func (w *WsArea) findMapWorkspace(path dmmap.DmmPath) (*workspace.Workspace, boo
 func (w *WsArea) findMapWorkspaces() []*workspace.Workspace {
 	var workspaces []*workspace.Workspace
 	for _, ws := range w.workspaces {
+		if _, ok := ws.Content().(*wsruin.WsRuin); ok {
+			workspaces = append(workspaces, ws)
+			continue
+		}
 		if _, ok := ws.Content().(*wsship.WsShip); ok {
 			workspaces = append(workspaces, ws)
 			continue
@@ -440,6 +463,9 @@ func (w *WsArea) switchActiveWorkspace(activeWs *workspace.Workspace) {
 }
 
 func (w *WsArea) isWorkspaceUnsaved(ws *workspace.Workspace) bool {
+	if ruin, ok := ws.Content().(*wsruin.WsRuin); ok {
+		return ruin.IsModified()
+	}
 	if ship, ok := ws.Content().(*wsship.WsShip); ok {
 		return ship.IsModified()
 	}
