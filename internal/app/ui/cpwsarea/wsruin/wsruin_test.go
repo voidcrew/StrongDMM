@@ -21,13 +21,15 @@ import (
 )
 
 type testApp struct {
-	dme    *dmenv.Dme
-	opened string
+	dme      *dmenv.Dme
+	opened   string
+	selected string
 }
 
-func (a *testApp) LoadedEnvironment() *dmenv.Dme { return a.dme }
-func (a *testApp) DoLoadResource(file string)    { a.opened = file }
-func (a *testApp) SyncPrefabs()                  {}
+func (a *testApp) LoadedEnvironment() *dmenv.Dme    { return a.dme }
+func (a *testApp) DoLoadResource(file string)       { a.opened = file }
+func (a *testApp) DoSelectPrefabByPath(path string) { a.selected = path }
+func (a *testApp) SyncPrefabs()                     {}
 
 func TestPropertyForm(t *testing.T) {
 	p := ruin.Properties{Name: "A ruin", Description: "A description", Cost: 2.5, MineralCost: 1, Weight: .125, AllowDuplicates: true}
@@ -101,6 +103,17 @@ func TestNativeRuinWorkshop(t *testing.T) {
 		t.Fatal("no live ruin catalog", ws.message)
 	}
 	t.Logf("Discovered %d ruins in %d locations", len(ws.catalog.Templates), len(ws.catalog.Locations))
+	if len(ws.catalog.Locations) != 6 {
+		t.Fatalf("expected five planet types and space: %+v", ws.catalog.Locations)
+	}
+	for _, loc := range ws.catalog.Locations {
+		if strings.Contains(strings.TrimPrefix(loc.Type, ruin.Type+"/"), "/") {
+			t.Fatal("abstract ruin family offered as a destination")
+		}
+		if ws.catalog.Dme.Objects[loc.Outdoor] == nil {
+			t.Fatalf("unknown outdoors for %s: %s", loc.Name, loc.Outdoor)
+		}
+	}
 	for _, item := range ws.catalog.Templates {
 		if _, err := ruin.ReadProperties(dme.Objects[item.Type]); err != nil {
 			t.Errorf("uneditable properties: %v", err)
@@ -181,7 +194,7 @@ func TestNativeRuinWorkshop(t *testing.T) {
 	}
 	app.dme = &copyEnv
 	ws.refresh()
-	// The tests create both a planet ruin and a space ruin with opposite area settings.
+	// Create a planet ruin, a space ruin, and one map shared by every destination.
 	if !ws.Save() {
 		t.Fatal(ws.message)
 	}
@@ -194,24 +207,40 @@ func TestNativeRuinWorkshop(t *testing.T) {
 		t.Fatal(ws.message)
 	}
 	ws.BeginNewRuin()
-	for i, loc := range ws.catalog.Locations {
-		if loc.Type == ruin.Type+"/space" {
-			ws.chooseLocation(i)
-		}
-	}
+	ws.chooseDestination(destinationSpace)
 	ws.form.Name = "Ruin Workshop Space Test"
 	ws.form.Description = "A blank orbital ruin."
 	ws.step = 0
 	capture("ruin-space-name")
 	ws.ground = 1
-	ws.power = 1
-	ws.gravity = false
+	ws.area = 1
+	ws.step = 1
+	capture("ruin-space-canvas")
 	ws.step = 3
 	if !ws.Save() {
 		t.Fatal(ws.message)
 	}
 	if strings.EqualFold(first, ws.selected.File) {
 		t.Fatal("new ruins shared a map")
+	}
+	space := ws.selected.File
+	ws.BeginNewRuin()
+	ws.chooseDestination(destinationAnywhere)
+	ws.form.Name = "Ruin Workshop Anywhere Test"
+	ws.form.Description = "A survey camp that can appear on any planet or in space."
+	capture("ruin-anywhere-name")
+	ws.step = 1
+	capture("ruin-anywhere-canvas")
+	ws.step = 3
+	if !ws.Save() {
+		t.Fatal(ws.message)
+	}
+	if ws.selected.Location != "Anywhere" || len(ws.selected.Variants) != 6 {
+		t.Fatalf("missing shared destinations: %+v", ws.selected)
+	}
+	ws.form.Weight = "2"
+	if !ws.Save() {
+		t.Fatal(ws.message)
 	}
 	rel, err := filepath.Rel(fixture, ws.selected.File)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
@@ -226,14 +255,27 @@ func TestNativeRuinWorkshop(t *testing.T) {
 	}
 	dmmap.PrefabStorage.Free()
 	dmmap.Init(parsed)
-	data, err := dmmdata.New(ws.selected.File)
-	if err != nil {
-		t.Fatal(err)
+	for _, file := range []string{first, space, ws.selected.File} {
+		data, err := dmmdata.New(file)
+		if err != nil {
+			t.Fatal(err)
+		}
+		m, unknown := dmmap.New(parsed, data, "")
+		if len(unknown) != 0 || len(m.Tiles) != int(ws.width*ws.height) {
+			t.Fatalf("generated map cannot open in the editor: %v", unknown)
+		}
 	}
-	m, unknown := dmmap.New(parsed, data, "")
-	if len(unknown) != 0 || len(m.Tiles) != int(ws.width*ws.height) {
-		t.Fatalf("generated map cannot open in the editor: %v", unknown)
+	app.dme = parsed
+	ws.refresh()
+	for _, item := range ws.catalog.Templates {
+		if item.Group == "ruin_workshop_anywhere_test" {
+			ws.selectRuin(item)
+			if ws.form.Weight != "2" || ws.form.Name != "Ruin Workshop Anywhere Test" {
+				t.Fatal("shared properties did not reload", ws.form)
+			}
+		}
 	}
+	capture("ruin-anywhere-properties")
 	t.Logf("Created and reloaded fixtures in %s", fixture)
 }
 

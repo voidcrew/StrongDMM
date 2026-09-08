@@ -22,21 +22,21 @@ type Setup struct {
 	Properties    Properties
 	Width, Height int
 	Turf          string
-	Power         int // 0: equipment needs power, 1: self-powered, 2: unpowered
-	Gravity       bool
+	Area          string
+	Anywhere      bool
 }
 
 type Project struct {
-	Catalog      *Catalog
-	Template     Template
-	Properties   Properties
-	initial      Properties
-	setup        *Setup
-	source, dme  ship.FileChange
-	dependencies []ship.FileChange
-	assignments  map[string]string
-	areaType     string
-	areaValues   map[string]string
+	Catalog       *Catalog
+	Template      Template
+	Properties    Properties
+	initial       Properties
+	setup         *Setup
+	source, dme   ship.FileChange
+	dependencies  []ship.FileChange
+	assignments   map[string]string
+	groupLocation string
+	companions    []*Project
 }
 
 func exists(file string) bool { _, err := os.Stat(file); return !os.IsNotExist(err) }
@@ -67,8 +67,28 @@ func (c *Catalog) ValidateSetup(s Setup) error {
 	if !found {
 		return fmt.Errorf("choose a ruin location from this project")
 	}
-	if c.idUsed(s.ID, s.Location) {
-		return fmt.Errorf("this identifier or one of its files already exists")
+	locations := []Location{s.Location}
+	if s.Anywhere {
+		locations = c.Locations
+	}
+	for _, loc := range locations {
+		if c.idUsed(s.ID, loc) {
+			return fmt.Errorf("this identifier or one of its files already exists")
+		}
+		if s.Anywhere {
+			if err := c.NameError(s.Properties.Name+" ("+loc.Name+")", ""); err != nil {
+				return err
+			}
+		}
+	}
+	if s.Anywhere {
+		file, err := ship.Inside(c.Dme.RootDir, c.anywherePrefix()+s.ID+".dmm")
+		if err != nil {
+			return err
+		}
+		if exists(file) {
+			return fmt.Errorf("the shared ruin map already exists")
+		}
 	}
 	if s.Width < 1 || s.Height < 1 || s.Width > 256 || s.Height > 256 {
 		return fmt.Errorf("map width and height must be between 1 and 256 tiles")
@@ -76,24 +96,60 @@ func (c *Catalog) ValidateSetup(s Setup) error {
 	if !strings.HasPrefix(s.Turf, "/turf/") || c.Dme.Objects[s.Turf] == nil {
 		return fmt.Errorf("choose a starting turf available in this project")
 	}
-	if c.Dme.Objects["/area/ruin"] == nil {
-		return fmt.Errorf("this project has no ruin area type")
+	for _, area := range c.Areas(s.Location, s.Anywhere) {
+		if area.Path == s.Area {
+			return nil
+		}
 	}
-	if s.Power < 0 || s.Power > 2 {
-		return fmt.Errorf("choose a power setting")
-	}
-	return nil
+	return fmt.Errorf("choose an existing area for this destination")
 }
 
 func New(c *Catalog, s Setup) (*Project, error) {
 	if err := c.ValidateSetup(s); err != nil {
 		return nil, err
 	}
-	file, err := ship.Inside(c.Dme.RootDir, s.Location.Prefix+s.ID+".dmm")
+	if !s.Anywhere {
+		return newSingle(c, s)
+	}
+	var members []*Project
+	var variants []Template
+	locations := append([]Location(nil), c.Locations...)
+	sort.Slice(locations, func(i, j int) bool { return locations[i].Type < locations[j].Type })
+	for _, loc := range locations {
+		one := s
+		one.Location = loc
+		p, err := newSingle(c, one)
+		if err != nil {
+			return nil, err
+		}
+		members = append(members, p)
+		t := p.Template
+		t.Name = p.Properties.Name + " (" + loc.Name + ")"
+		variants = append(variants, t)
+	}
+	if len(members) == 0 {
+		return nil, fmt.Errorf("this project has no destinations")
+	}
+	p := members[0]
+	p.companions = members[1:]
+	p.Template.Variants = variants
+	p.Template.Location = "Anywhere"
+	return p, nil
+}
+
+func newSingle(c *Catalog, s Setup) (*Project, error) {
+	prefix := s.Location.Prefix
+	if s.Anywhere {
+		prefix = c.anywherePrefix()
+	}
+	file, err := ship.Inside(c.Dme.RootDir, prefix+s.ID+".dmm")
 	if err != nil {
 		return nil, err
 	}
 	t := Template{Type: s.Location.Type + "/" + s.ID, ID: s.ID, Name: s.Properties.Name, Location: s.Location.Name, File: file}
+	if s.Anywhere {
+		t.Group = s.ID
+	}
 	p, err := open(c, t)
 	if err != nil {
 		return nil, err
@@ -101,25 +157,34 @@ func New(c *Catalog, s Setup) (*Project, error) {
 	p.setup = &s
 	p.Properties = s.Properties
 	p.initial = s.Properties
-	p.assignments = s.Properties.values()
+	p.groupLocation = s.Location.Name
+	p.assignments = p.registrationValues(s.Properties)
 	p.assignments["id"] = quote(s.ID)
-	p.assignments["prefix"] = quote(s.Location.Prefix)
+	p.assignments["prefix"] = quote(prefix)
 	p.assignments["suffix"] = quote(s.ID + ".dmm")
-	p.areaType = "/area/ruin/" + s.ID
-	p.areaValues = map[string]string{"name": quote(s.Properties.Name), "requires_power": "TRUE", "always_unpowered": "FALSE", "default_gravity": "1"}
-	if !s.Gravity {
-		p.areaValues["default_gravity"] = "0"
-	}
-	if s.Power == 1 {
-		p.areaValues["requires_power"] = "FALSE"
-	}
-	if s.Power == 2 {
-		p.areaValues["always_unpowered"] = "TRUE"
-	}
 	return p, nil
 }
 
 func Open(c *Catalog, t Template) (*Project, error) {
+	if len(t.Variants) == 0 {
+		return openSingle(c, t)
+	}
+	p, err := openSingle(c, t.Variants[0])
+	if err != nil {
+		return nil, err
+	}
+	for _, v := range t.Variants[1:] {
+		child, err := openSingle(c, v)
+		if err != nil {
+			return nil, err
+		}
+		p.companions = append(p.companions, child)
+	}
+	p.Template = t
+	return p, nil
+}
+
+func openSingle(c *Catalog, t Template) (*Project, error) {
 	obj := c.Dme.Objects[t.Type]
 	if obj == nil {
 		return nil, fmt.Errorf("ruin is no longer in the loaded project")
@@ -128,7 +193,8 @@ func Open(c *Catalog, t Template) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
-	p.Properties, err = ReadProperties(obj)
+	p.groupLocation = t.Location
+	p.Properties, err = p.readProperties()
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +289,7 @@ func definition(path string, values map[string]string) string {
 
 func (p *Project) Modified() bool { return p.setup != nil || p.Properties != p.initial }
 
-func (p *Project) Changes() ([]ship.FileChange, error) {
+func (p *Project) changesOne() ([]ship.FileChange, error) {
 	if !p.Modified() {
 		return nil, nil
 	}
@@ -233,13 +299,17 @@ func (p *Project) Changes() ([]ship.FileChange, error) {
 	// A parent edited in another workshop project can change this ruin's
 	// inherited settings while this form is open.
 	if p.setup == nil {
-		current, err := ReadProperties(p.Catalog.Dme.Objects[p.Template.Type])
+		current, err := p.readProperties()
 		if err != nil || current != p.initial {
 			return nil, fmt.Errorf("this ruin's inherited properties changed; reopen its properties before saving")
 		}
 	}
 	if p.setup != nil || normalized(p.Properties.Name) != normalized(p.initial.Name) {
-		if err := p.Catalog.NameError(p.Properties.Name, p.Template.Type); err != nil {
+		name := p.Properties.Name
+		if p.Template.Group != "" {
+			name += " (" + p.groupLocation + ")"
+		}
+		if err := p.Catalog.NameError(name, p.Template.Type); err != nil {
 			return nil, err
 		}
 	}
@@ -247,8 +317,8 @@ func (p *Project) Changes() ([]ship.FileChange, error) {
 	for k, v := range p.assignments {
 		values[k] = v
 	}
-	initial := p.initial.values()
-	for k, v := range p.Properties.values() {
+	initial := p.registrationValues(p.initial)
+	for k, v := range p.registrationValues(p.Properties) {
 		if v != initial[k] {
 			values[k] = v
 		}
@@ -267,8 +337,8 @@ func (p *Project) Changes() ([]ship.FileChange, error) {
 		source.After = []byte(string(source.Before[:start]) + block + string(source.Before[finish:]))
 	} else {
 		prefix := ""
-		if p.setup != nil {
-			prefix = definition(p.areaType, p.areaValues) + "\n"
+		if p.Template.Group != "" {
+			prefix = groupHeader + p.Template.Group + "\n"
 		}
 		source.After = []byte(prefix + block + "\n")
 	}
@@ -292,7 +362,7 @@ func (p *Project) Changes() ([]ship.FileChange, error) {
 		}
 		s := p.setup
 		prefab := func(path string) *dmmprefab.Prefab { return dmmprefab.New(0, path, &dmvars.Variables{}) }
-		d := &dmmdata.DmmData{IsTgm: true, LineBreak: "\n", KeyLength: 3, MaxX: s.Width, MaxY: s.Height, MaxZ: 1, Dictionary: dmmdata.DataDictionary{"aaa": {prefab(s.Turf), prefab(p.areaType)}}, Grid: dmmdata.DataGrid{}}
+		d := &dmmdata.DmmData{IsTgm: true, LineBreak: "\n", KeyLength: 3, MaxX: s.Width, MaxY: s.Height, MaxZ: 1, Dictionary: dmmdata.DataDictionary{"aaa": {prefab(s.Turf), prefab(s.Area)}}, Grid: dmmdata.DataGrid{}}
 		for x := 1; x <= s.Width; x++ {
 			for y := 1; y <= s.Height; y++ {
 				d.Grid[util.Point{X: x, Y: y, Z: 1}] = "aaa"
@@ -335,19 +405,33 @@ func (p *Project) Save() error {
 	if err = ship.WriteChanges(p.Catalog.Dme.RootDir, changes); err != nil {
 		return err
 	}
-	dme := p.Catalog.Dme
-	if p.setup != nil {
-		// Parents were validated before writing, so these do not require a reload.
-		if err = dme.AddDraftType(p.areaType, p.areaValues); err != nil {
+	for _, member := range append([]*Project{p}, p.companions...) {
+		if err = member.accept(changes); err != nil {
 			return err
 		}
-		if err = dme.AddDraftType(p.Template.Type, p.assignments); err != nil {
+	}
+	// Reserve the shared display name immediately, including before the UI's
+	// next catalog refresh. Runtime registration names include the destination.
+	for i, t := range p.Catalog.Templates {
+		if t.Type == p.Template.Type {
+			p.Catalog.Templates[i] = p.Template
+			return nil
+		}
+	}
+	p.Catalog.Templates = append(p.Catalog.Templates, p.Template)
+	return nil
+}
+
+func (p *Project) accept(changes []ship.FileChange) error {
+	dme := p.Catalog.Dme
+	if p.setup != nil {
+		if err := dme.AddDraftType(p.Template.Type, p.assignments); err != nil {
 			return err
 		}
 	}
 	obj := dme.Objects[p.Template.Type]
-	old := p.initial.values()
-	for key, value := range p.Properties.values() {
+	old := p.registrationValues(p.initial)
+	for key, value := range p.registrationValues(p.Properties) {
 		if value != old[key] {
 			*obj.Vars = *dmvars.Set(obj.Vars, key, value)
 			p.assignments[key] = value

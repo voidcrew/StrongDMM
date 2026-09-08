@@ -18,6 +18,7 @@ import (
 type App interface {
 	LoadedEnvironment() *dmenv.Dme
 	DoLoadResource(string)
+	DoSelectPrefabByPath(string)
 	SyncPrefabs()
 }
 
@@ -46,21 +47,20 @@ func (f form) properties() (ruin.Properties, error) {
 
 type WsRuin struct {
 	workspace.Content
-	app                                 App
-	catalog                             *ruin.Catalog
-	project                             *ruin.Project
-	selected                            *ruin.Template
-	form, initial                       form
-	creating                            bool
-	step, location, ground, power       int
-	width, height                       int32
-	gravity                             bool
-	filter, locationFilter, id, message string
-	customID                            bool
+	app                                       App
+	catalog                                   *ruin.Catalog
+	project                                   *ruin.Project
+	selected                                  *ruin.Template
+	form, initial                             form
+	creating                                  bool
+	step, destination, location, ground, area int
+	width, height                             int32
+	filter, locationFilter, id, message       string
+	customID                                  bool
 }
 
 func New(app App) *WsRuin {
-	ws := &WsRuin{app: app, width: 24, height: 24, gravity: true}
+	ws := &WsRuin{app: app, width: 24, height: 24}
 	ws.refresh()
 	return ws
 }
@@ -110,11 +110,10 @@ func (ws *WsRuin) BeginNewRuin() {
 		ws.step = 0
 		ws.customID = false
 		ws.width, ws.height = 24, 24
-		ws.ground, ws.power = 0, 0
-		ws.gravity = true
+		ws.ground, ws.area = 0, 0
 		ws.message = ""
 		ws.form = makeForm(ruin.Properties{Weight: 1})
-		ws.chooseLocation(0)
+		ws.chooseDestination(destinationPlanet)
 		ws.form.Name = ""
 		ws.form.Description = ""
 		ws.initial = ws.form
@@ -122,6 +121,7 @@ func (ws *WsRuin) BeginNewRuin() {
 }
 func (ws *WsRuin) chooseLocation(index int) {
 	ws.location = index
+	ws.area = 0
 	loc := ws.catalog.Locations[index]
 	p, err := ruin.ReadProperties(ws.catalog.Dme.Objects[loc.Type])
 	if err == nil {
@@ -129,10 +129,53 @@ func (ws *WsRuin) chooseLocation(index int) {
 		p.Description = ws.form.Description
 		ws.form = makeForm(p)
 	}
-	ws.gravity = !strings.HasPrefix(loc.Type, ruin.Type+"/space")
-	if !ws.customID {
-		ws.id = ws.catalog.SuggestID(ws.form.Name, loc)
+	ws.suggestID()
+}
+
+const (
+	destinationSpace = iota
+	destinationPlanet
+	destinationAnywhere
+)
+
+var destinations = []string{"Space", "A planet type", "Anywhere"}
+
+func (ws *WsRuin) chooseDestination(destination int) {
+	ws.destination = destination
+	for i, loc := range ws.catalog.Locations {
+		if (loc.Type == ruin.Type+"/space") == (destination == destinationSpace) {
+			ws.chooseLocation(i)
+			return
+		}
 	}
+	if destination != destinationAnywhere {
+		ws.destination = destinationPlanet
+		if ws.catalog.Locations[0].Type == ruin.Type+"/space" {
+			ws.destination = destinationSpace
+		}
+	}
+	ws.chooseLocation(0)
+}
+
+func (ws *WsRuin) suggestID() {
+	if !ws.customID {
+		if ws.destination == destinationAnywhere {
+			ws.id = ws.catalog.SuggestAnywhereID(ws.form.Name)
+		} else {
+			ws.id = ws.catalog.SuggestID(ws.form.Name, ws.catalog.Locations[ws.location])
+		}
+	}
+}
+
+func (ws *WsRuin) areas() []ruin.AreaChoice {
+	return ws.catalog.Areas(ws.catalog.Locations[ws.location], ws.destination == destinationAnywhere)
+}
+
+func (ws *WsRuin) destinationName() string {
+	if ws.destination == destinationAnywhere {
+		return "Anywhere"
+	}
+	return ws.catalog.Locations[ws.location].Name
 }
 func (ws *WsRuin) selectRuin(t ruin.Template) {
 	ws.navigate(func() {
@@ -175,7 +218,11 @@ func (ws *WsRuin) setup() (ruin.Setup, error) {
 	if ws.ground >= len(grounds) {
 		return ruin.Setup{}, fmt.Errorf("this project has no supported starting turf")
 	}
-	s := ruin.Setup{Location: ws.catalog.Locations[ws.location], ID: ws.id, Properties: p, Width: int(ws.width), Height: int(ws.height), Turf: grounds[ws.ground].path, Power: ws.power, Gravity: ws.gravity}
+	areas := ws.areas()
+	if ws.area >= len(areas) {
+		return ruin.Setup{}, fmt.Errorf("this project has no supported ruin areas")
+	}
+	s := ruin.Setup{Location: ws.catalog.Locations[ws.location], ID: ws.id, Properties: p, Width: int(ws.width), Height: int(ws.height), Turf: grounds[ws.ground].path, Area: areas[ws.area].Path, Anywhere: ws.destination == destinationAnywhere}
 	return s, ws.catalog.ValidateSetup(s)
 }
 
@@ -243,7 +290,7 @@ func (ws *WsRuin) Process() {
 		heading("Ruin Workshop")
 		imgui.TextWrapped("Choose a ruin to open its map or edit its properties.")
 		imgui.Spacing()
-		imgui.TextWrapped("New ruins get their map, area, and project registration automatically.")
+		imgui.TextWrapped("Choose where a new ruin belongs. Its map and registration are created automatically, using the project's existing areas.")
 		if button("Create a ruin") {
 			ws.BeginNewRuin()
 		}
@@ -291,6 +338,9 @@ func (ws *WsRuin) library() {
 		if imgui.Selectable("All locations") {
 			ws.locationFilter = ""
 		}
+		if imgui.Selectable("Anywhere") {
+			ws.locationFilter = "Anywhere"
+		}
 		for _, loc := range ws.catalog.Locations {
 			if imgui.Selectable(loc.Name) {
 				ws.locationFilter = loc.Name
@@ -302,7 +352,7 @@ func (ws *WsRuin) library() {
 	imgui.BeginChild("ruin-results")
 	count := 0
 	for _, t := range ws.catalog.Templates {
-		if ws.locationFilter != "" && t.Location != ws.locationFilter {
+		if ws.locationFilter != "" && !t.PlacedIn(ws.locationFilter) {
 			continue
 		}
 		if !strings.Contains(strings.ToLower(t.Name+" "+t.ID+" "+t.Location), strings.ToLower(ws.filter)) {
@@ -340,7 +390,7 @@ func (ws *WsRuin) spawning() {
 	if ws.form.Manual {
 		mode = "Manual or linked placement only"
 	}
-	if combo("Spawning", mode) {
+	if combo("Ruin placement", mode) {
 		for i, label := range []string{"Random placement", "Always place", "Manual or linked placement only"} {
 			if imgui.Selectable(label) {
 				ws.form.Always = i == 1
@@ -349,6 +399,7 @@ func (ws *WsRuin) spawning() {
 		}
 		imgui.EndCombo()
 	}
+	hint("Controls when the whole ruin appears in a generated planet or space encounter.")
 	imgui.Checkbox("Allow more than one per map", &ws.form.Duplicates)
 	field("Ruin budget cost", &ws.form.Cost)
 	field("Spawn weight", &ws.form.Weight)
@@ -360,23 +411,38 @@ func (ws *WsRuin) spawning() {
 
 func (ws *WsRuin) wizard() {
 	heading("New ruin")
-	steps := []string{"1. Name and location", "2. Map canvas", "3. Spawning", "4. Create"}
+	steps := []string{"1. Name and destination", "2. Map canvas", "3. Ruin placement", "4. Create"}
 	imgui.Text(steps[ws.step])
 	imgui.Separator()
 	switch ws.step {
 	case 0:
 		ws.identity()
-		if combo("Ruin location", ws.catalog.Locations[ws.location].Name) {
+		if combo("Where can this ruin appear?", destinations[ws.destination]) {
+			for i, name := range destinations {
+				available := i == destinationAnywhere
+				for _, loc := range ws.catalog.Locations {
+					if (loc.Type == ruin.Type+"/space") == (i == destinationSpace) {
+						available = true
+					}
+				}
+				if available && imgui.Selectable(name) {
+					ws.chooseDestination(i)
+				}
+			}
+			imgui.EndCombo()
+		}
+		if ws.destination == destinationPlanet && combo("Planet type", ws.catalog.Locations[ws.location].Name) {
 			for i, loc := range ws.catalog.Locations {
-				if imgui.Selectable(loc.Name) {
+				if loc.Type != ruin.Type+"/space" && imgui.Selectable(loc.Name) {
 					ws.chooseLocation(i)
 				}
 			}
 			imgui.EndCombo()
 		}
-		if !ws.customID {
-			ws.id = ws.catalog.SuggestID(ws.form.Name, ws.catalog.Locations[ws.location])
+		if ws.destination == destinationAnywhere {
+			hint("Uses one shared map for space encounters and every supported planet type.")
 		}
+		ws.suggestID()
 		if imgui.CollapsingHeader("File identifier") {
 			imgui.Checkbox("Choose identifier manually", &ws.customID)
 			imgui.BeginDisabledV(!ws.customID)
@@ -410,22 +476,24 @@ func (ws *WsRuin) wizard() {
 			imgui.EndCombo()
 		}
 		hint("Use the normal mapping tools to build and furnish the ruin.")
-		heading("Ruin area")
-		powers := []string{"Equipment needs power", "Self-powered", "Always unpowered"}
-		if combo("Power", powers[ws.power]) {
-			for i, label := range powers {
-				if imgui.Selectable(label) {
-					ws.power = i
+		areas := ws.areas()
+		if len(areas) > 0 && combo("Starting area", areas[ws.area].Name) {
+			for i, area := range areas {
+				if imgui.Selectable(area.Name) {
+					ws.area = i
 				}
 			}
 			imgui.EndCombo()
 		}
-		imgui.Checkbox("Gravity", &ws.gravity)
+		hint("Fills the canvas with an existing area. Paint interiors and outdoors with the normal area tools as you build.")
+		if ws.destination == destinationAnywhere {
+			hint("Outdoors keeps the host planet or space area's settings.")
+		}
 	case 2:
 		ws.spawning()
 	case 3:
 		imgui.TextWrapped(ws.form.Name)
-		imgui.Text(fmt.Sprintf("%s | %d x %d tiles", ws.catalog.Locations[ws.location].Name, ws.width, ws.height))
+		imgui.Text(fmt.Sprintf("%s | %d x %d tiles", ws.destinationName(), ws.width, ws.height))
 		if ws.form.Description != "" {
 			hint(ws.form.Description)
 		}
@@ -433,12 +501,9 @@ func (ws *WsRuin) wizard() {
 		if grounds := ws.grounds(); ws.ground < len(grounds) {
 			imgui.Text("Terrain: " + grounds[ws.ground].name)
 		}
-		imgui.Text("Power: " + []string{"Equipment needs power", "Self-powered", "Always unpowered"}[ws.power])
-		gravity := "Off"
-		if ws.gravity {
-			gravity = "On"
+		if areas := ws.areas(); ws.area < len(areas) {
+			imgui.Text("Area: " + areas[ws.area].Name)
 		}
-		imgui.Text("Gravity: " + gravity)
 		spawning := "Random placement"
 		if ws.form.Always {
 			spawning = "Always place"
@@ -446,10 +511,10 @@ func (ws *WsRuin) wizard() {
 		if ws.form.Manual {
 			spawning = "Manual or linked placement only"
 		}
-		imgui.Text("Spawning: " + spawning)
+		imgui.Text("Ruin placement: " + spawning)
 		imgui.Text("Budget: " + ws.form.Cost + " | Weight: " + ws.form.Weight)
 		imgui.Spacing()
-		imgui.TextWrapped("Create the map and its ruin area, register its properties, and open the map for editing.")
+		imgui.TextWrapped("Create and register the map, then open it for editing.")
 		if imgui.CollapsingHeader("Files") {
 			if s, err := ws.setup(); err == nil {
 				if p, err := ruin.New(ws.catalog, s); err == nil {
@@ -520,6 +585,15 @@ func (ws *WsRuin) details() {
 		ws.app.DoLoadResource(ws.selected.File)
 	}
 	imgui.EndDisabled()
+	if ws.selected.Problem == "" && imgui.CollapsingHeader("Areas for this ruin") {
+		hint("Select an existing area, then paint it onto the map with the area tools.")
+		for _, area := range ws.catalog.TemplateAreas(*ws.selected) {
+			if button("Select " + area.Name) {
+				ws.app.DoLoadResource(ws.selected.File)
+				ws.app.DoSelectPrefabByPath(area.Path)
+			}
+		}
+	}
 	if ws.selected.Problem != "" {
 		imgui.TextWrapped(ws.selected.Problem)
 	}

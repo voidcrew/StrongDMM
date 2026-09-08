@@ -28,6 +28,7 @@ type App interface {
 	wsmap.App
 	wscreatemap.App
 	wschangelog.App
+	wsruin.App
 
 	DoClose()
 

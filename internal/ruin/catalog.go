@@ -4,6 +4,7 @@ package ruin
 import (
 	"fmt"
 	"math"
+	"os"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -16,8 +17,12 @@ import (
 
 const Type = "/datum/map_template/ruin"
 
-type Location struct{ Type, Name, Prefix string }
-type Template struct{ Type, ID, Name, Location, File, Problem string }
+type Location struct{ Type, Name, Prefix, Outdoor string }
+type Template struct {
+	Type, ID, Name, Location, File, Problem string
+	Group                                   string
+	Variants                                []Template
+}
 type Catalog struct {
 	Dme       *dmenv.Dme
 	Locations []Location
@@ -61,9 +66,21 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 		return nil, fmt.Errorf("open a project with ruin templates to use Ruin Workshop")
 	}
 	c := &Catalog{Dme: dme}
-	labels := map[string]string{"space": "Space", "lavaland": "Lavaland", "icemoon": "Ice moon surface", "icemoon/underground": "Ice moon underground", "jungle": "Jungle", "beach": "Beach", "wasteland": "Wasteland", "reebe": "Reebe"}
+	labels := map[string]string{"space": "Space", "lavaland": "Lava planet", "icemoon": "Ice planet", "jungle": "Jungle planet", "beach": "Ocean planet", "wasteland": "Wasteland planet", "reebe": "Reebe"}
+	// Actual destinations, rather than abstract families such as biodome or sin.
+	planetAreas := map[string]string{}
+	for path, obj := range dme.Objects {
+		if strings.HasPrefix(path, "/datum/overmap/planet/") {
+			if trait := obj.Vars.ValueV("ruin_type", "null"); trait != "null" {
+				planetAreas[trait] = obj.Vars.ValueV("surface_area", "")
+			}
+		}
+	}
 	for path, obj := range dme.Objects {
 		if !strings.HasPrefix(path, Type+"/") {
+			continue
+		}
+		if strings.Contains(strings.TrimPrefix(path, Type+"/"), "/") {
 			continue
 		}
 		prefix := strings.ReplaceAll(text(obj.Vars, "prefix"), "\\", "/")
@@ -74,6 +91,17 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 			continue
 		}
 		key := strings.TrimPrefix(path, Type+"/")
+		outdoor := obj.Vars.ValueV("default_area", "")
+		if len(planetAreas) > 0 {
+			var ok bool
+			outdoor, ok = planetAreas[obj.Vars.ValueV("ruin_type", "null")]
+			if !ok {
+				continue
+			}
+		}
+		if key == "space" {
+			outdoor = "/area/space"
+		}
 		name := labels[key]
 		if name == "" {
 			name = strings.ReplaceAll(strings.ReplaceAll(key, "_", " "), "/", " / ")
@@ -85,7 +113,7 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 			}
 			name = strings.Join(words, " ")
 		}
-		c.Locations = append(c.Locations, Location{Type: path, Name: name, Prefix: prefix})
+		c.Locations = append(c.Locations, Location{Type: path, Name: name, Prefix: prefix, Outdoor: outdoor})
 	}
 	sort.Slice(c.Locations, func(i, j int) bool { return c.Locations[i].Name < c.Locations[j].Name })
 	for path, obj := range dme.Objects {
@@ -106,13 +134,29 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 				longest = len(loc.Type)
 			}
 		}
+		if t.Location == "" {
+			family, _, _ := strings.Cut(strings.TrimPrefix(path, Type+"/"), "/")
+			t.Location = labels[family]
+			if t.Location == "" {
+				t.Location = family
+			}
+		}
 		var err error
 		t.File, err = ship.Inside(dme.RootDir, strings.ReplaceAll(text(obj.Vars, "prefix")+text(obj.Vars, "suffix"), "\\", "/"))
 		if err != nil {
 			t.Problem = err.Error()
 		}
+		if source, err := ship.Inside(dme.RootDir, c.sourceRelative(path)); err == nil {
+			if data, err := os.ReadFile(source); err == nil {
+				first, _, _ := strings.Cut(string(data), "\n")
+				if strings.HasPrefix(first, groupHeader) {
+					t.Group = strings.TrimSpace(strings.TrimPrefix(first, groupHeader))
+				}
+			}
+		}
 		c.Templates = append(c.Templates, t)
 	}
+	c.groupTemplates()
 	sort.Slice(c.Templates, func(i, j int) bool {
 		if c.Templates[i].Name == c.Templates[j].Name {
 			return c.Templates[i].Type < c.Templates[j].Type
@@ -127,8 +171,16 @@ func (c *Catalog) NameError(name, except string) error {
 	if normalized(name) == "" {
 		return fmt.Errorf("give the ruin a name")
 	}
+	excluded := map[string]bool{except: true}
+	for _, t := range c.Templates {
+		if t.Group != "" && memberOf(t, except) {
+			for _, v := range t.Variants {
+				excluded[v.Type] = true
+			}
+		}
+	}
 	for path, obj := range c.Dme.Objects {
-		if path == except || !strings.HasPrefix(path, Type+"/") || text(obj.Vars, "suffix") == "" {
+		if excluded[path] || !strings.HasPrefix(path, Type+"/") || text(obj.Vars, "suffix") == "" {
 			continue
 		}
 		current := text(obj.Vars, "name")
@@ -136,9 +188,22 @@ func (c *Catalog) NameError(name, except string) error {
 			return fmt.Errorf("a ruin named %q already exists", current)
 		}
 	}
+	for _, t := range c.Templates {
+		if t.Group != "" && !excluded[t.Type] {
+			current := text(c.Dme.Objects[t.Type].Vars, "name")
+			current = strings.TrimSuffix(current, " ("+t.Variants[0].Location+")")
+			if normalized(current) == normalized(name) {
+				return fmt.Errorf("a ruin named %q already exists", current)
+			}
+		}
+	}
 	return nil
 }
 func (c *Catalog) SuggestID(name string, loc Location) string {
+	return suggestID(name, func(id string) bool { return c.idUsed(id, loc) })
+}
+
+func suggestID(name string, used func(string) bool) string {
 	var b strings.Builder
 	separator := false
 	for _, r := range strings.ToLower(name) {
@@ -165,13 +230,13 @@ func (c *Catalog) SuggestID(name string, loc Location) string {
 	id := base
 	// If the directory is inaccessible, validation can explain the problem
 	// without an unbounded search blocking the UI.
-	for n := 2; n <= 1000 && c.idUsed(id, loc); n++ {
+	for n := 2; n <= 1000 && used(id); n++ {
 		id = base + "_" + strconv.Itoa(n)
 	}
 	return id
 }
 func (c *Catalog) idUsed(id string, loc Location) bool {
-	if c.Dme.Objects[loc.Type+"/"+id] != nil || c.Dme.Objects["/area/ruin/"+id] != nil {
+	if c.Dme.Objects[loc.Type+"/"+id] != nil {
 		return true
 	}
 	for _, t := range c.Templates {

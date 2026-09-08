@@ -10,11 +10,16 @@ type startupArgs struct {
 	project       string
 	maps          []string
 	shipWorkspace bool
+	ruinWorkspace bool
 }
 
 func parseStartupArgs(args []string) startupArgs {
 	var parsed startupArgs
 	for _, arg := range args {
+		if arg == "--ruin-workspace" {
+			parsed.ruinWorkspace = true
+			continue
+		}
 		if arg == "--ship-workspace" {
 			parsed.shipWorkspace = true
 			continue
@@ -39,6 +44,9 @@ func (a *app) checkProgramArgs() {
 		a.loadEnvironmentV(args.project, func() {
 			if args.shipWorkspace {
 				a.DoOpenShipWorkspace()
+			}
+			if args.ruinWorkspace {
+				a.DoOpenRuinWorkspace()
 			}
 			for _, path := range args.maps {
 				a.loadMap(path, nil)

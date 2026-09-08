@@ -19,6 +19,20 @@ const fixture = `#define TRUE 1
 	var/requires_power = TRUE
 	var/always_unpowered = FALSE
 	var/default_gravity = 1
+/area/ruin/powered
+	requires_power = FALSE
+/area/ruin/unpowered
+	always_unpowered = TRUE
+/area/ruin/space
+	default_gravity = 0
+/area/ruin/space/unpowered
+	always_unpowered = TRUE
+/area/ruin/space/has_grav
+	default_gravity = 1
+/area/ruin/space/has_grav/powered
+	requires_power = FALSE
+/area/template_noop
+/area/ice_outdoors
 /turf/open/space
 /turf/open/floor/plating
 /turf/template_noop
@@ -36,12 +50,27 @@ const fixture = `#define TRUE 1
 	var/always_place = FALSE
 	var/unpickable = FALSE
 	var/always_spawn_with = null
+	var/default_area = /area/space
+	var/ruin_type = null
+/datum/overmap/planet
+	var/ruin_type = null
+	var/surface_area = null
+/datum/overmap/planet/space
+	ruin_type = "space"
+/datum/overmap/planet/ice
+	ruin_type = "ice"
+	surface_area = /area/ice_outdoors
 /datum/map_template/ruin/space
+	ruin_type = "space"
 	prefix = "_maps/voidcrew/RandomRuins/SpaceRuins/"
 	cost = 3
 	allow_duplicates = FALSE
 /datum/map_template/ruin/icemoon
+	ruin_type = "ice"
 	prefix = "_maps/RandomRuins/IceRuins/"
+/datum/map_template/ruin/unused_planet
+	ruin_type = "unused"
+	prefix = "_maps/RandomRuins/UnusedRuins/"
 /datum/map_template/ruin/icemoon/underground
 	cost = 6
 /datum/map_template/ruin/space/old
@@ -96,7 +125,7 @@ func setup(c *Catalog) Setup {
 			loc = l
 		}
 	}
-	return Setup{Location: loc, ID: "new_wreck", Properties: Properties{Name: "New [wreck]", Description: "Quotes \" and a [bracket]\nSecond line", Cost: 3, Weight: 1}, Width: 9, Height: 7, Turf: "/turf/open/floor/plating", Power: 1, Gravity: false}
+	return Setup{Location: loc, ID: "new_wreck", Properties: Properties{Name: "New [wreck]", Description: "Quotes \" and a [bracket]\nSecond line", Cost: 3, Weight: 1}, Width: 9, Height: 7, Turf: "/turf/open/floor/plating", Area: "/area/ruin/space/unpowered"}
 }
 func find(t *testing.T, c *Catalog, path string) Template {
 	t.Helper()
@@ -123,7 +152,7 @@ func reload(t *testing.T, c *Catalog) *Catalog {
 
 func TestDiscoveryAndDefaults(t *testing.T) {
 	c := environment(t)
-	if len(c.Locations) != 3 || len(c.Templates) != 2 {
+	if len(c.Locations) != 2 || len(c.Templates) != 2 {
 		t.Fatalf("wrong catalog: %+v", c)
 	}
 	linked := find(t, c, Type+"/space/old/linked")
@@ -160,7 +189,7 @@ func TestCreateAndReloadRuin(t *testing.T) {
 	if err != nil || len(changes) != 3 {
 		t.Fatalf("review: %v %+v", err, changes)
 	}
-	if exists(p.Template.File) || c.Dme.Objects[p.areaType] != nil {
+	if exists(p.Template.File) || c.Dme.Objects[p.Template.Type] != nil {
 		t.Fatal("preview changed files or environment")
 	}
 	if err = p.Save(); err != nil {
@@ -180,7 +209,7 @@ func TestCreateAndReloadRuin(t *testing.T) {
 		t.Fatal("bad map dimensions or format")
 	}
 	for _, prefabs := range data.Dictionary {
-		if len(prefabs) != 2 || prefabs[0].Path() != s.Turf || prefabs[1].Path() != p.areaType {
+		if len(prefabs) != 2 || prefabs[0].Path() != s.Turf || prefabs[1].Path() != s.Area {
 			t.Fatal("bad map palette")
 		}
 	}
@@ -197,9 +226,8 @@ func TestCreateAndReloadRuin(t *testing.T) {
 	if q.Properties != s.Properties {
 		t.Fatalf("properties did not round-trip: %+v != %+v", q.Properties, s.Properties)
 	}
-	area := c.Dme.Objects[p.areaType]
-	if area == nil || area.Vars.ValueV("default_gravity", "") != "0" || area.Vars.ValueV("requires_power", "") != "0" {
-		t.Fatal("area settings did not round-trip")
+	if c.Dme.Objects["/area/ruin/"+s.ID] != nil || bytes.Contains(read(t, p.source.Path), []byte("/area/")) {
+		t.Fatal("created a custom area instead of using the existing area")
 	}
 	beforeMap := read(t, p.Template.File)
 	q.Properties.Cost = 7.5

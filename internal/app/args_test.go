@@ -16,4 +16,8 @@ func TestStartupArguments(t *testing.T) {
 	if args.project != "Project with spaces.DME" || args.shipWorkspace || len(args.maps) != 0 {
 		t.Fatalf("project launch should open the project home: %+v", args)
 	}
+	args = parseStartupArgs([]string{folder, "--ruin-workspace"})
+	if !args.ruinWorkspace || args.shipWorkspace || args.project != filepath.Join(folder, "tgstation.dme") {
+		t.Fatalf("ruin workshop launch lost its project or workspace: %+v", args)
+	}
 }
