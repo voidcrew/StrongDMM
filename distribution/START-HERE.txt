@@ -26,7 +26,9 @@ installed channel. Automatic checks and downloads can be changed in Preferences
 before restarting, and your project reopens after the update.
 
 Existing Voidcrew editor settings and backups are copied into the Voidworks
-profile on first launch. Old shortcuts continue to work after an automatic update.
+profile on first launch. Older StrongDMM builds need one manual download of
+this ZIP after the repository rename. Run Voidworks.exe; future updates use
+the Voidworks release channels.
 
 PLANET WORKSHOP
 Choose an existing planet or start a new planet, then edit its biomes and
