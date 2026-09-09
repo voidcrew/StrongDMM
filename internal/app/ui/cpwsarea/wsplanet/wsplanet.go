@@ -41,6 +41,7 @@ type Workspace struct {
 	project                                                               *planet.Project
 	dme                                                                   *dmenv.Dme
 	canvas                                                                *canvas.Canvas
+	canvasSize                                                            imgui.Vec2
 	control                                                               *canvas.Control
 	preview                                                               *planet.Preview
 	scene                                                                 *mappreview.Scene
@@ -398,6 +399,11 @@ func (w *Workspace) visual() {
 	size := imgui.ContentRegionAvail()
 	if size.X > 1 && size.Y > 1 {
 		camera := w.canvas.Render().Camera
+		if !w.fit && w.canvasSize.X > 0 && w.canvasSize.Y > 0 {
+			camera.ShiftX += (size.X - w.canvasSize.X) / (2 * camera.Scale)
+			camera.ShiftY += (size.Y - w.canvasSize.Y) / (2 * camera.Scale)
+		}
+		w.canvasSize = size
 		tileSize := float32(32)
 		width := float32(w.preview.Map.MaxX) * tileSize
 		if w.fit {

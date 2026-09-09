@@ -125,6 +125,23 @@ func TestNativePlanetWorkshop(t *testing.T) {
 		_ = f.Close()
 	}
 	capture("planet")
+	// Restoring a maximized editor must keep the planet visible, even when
+	// the first fit centered it in a much wider canvas.
+	viewWidth, viewHeight = 3200, 1100
+	ws.fit = true
+	capture("wide-planet")
+	viewWidth, viewHeight = 1000, 720
+	capture("restored-planet")
+	colors := map[[3]byte]bool{}
+	pixels := ws.canvas.ReadPixels()
+	for i := 0; i+3 < len(pixels); i += 4 {
+		colors[[3]byte{pixels[i], pixels[i+1], pixels[i+2]}] = true
+	}
+	if len(colors) < 20 {
+		t.Fatal("restoring a smaller window moved the planet out of view")
+	}
+	viewWidth, viewHeight = width, height
+	capture("planet")
 	if ws.preview == nil || ws.preview.Map.MaxX != 123 {
 		t.Fatal("no planet rendered", ws.message)
 	}

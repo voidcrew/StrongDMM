@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.13-beta.1 - Planet Workshop beta
+Version: 0.5.14-beta.1 - Planet Workshop beta
 
 START
 1. Extract the whole ZIP into its own writable folder, beside your stable editor.
@@ -16,9 +16,13 @@ editor. Compiling and playing the game still require the game's usual tools.
 This build needs 64-bit Windows and a graphics driver supporting OpenGL 3.3.
 
 UPDATES
-This beta is a separate manual download. Stable installations will not update
-to it. Beta builds do not receive automatic updates; download later betas or
-the stable release yourself. Your stable editor can stay in its own folder.
+Use Help > Updates & Release Channel to check for updates or switch between
+Stable and Beta. Choose a channel, download it, then switch and restart. Beta
+includes features still being tested; returning to Stable is supported even
+when its version number is lower. Each installation receives updates for its
+installed channel. Automatic checks and downloads can be changed in Preferences
+> Application. Keep the installation folder writable. Save prompts appear
+before restarting, and your project reopens after the update.
 
 PLANET WORKSHOP
 Choose an existing planet or start a new planet, then edit its biomes and
