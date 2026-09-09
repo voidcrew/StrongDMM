@@ -7,6 +7,7 @@ import (
 	"sdmm/internal/dmapi/dm"
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/dmapi/dmmclip"
+	"sdmm/internal/env"
 	"sdmm/internal/imguiext/icon"
 	"sdmm/internal/imguiext/style"
 	w "sdmm/internal/imguiext/widget"
@@ -67,6 +68,7 @@ type app interface {
 	ShipPreviewStatus() shippreview.Status
 	DoOpenSourceCode()
 	DoCheckForUpdates()
+	DoSelectUpdateChannel(selfupdate.Channel)
 	DoOpenUpdateDownload()
 	DoOpenSupport()
 
@@ -119,10 +121,11 @@ type Menu struct {
 	updateDescription string
 	updateError       string
 	updateOpen        bool
+	updateChannel     selfupdate.Channel
 }
 
 func New(app app) *Menu {
-	m := &Menu{app: app}
+	m := &Menu{app: app, updateChannel: selfupdate.CurrentChannel(env.Version)}
 	m.addShortcuts()
 	return m
 }
@@ -277,7 +280,7 @@ func (m *Menu) Process() {
 				Icon(icon.ClipboardMultiple),
 			w.MenuItem("Source Code", m.app.DoOpenSourceCode).
 				Icon(icon.GitHub),
-			w.MenuItem("Check for Updates", m.app.DoCheckForUpdates).
+			w.MenuItem("Updates & Release Channel", m.app.DoCheckForUpdates).
 				Enabled(selfupdate.Supported()).
 				Icon(icon.SystemUpdate),
 			w.Separator(),

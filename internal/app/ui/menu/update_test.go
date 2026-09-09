@@ -11,17 +11,20 @@ import (
 	"github.com/SpaiR/imgui-go"
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/go-gl/glfw/v3.3/glfw"
+	"sdmm/internal/app/selfupdate"
 	"sdmm/internal/app/window"
+	"sdmm/internal/env"
 	"sdmm/internal/platform"
 )
 
 type updatePopupApp struct{ app }
 
-func (*updatePopupApp) DoSelfUpdate()         {}
-func (*updatePopupApp) DoRestart()            {}
-func (*updatePopupApp) DoIgnoreUpdate()       {}
-func (*updatePopupApp) DoCheckForUpdates()    {}
-func (*updatePopupApp) DoOpenUpdateDownload() {}
+func (*updatePopupApp) DoSelfUpdate()                            {}
+func (*updatePopupApp) DoRestart()                               {}
+func (*updatePopupApp) DoIgnoreUpdate()                          {}
+func (*updatePopupApp) DoCheckForUpdates()                       {}
+func (*updatePopupApp) DoSelectUpdateChannel(selfupdate.Channel) {}
+func (*updatePopupApp) DoOpenUpdateDownload()                    {}
 
 func TestNativeUpdatePopup(t *testing.T) {
 	output := os.Getenv("STRONGDMM_TEST_UPDATE_UI")
@@ -62,8 +65,27 @@ func TestNativeUpdatePopup(t *testing.T) {
 	if err := os.MkdirAll(output, 0700); err != nil {
 		t.Fatal(err)
 	}
-	for _, status := range []upStatus{upStatusAvailable, upStatusUpdating, upStatusUpdated, upStatusCurrent, upStatusError} {
-		m := &Menu{app: &updatePopupApp{}, updateStatus: status, updateVersion: "0.5.2"}
+	previousVersion := env.Version
+	defer func() { env.Version = previousVersion }()
+	for _, test := range []struct {
+		name               string
+		status             upStatus
+		installed, offered string
+		channel            selfupdate.Channel
+	}{
+		{"available", upStatusAvailable, "0.5.1", "0.5.2", selfupdate.Stable},
+		{"downloading", upStatusUpdating, "0.5.1", "0.5.2", selfupdate.Stable},
+		{"ready", upStatusUpdated, "0.5.1", "0.5.2", selfupdate.Stable},
+		{"current", upStatusCurrent, "0.5.2", "0.5.2", selfupdate.Stable},
+		{"error", upStatusError, "0.5.1", "", selfupdate.Stable},
+		{"switch-to-beta", upStatusAvailable, "0.5.13", "0.5.14-beta.1", selfupdate.Beta},
+		{"beta-ready", upStatusUpdated, "0.5.13", "0.5.14-beta.1", selfupdate.Beta},
+		{"return-to-stable", upStatusAvailable, "0.5.14-beta.1", "0.5.13", selfupdate.Stable},
+		{"stable-ready", upStatusUpdated, "0.5.14-beta.1", "0.5.13", selfupdate.Stable},
+	} {
+		env.Version = test.installed
+		status := test.status
+		m := &Menu{app: &updatePopupApp{}, updateStatus: status, updateVersion: test.offered, updateChannel: test.channel}
 		if status != upStatusCurrent {
 			m.updateDescription = "StrongDMM now downloads and verifies updates in the background.\n\nChoose Update & restart when you are ready. Your project reopens after the update.\n\nWindows x64 package with the matching editor, checker, and source."
 		}
@@ -91,7 +113,7 @@ func TestNativeUpdatePopup(t *testing.T) {
 		for y := 0; y < height; y++ {
 			copy(frame.Pix[y*frame.Stride:(y+1)*frame.Stride], pixels[(height-1-y)*width*4:(height-y)*width*4])
 		}
-		file, err := os.Create(filepath.Join(output, []string{"", "available", "downloading", "ready", "error", "checking", "current"}[status]+".png"))
+		file, err := os.Create(filepath.Join(output, test.name+".png"))
 		if err != nil {
 			t.Fatal(err)
 		}
