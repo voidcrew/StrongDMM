@@ -566,18 +566,16 @@ func (ws *WsShip) settingsControls() {
 	textField("Ship name", "Name shown to players", &s.name)
 	textField("Description", "What is this ship for?", &s.description)
 	heading("BASE SHIP PRICE")
-	width := (imgui.ContentRegionAvail().X - imgui.CurrentStyle().ItemSpacing().X) / 2
-	for i, class := range ship.PartClasses {
-		imgui.BeginGroup()
-		imgui.Text(class.Name + " parts")
-		value := int32(s.costs[class.ID])
-		imgui.SetNextItemWidth(width)
-		imgui.InputIntV("##base-cost-"+class.ID, &value, 0, 0, imgui.InputTextFlagsNone)
-		s.costs[class.ID] = int(value)
-		imgui.EndGroup()
-		if i%2 == 0 {
-			imgui.SameLine()
+	if imgui.BeginTableV("base-ship-price", 2, imgui.TableFlagsSizingStretchSame, imgui.Vec2{}, 0) {
+		for _, class := range ship.PartClasses {
+			imgui.TableNextColumn()
+			imgui.Text(class.Name + " parts")
+			value := int32(s.costs[class.ID])
+			imgui.SetNextItemWidth(-1)
+			imgui.InputIntV("##base-cost-"+class.ID, &value, 0, 0, imgui.InputTextFlagsNone)
+			s.costs[class.ID] = int(value)
 		}
+		imgui.EndTable()
 	}
 	hint(s.costs.Summary())
 	if ws.project.Crew == nil {
