@@ -111,6 +111,11 @@ func TestNativePlanetWorkshop(t *testing.T) {
 		}
 		pixels := make([]byte, width*height*4)
 		gl.ReadPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(pixels))
+		// The desktop framebuffer is opaque. Its blend alpha is not premultiplied
+		// PNG alpha; preserving it corrupts translucent overlays in screenshots.
+		for i := 3; i < len(pixels); i += 4 {
+			pixels[i] = 255
+		}
 		frame := image.NewRGBA(image.Rect(0, 0, width, height))
 		for y := 0; y < height; y++ {
 			copy(frame.Pix[y*frame.Stride:(y+1)*frame.Stride], pixels[(height-1-y)*width*4:(height-y)*width*4])
@@ -158,6 +163,7 @@ func TestNativePlanetWorkshop(t *testing.T) {
 	ws.picking = false
 	ws.mode = 2
 	capture("climate")
+	testClimatePainting(t, ws, io, render, capture, &viewWidth, &viewHeight)
 	ws.mode = 3
 	capture("terrain")
 	ws.mode = 0

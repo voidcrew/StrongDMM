@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/SpaiR/imgui-go"
+	"github.com/go-gl/gl/v3.3-core/gl"
 	"sdmm/internal/app/command"
 	"sdmm/internal/app/ui/cpwsarea/workspace"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/pmap/canvas"
@@ -29,6 +30,8 @@ type App interface {
 	CommandStorage() *command.Storage
 }
 type Workspace struct {
+	climateView        climateView
+	climateTexture     uint32
 	pickingRiver       bool
 	pickingEnvironment bool
 	ruinFilter         string
@@ -129,6 +132,8 @@ func (*Workspace) OnFocusChange(f bool) {
 	}
 }
 func (w *Workspace) Dispose() {
+	texture := w.climateTexture
+	window.RunLater(func() { gl.DeleteTextures(1, &texture) })
 	w.canvas.Dispose()
 	for path := range w.drafts {
 		w.app.CommandStorage().DisposeStack(w.planetStack(path))
@@ -139,6 +144,7 @@ func (w *Workspace) open(index int) {
 	w.switchPlanet(w.catalog.Planets[index].Path)
 }
 func (w *Workspace) bind(p *planet.Project) {
+	w.climateView = climateView{}
 	w.nameDirty = false
 	w.project = p
 	w.last = planet.Clone(p.State)
@@ -194,6 +200,8 @@ func (w *Workspace) recordNamed(label string) {
 	focus := w.selected
 	before, after := planet.Clone(w.last), planet.Clone(p.State)
 	apply := func(s planet.State) {
+		w.climateView.stroke = false
+		w.climateView.before = nil
 		w.nameDirty = false
 		p.State = planet.Clone(s)
 		w.project = p
@@ -323,6 +331,10 @@ func (w *Workspace) Process() {
 		w.reviewPanel()
 	default:
 		w.rebuild()
+		if w.mode == 2 {
+			w.visual()
+			break
+		}
 		wide := imgui.ContentRegionAvail().X >= 840*s
 		if !wide {
 			if imgui.Button("Preview") {
@@ -353,7 +365,10 @@ func (w *Workspace) Process() {
 		}
 	}
 	imgui.EndChild()
-	if !imgui.IsAnyItemActive() {
+	if w.climateView.stroke && !imgui.IsMouseDown(imgui.MouseButtonLeft) {
+		w.finishClimateStroke()
+	}
+	if !imgui.IsAnyItemActive() && !w.climateView.stroke {
 		w.record()
 	}
 }
@@ -395,7 +410,12 @@ func (w *Workspace) visual() {
 		imgui.TextWrapped(w.message)
 		return
 	}
-	imgui.BeginChildV("planet-canvas", imgui.Vec2{Y: -46 * window.PointSize()}, false, imgui.WindowFlagsNoScrollbar|imgui.WindowFlagsNoScrollWithMouse)
+	w.previewCanvas(imgui.Vec2{Y: -46 * window.PointSize()})
+	workshop.Muted("Seeded terrain and rivers. Ruins, weather and runtime mob behavior are not simulated.")
+}
+
+func (w *Workspace) previewCanvas(extent imgui.Vec2) {
+	imgui.BeginChildV("planet-canvas", extent, false, imgui.WindowFlagsNoScrollbar|imgui.WindowFlagsNoScrollWithMouse)
 	size := imgui.ContentRegionAvail()
 	if size.X > 1 && size.Y > 1 {
 		camera := w.canvas.Render().Camera
@@ -428,11 +448,16 @@ func (w *Workspace) visual() {
 		}
 		mouse := imgui.MousePos().Minus(w.control.PosMin())
 		w.mouseWorld = imgui.Vec2{X: mouse.X/camera.Scale - camera.ShiftX, Y: (size.Y-mouse.Y)/camera.Scale - camera.ShiftY}
+		if w.mode == 2 {
+			w.climateMapInput()
+		}
 		w.hoverActive = w.control.Active()
 		w.hovered = nil
 		w.canvas.Process(size)
 		imgui.WindowDrawList().AddImageV(imgui.TextureID(w.canvas.Texture()), w.control.PosMin(), w.control.PosMax(), imgui.Vec2{Y: 1}, imgui.Vec2{X: 1}, style.ColorWhitePacked)
-		if w.control.Active() {
+		if w.mode == 2 {
+			w.climateOverlay()
+		} else if w.control.Active() {
 			if target, ok := w.previewTarget(); ok {
 				if imgui.IsMouseClicked(imgui.MouseButtonLeft) && !w.control.Moving() {
 					w.inspectPreview(target)
@@ -446,5 +471,4 @@ func (w *Workspace) visual() {
 		}
 	}
 	imgui.EndChild()
-	workshop.Muted("Seeded terrain and rivers. Ruins, weather and runtime mob behavior are not simulated.")
 }

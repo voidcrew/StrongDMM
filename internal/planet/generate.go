@@ -23,7 +23,24 @@ type Cell struct {
 	Spawn, SpawnField      string
 	Heat, Moisture, Height float64
 	Closed, River          bool
+	Climate                ClimateCell
 }
+
+// ClimateCell identifies the rule that chose a tile, even if a river later
+// replaces its turf or the same biome is assigned to several climate cells.
+type ClimateCell struct {
+	Row, Col int
+	Caves    bool
+}
+
+func ClimateAt(heat, moisture float64, caves bool) ClimateCell {
+	row := band(heat, .2, .4, .6, .65, .8)
+	if caves {
+		row = band(heat, .25, .5, .75)
+	}
+	return ClimateCell{Row: row, Col: band(moisture, .2, .4, .6, .8), Caves: caves}
+}
+
 type Preview struct {
 	Map    *dmmap.Dmm
 	Cells  []Cell
@@ -187,20 +204,19 @@ func Generate(c *Catalog, s State, dme *dmenv.Dme, o PreviewOptions) (*Preview, 
 			dy := float64(gy + int(roll(s.Seeds.Detail, gx, gy, 1)*5) - 2)
 			cell := Cell{Heat: heat.sample(dx, dy), Moisture: wet.sample(dx, dy), Height: high.sample(float64(gx), float64(gy))}
 			isCave := len(s.Definition.Caves) > 0 && (o.Caves || len(s.Definition.Surface) == 0 || cell.Height > s.Definition.Settings.Mountain)
+			cell.Climate = ClimateAt(cell.Heat, cell.Moisture, isCave)
 			if o.Biome != "" {
 				cell.Biome = o.Biome
 				isCave = s.Biomes[o.Biome].Cave
 			} else {
 				grid := s.Definition.Surface
-				row := band(cell.Heat, .2, .4, .6, .65, .8)
 				if isCave {
 					grid = s.Definition.Caves
-					row = band(cell.Heat, .25, .5, .75)
 				}
 				if len(grid) == 0 {
 					return nil, fmt.Errorf("This planet has no biomes for this layer.")
 				}
-				cell.Biome = grid[row][band(cell.Moisture, .2, .4, .6, .8)]
+				cell.Biome = grid[cell.Climate.Row][cell.Climate.Col]
 			}
 			b := s.Biomes[cell.Biome]
 			field := "open_turf_types"

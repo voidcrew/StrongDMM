@@ -79,7 +79,7 @@ func (w *Workspace) library() {
 	for _, path := range w.project.State.VisibleBiomes() {
 		b := w.project.State.Biomes[path]
 		badge := ""
-		if w.preview != nil && w.mode == 0 {
+		if w.preview != nil && (w.mode == 0 || w.mode == 2) {
 			badge = fmt.Sprintf("%.0f%%", float64(w.preview.Counts[path])*100/float64(len(w.preview.Cells)))
 		}
 		detail := "Surface"
@@ -87,8 +87,15 @@ func (w *Workspace) library() {
 			detail = "Caves"
 		}
 		pos := imgui.CursorScreenPos()
-		if workshop.Row(path, b.Name, detail, badge, w.selected == path, style.Teal, 38) {
-			w.selectBiome(path)
+		active := w.selected == path
+		if w.mode == 2 && w.climateView.brush != "" {
+			active = w.climateView.brush == path
+		}
+		if workshop.Row(path, b.Name, detail, badge, active, style.Teal, 38) {
+			if w.selectBiome(path) && w.mode == 2 {
+				w.climateView.brush = path
+				w.climateView.painting = true
+			}
 		}
 		w.sprite(w.biomeGround(b), imgui.Vec2{X: pos.X + 9*window.PointSize(), Y: pos.Y + 12*window.PointSize()}, 32*window.PointSize())
 	}
@@ -390,7 +397,13 @@ func (w *Workspace) editor() {
 		imgui.TextWrapped(b.Parent)
 	}
 }
-func (w *Workspace) local() { w.selected = w.project.State.LocalBiome(w.selected) }
+func (w *Workspace) local() {
+	previous := w.selected
+	w.selected = w.project.State.LocalBiome(w.selected)
+	if w.climateView.brush == previous {
+		w.climateView.brush = w.selected
+	}
+}
 func (w *Workspace) biomeGround(b planet.Biome) string {
 	for _, t := range b.Tables {
 		if t.Field == "open_turf_types" && len(t.Entries) > 0 {
@@ -443,93 +456,5 @@ func (w *Workspace) reviewPanel() {
 	}
 	if w.message != "" {
 		imgui.TextWrapped(w.message)
-	}
-}
-
-func (w *Workspace) climate() {
-	workshop.Title("Where biomes grow")
-	workshop.Muted("Choose a climate cell, then assign a biome. Heat runs down; moisture runs across.")
-	imgui.Checkbox("Cave climate", &w.cave)
-	grid := w.project.State.Definition.Surface
-	names := planet.HeatNames
-	if w.cave {
-		grid = w.project.State.Definition.Caves
-		names = planet.CaveNames
-	}
-	if len(grid) == 0 {
-		workshop.Muted("This layer has no climate table.")
-		if workshop.Button("Add this layer", true) {
-			for path, b := range w.catalog.Biomes {
-				if b.Cave != w.cave {
-					continue
-				}
-				w.project.State.Biomes[path] = b
-				rows := 6
-				if w.cave {
-					rows = 4
-				}
-				next := make([][]string, rows)
-				for i := range next {
-					next[i] = []string{path, path, path, path, path}
-				}
-				if w.cave {
-					w.project.State.Definition.Caves = next
-				} else {
-					w.project.State.Definition.Surface = next
-				}
-				break
-			}
-		}
-		return
-	}
-	gridHeight := min(float32(len(grid)+1)*69*window.PointSize(), max(130*window.PointSize(), imgui.ContentRegionAvail().Y-165*window.PointSize()))
-	imgui.BeginChildV("climate-grid", imgui.Vec2{Y: gridHeight}, false, 0)
-	cellWidth := max(50, (imgui.ContentRegionAvail().X-98*window.PointSize())/5)
-	imgui.ColumnsV(6, "climate-columns", false)
-	imgui.SetColumnWidth(0, 98*window.PointSize())
-	imgui.NextColumn()
-	for _, name := range planet.MoistureNames {
-		imgui.Text(name)
-		imgui.NextColumn()
-	}
-	for i, row := range grid {
-		imgui.Text(names[i])
-		imgui.NextColumn()
-		for j, path := range row {
-			b := w.project.State.Biomes[path]
-			imgui.PushIDInt(i*5 + j)
-			pos := imgui.CursorScreenPos()
-			if imgui.SelectableV("##cell", w.row == i && w.col == j, 0, imgui.Vec2{X: cellWidth - 10, Y: 57 * window.PointSize()}) {
-				w.row, w.col = i, j
-				w.selectBiome(path)
-			}
-			w.sprite(w.biomeGround(b), pos, 28*window.PointSize())
-			imgui.WindowDrawList().AddText(imgui.Vec2{X: pos.X, Y: pos.Y + 32*window.PointSize()}, style.ColorWhitePacked, workshop.Ellipsis(b.Name, cellWidth-12))
-			workshop.Tooltip(b.Name)
-			imgui.PopID()
-			imgui.NextColumn()
-		}
-	}
-	imgui.Columns()
-	imgui.EndChild()
-	w.row = min(w.row, len(grid)-1)
-	w.col = min(w.col, 4)
-	workshop.Section(names[w.row]+" / "+planet.MoistureNames[w.col], style.Teal)
-	if combo("Assign biome", w.project.State.Biomes[grid[w.row][w.col]].Name) {
-		for _, b := range w.project.BiomeChoices(w.cave) {
-			path := b.Path
-			if imgui.Selectable(b.Name + "##" + path) {
-				w.project.State.Biomes[path] = b
-				grid[w.row][w.col] = path
-				w.selectBiome(path)
-			}
-		}
-		imgui.EndCombo()
-	}
-	if workshop.Button("Fill this climate row", false) {
-		path := grid[w.row][w.col]
-		for i := range grid[w.row] {
-			grid[w.row][i] = path
-		}
 	}
 }

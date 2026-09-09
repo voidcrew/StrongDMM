@@ -78,6 +78,7 @@ func (w *Workspace) switchPlanet(path string) {
 	w.settingsTab = draft.settingsTab
 	w.picking, w.deleting, w.review, w.creating, w.cancelling = false, false, false, false, false
 	w.preview, w.scene = nil, nil
+	w.climateView = climateView{}
 	w.renderKey, w.message = "", ""
 	w.fit = true
 	w.app.CommandStorage().SetStack(w.CommandStackId())

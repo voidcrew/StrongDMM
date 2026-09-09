@@ -37,6 +37,9 @@ func (w *Workspace) deleteBiome() {
 		next = w.project.State.UsedBiomes()[0]
 	}
 	w.selectBiome(next)
+	if w.climateView.brush == b.Path {
+		w.climateView.brush = next
+	}
 	w.renderKey = ""
 	w.mode, w.fit = 0, true
 	w.message = fmt.Sprintf("%s deleted from this planet. Undo restores it.", b.Name)

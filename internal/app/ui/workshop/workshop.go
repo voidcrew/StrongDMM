@@ -37,8 +37,16 @@ func EndPanel() { imgui.EndChild() }
 
 func Muted(text string) {
 	imgui.PushStyleColor(imgui.StyleColorText, style.Muted)
-	imgui.TextWrapped(text)
+	Wrapped(text)
 	imgui.PopStyleColor()
+}
+
+// The binding's TextWrapped passes its argument as a printf format. Use
+// unformatted text under a wrap position so labels can safely contain '%'.
+func Wrapped(text string) {
+	imgui.PushTextWrapPosV(0)
+	imgui.Text(text)
+	imgui.PopTextWrapPos()
 }
 
 func Section(text string, accent imgui.Vec4) {
