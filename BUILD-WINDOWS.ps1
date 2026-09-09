@@ -26,7 +26,9 @@ try {
     if (-not $env:CXX) { $env:CXX = (Get-Command g++).Source }
     $moduleMode = 'mod'
     if (Test-Path -LiteralPath 'vendor/modules.txt') { $moduleMode = 'vendor' }
-    & go run "-mod=$moduleMode" ./cmd/bundlepreviews
+    $previewArgs = @()
+    if (Test-Path -LiteralPath 'preview-dependencies') { $previewArgs += @('-cache', 'preview-dependencies') }
+    & go run "-mod=$moduleMode" ./cmd/bundlepreviews @previewArgs
     if ($LASTEXITCODE -ne 0) { throw 'Preview runtime packaging failed.' }
     Push-Location third_party/sdmmparser/src
     try {
