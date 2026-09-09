@@ -24,7 +24,7 @@ func TestStableVersionOrdering(t *testing.T) {
 }
 
 func TestReleaseValidation(t *testing.T) {
-	fixture := `{"tag_name":"0.5.2","body":"Release notes","assets":[{"name":"StrongDMM-Voidcrew-0.5.2-windows-x64.zip","browser_download_url":"https://github.com/voidcrew/StrongDMM/releases/download/0.5.2/StrongDMM-Voidcrew-0.5.2-windows-x64.zip","digest":"sha256:` + strings.Repeat("a", 64) + `","size":100}]}`
+	fixture := `{"tag_name":"0.5.2","body":"Release notes","assets":[{"name":"Voidworks-0.5.2-windows-x64.zip","browser_download_url":"https://github.com/voidcrew/Voidworks/releases/download/0.5.2/Voidworks-0.5.2-windows-x64.zip","digest":"sha256:` + strings.Repeat("a", 64) + `","size":100}]}`
 	for _, test := range []struct {
 		name   string
 		change func(*githubRelease)

@@ -130,7 +130,7 @@ func (ws *WsEmpty) OnFocusChange(focused bool) {
 
 func (ws *WsEmpty) showContent() {
 	if !ws.app.HasLoadedEnvironment() {
-		imgui.Text("StrongDMM - Voidcrew")
+		imgui.Text("Voidworks")
 		imgui.TextDisabled("Open your project to start mapping.")
 		imgui.NewLine()
 		w.Button("Open Project...", ws.app.DoOpenProject).Style(style.ButtonGreen{}).Build()

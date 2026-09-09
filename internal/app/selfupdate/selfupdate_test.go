@@ -26,7 +26,7 @@ func fixturePackage(t *testing.T, mutate func(map[string][]byte), entryName func
 		t.Fatal(err)
 	}
 	files := map[string][]byte{
-		"StrongDMM.exe": binary, "shipcheck.exe": binary, "Source.zip": []byte("matching source"),
+		"Voidworks.exe": binary, "shipcheck.exe": binary, "Source.zip": []byte("matching source"),
 		"LICENSE": []byte("license"), "START-HERE.txt": []byte("instructions"), "BUILD-INFO.json": []byte(`{"version":"0.5.2"}`),
 	}
 	var checksums strings.Builder
@@ -65,7 +65,7 @@ func fixturePackage(t *testing.T, mutate func(map[string][]byte), entryName func
 
 func fixtureInstallation(t *testing.T) string {
 	t.Helper()
-	folder := filepath.Join(t.TempDir(), "StrongDMM folder & [test]")
+	folder := filepath.Join(t.TempDir(), "Voidworks folder & [test]")
 	if err := os.Mkdir(folder, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func fixtureInstallation(t *testing.T) string {
 	if err := os.WriteFile(filepath.Join(folder, "my-map.dmm"), []byte("user map"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	return filepath.Join(folder, "StrongDMM.exe")
+	return filepath.Join(folder, "Voidworks.exe")
 }
 
 func fixtureStage(t *testing.T, exe string, data []byte, release Release) Staged {
@@ -153,7 +153,7 @@ func TestRejectUnsafePackages(t *testing.T) {
 	}{
 		{name: "corrupt archive", corrupt: true},
 		{name: "missing file", mutate: func(f map[string][]byte) { delete(f, "Source.zip") }},
-		{name: "tampered executable", mutate: func(f map[string][]byte) { f["StrongDMM.exe"] = []byte("bad") }},
+		{name: "tampered executable", mutate: func(f map[string][]byte) { f["Voidworks.exe"] = []byte("bad") }},
 		{name: "path traversal", entry: func(s string) string { return "../" + s }},
 		{name: "absolute path", entry: func(s string) string { return "C:/" + s }},
 		{name: "duplicates", entry: func(s string) string { return packageName("0.5.2") + "/LICENSE" }},
@@ -170,7 +170,7 @@ func TestRejectUnsafePackages(t *testing.T) {
 			if _, err := Install(staged, exe); err == nil {
 				t.Fatal("accepted unsafe package")
 			}
-			if got, _ := os.ReadFile(exe); string(got) != "previous StrongDMM.exe" {
+			if got, _ := os.ReadFile(exe); string(got) != "previous Voidworks.exe" {
 				t.Fatal("changed installation before validation")
 			}
 		})
@@ -209,7 +209,7 @@ func TestDownloadFailuresAndCancellation(t *testing.T) {
 				if err != nil {
 					t.Fatal(err)
 				}
-				if got, _ := os.ReadFile(exe); string(got) != "previous StrongDMM.exe" {
+				if got, _ := os.ReadFile(exe); string(got) != "previous Voidworks.exe" {
 					t.Fatal("download changed running executable")
 				}
 				if err := staged.Discard(exe); err != nil {
@@ -240,8 +240,8 @@ func TestStageMustBeBesideExecutable(t *testing.T) {
 
 // Opt-in check against the public feed and package, without installing it.
 func TestPublicReleaseDownload(t *testing.T) {
-	if os.Getenv("STRONGDMM_TEST_PUBLIC_UPDATE") == "" {
-		t.Skip("set STRONGDMM_TEST_PUBLIC_UPDATE for the live release check")
+	if os.Getenv("VOIDWORKS_TEST_PUBLIC_UPDATE") == "" {
+		t.Skip("set VOIDWORKS_TEST_PUBLIC_UPDATE for the live release check")
 	}
 	release, err := Check(context.Background(), "0.0.0")
 	if err != nil {

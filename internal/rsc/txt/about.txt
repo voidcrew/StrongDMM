@@ -1,6 +1,7 @@
-StrongDMM - Voidcrew %VERSION%
+Voidworks %VERSION%
 Copyright (C) 2019-2024, SpaiR
-Voidcrew fork maintained by the Voidcrew contributors.
+Voidworks is maintained by the Voidcrew contributors.
+Based on StrongDMM by SpaiR and its contributors.
 
 This program comes with ABSOLUTELY NO WARRANTY. This is free software,
 and you are welcome to redistribute it under the conditions of the GNU

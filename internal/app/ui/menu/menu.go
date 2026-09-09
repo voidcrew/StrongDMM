@@ -288,7 +288,7 @@ func (m *Menu) Process() {
 			w.MenuItem("About", m.app.DoOpenAbout).
 				IconEmpty(),
 			w.Separator(),
-			w.Button("Support", m.app.DoOpenSupport).
+			w.Button("Support Upstream", m.app.DoOpenSupport).
 				Size(imgui.Vec2{X: -1}).
 				Style(style.ButtonFireCoral{}).
 				Tooltip(rsc.SupportTxt).

@@ -1,3 +1,11 @@
+# Voidworks 0.5.14
+
+* Renamed the editor to Voidworks, with a new icon, executable, and release packages.
+* Existing Voidcrew editor profiles are copied on first launch. Automatic updates and old shortcuts transition to Voidworks.
+* Stable and Beta remain selectable in Help > Updates & Release Channel.
+
+# StrongDMM upstream history
+
 # v2.17.0.alpha
 
 * Bumped sdmmparser dependencies. Updates the BYOND parser and related libraries to pick up parser fixes and compatibility improvements. @Absolucy

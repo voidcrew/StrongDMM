@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"time"
 
 	"sdmm/internal/env"
@@ -14,12 +15,25 @@ import (
 	"github.com/sqweek/dialog"
 )
 
-const editorArgument = "--strongdmm-editor"
+const editorArgument = "--voidworks-editor"
 
 // Run keeps crash reporting independent of the graphics context and editor
 // goroutines. On Windows the same executable quietly supervises its editor
-// process, so launching StrongDMM.exe needs no console or external launcher.
+// process, so launching Voidworks.exe needs no console or external launcher.
 func Run(start func()) int {
+	if runtime.GOOS == "windows" {
+		if executable, err := os.Executable(); err == nil && strings.EqualFold(filepath.Base(executable), "StrongDMM.exe") {
+			target, err := legacyExecutable(executable)
+			if err == nil {
+				err = restartProcess(target, os.Args[1:], cleanupDirectory())
+			}
+			if err != nil {
+				showError("Unable to start Voidworks.\n\n" + err.Error())
+				return 1
+			}
+			return 0
+		}
+	}
 	if len(os.Args) > 1 && os.Args[1] == editorArgument {
 		os.Args = append(os.Args[:1], os.Args[2:]...)
 		start()
@@ -42,7 +56,7 @@ func Run(start func()) int {
 	code := 1
 	if err == nil {
 		cleanupUpdate(executable)
-		requestDir, requestErr := os.MkdirTemp("", "StrongDMM-restart-")
+		requestDir, requestErr := os.MkdirTemp("", "Voidworks-restart-")
 		if requestErr != nil {
 			err = requestErr
 		} else {
@@ -64,7 +78,7 @@ func Run(start func()) int {
 	}
 	_ = file.Close()
 	if code != 0 {
-		showError(fmt.Sprintf("StrongDMM stopped unexpectedly.\n\nExit code: %d (0x%08X)\n\nDetails were saved to:\n%s", code, uint32(code), file.Name()))
+		showError(fmt.Sprintf("Voidworks stopped unexpectedly.\n\nExit code: %d (0x%08X)\n\nDetails were saved to:\n%s", code, uint32(code), file.Name()))
 	}
 	return code
 }
@@ -96,7 +110,7 @@ func sessionLog() (*os.File, error) {
 	if profile, err := env.ProfileDir(); err == nil {
 		folders = append(folders, filepath.Join(profile, "logs"))
 	}
-	folders = append(folders, filepath.Join(os.TempDir(), "StrongDMM-Voidcrew", "logs"))
+	folders = append(folders, filepath.Join(os.TempDir(), "Voidworks", "logs"))
 	var failures []error
 	for _, folder := range folders {
 		if err := os.MkdirAll(folder, 0700); err != nil {

@@ -11,11 +11,12 @@ import (
 )
 
 func lockUpdate(executable string) (func(), error) {
-	executable, err := filepath.EvalSymlinks(executable)
+	folder, err := filepath.EvalSymlinks(filepath.Dir(executable))
 	if err != nil {
 		return nil, err
 	}
-	name := fmt.Sprintf("Local\\StrongDMM-Update-%x", sha256.Sum256([]byte(strings.ToLower(executable))))
+	executable = filepath.Join(folder, filepath.Base(executable))
+	name := fmt.Sprintf("Local\\Voidworks-Update-%x", sha256.Sum256([]byte(strings.ToLower(executable))))
 	namePtr, err := windows.UTF16PtrFromString(name)
 	if err != nil {
 		return nil, err
@@ -29,7 +30,7 @@ func lockUpdate(executable string) (func(), error) {
 	if err != nil || (status != windows.WAIT_OBJECT_0 && status != windows.WAIT_ABANDONED) {
 		windows.CloseHandle(handle)
 		runtime.UnlockOSThread()
-		return nil, fmt.Errorf("another StrongDMM instance is applying an update; try again after it finishes")
+		return nil, fmt.Errorf("another Voidworks instance is applying an update; try again after it finishes")
 	}
 	return func() { windows.ReleaseMutex(handle); windows.CloseHandle(handle); runtime.UnlockOSThread() }, nil
 }

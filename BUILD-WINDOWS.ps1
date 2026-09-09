@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.5.13',
+    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.5.14',
     [string]$Revision = 'source',
     [switch]$Test
 )
@@ -41,16 +41,16 @@ try {
     }
     $sharedFlags = "-s -w -X sdmm/internal/env.Version=$Version -X sdmm/internal/env.Revision=$Revision -extldflags=-static"
     [void][System.IO.Directory]::CreateDirectory((Join-Path $PSScriptRoot 'dst'))
-    $resourceText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'distribution/StrongDMM.rc.in'))
+    $resourceText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'distribution/Voidworks.rc.in'))
     $resourceText = $resourceText.Replace('@VERSION@', $Version).Replace('@VERSION_NUMBERS@', (($Version -split '\.') -join ',') + ',0')
     [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'dst/version.rc'), $resourceText)
     & windres -i dst/version.rc -o resource_windows_amd64.syso -O coff --target=pe-x86-64
     if ($LASTEXITCODE -ne 0) { throw 'Windows resource build failed.' }
     try {
-        & go build "-mod=$moduleMode" -tags bundled_previews -buildvcs=false -trimpath "-ldflags=$sharedFlags -H windowsgui" -o dst/StrongDMM.exe .
+        & go build "-mod=$moduleMode" -tags bundled_previews -buildvcs=false -trimpath "-ldflags=$sharedFlags -H windowsgui" -o dst/Voidworks.exe .
         if ($LASTEXITCODE -ne 0) { throw 'Editor build failed.' }
     } finally { Remove-Item -LiteralPath (Join-Path $PSScriptRoot 'resource_windows_amd64.syso') -ErrorAction SilentlyContinue }
     & go build "-mod=$moduleMode" -buildvcs=false -trimpath "-ldflags=$sharedFlags" -o dst/shipcheck.exe ./cmd/shipcheck
     if ($LASTEXITCODE -ne 0) { throw 'Checker build failed.' }
-    Write-Host 'Built dst/StrongDMM.exe and dst/shipcheck.exe.'
+    Write-Host 'Built dst/Voidworks.exe and dst/shipcheck.exe.'
 } finally { Pop-Location }

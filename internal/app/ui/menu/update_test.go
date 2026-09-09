@@ -27,9 +27,9 @@ func (*updatePopupApp) DoSelectUpdateChannel(selfupdate.Channel) {}
 func (*updatePopupApp) DoOpenUpdateDownload()                    {}
 
 func TestNativeUpdatePopup(t *testing.T) {
-	output := os.Getenv("STRONGDMM_TEST_UPDATE_UI")
+	output := os.Getenv("VOIDWORKS_TEST_UPDATE_UI")
 	if output == "" {
-		t.Skip("set STRONGDMM_TEST_UPDATE_UI for native popup captures")
+		t.Skip("set VOIDWORKS_TEST_UPDATE_UI for native popup captures")
 	}
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
@@ -87,10 +87,10 @@ func TestNativeUpdatePopup(t *testing.T) {
 		status := test.status
 		m := &Menu{app: &updatePopupApp{}, updateStatus: status, updateVersion: test.offered, updateChannel: test.channel}
 		if status != upStatusCurrent {
-			m.updateDescription = "StrongDMM now downloads and verifies updates in the background.\n\nChoose Update & restart when you are ready. Your project reopens after the update.\n\nWindows x64 package with the matching editor, checker, and source."
+			m.updateDescription = "Voidworks now downloads and verifies updates in the background.\n\nChoose Update & restart when you are ready. Your project reopens after the update.\n\nWindows x64 package with the matching editor, checker, and source."
 		}
 		if status == upStatusError {
-			m.updateError = "The installation folder must be writable. Extract StrongDMM to a folder you own, then try again."
+			m.updateError = "The installation folder must be writable. Extract Voidworks to a folder you own, then try again."
 		}
 		m.ShowUpdatePopup()
 		for i := 0; i < 4; i++ {
@@ -98,7 +98,7 @@ func TestNativeUpdatePopup(t *testing.T) {
 			imgui.NewFrame()
 			imgui.SetNextWindowPos(imgui.Vec2{})
 			imgui.SetNextWindowSize(imgui.Vec2{X: width, Y: height})
-			imgui.BeginV("StrongDMM", nil, imgui.WindowFlagsNoSavedSettings|imgui.WindowFlagsNoResize|imgui.WindowFlagsNoMove)
+			imgui.BeginV("Voidworks", nil, imgui.WindowFlagsNoSavedSettings|imgui.WindowFlagsNoResize|imgui.WindowFlagsNoMove)
 			m.showUpdateMenu()
 			if !imgui.IsPopupOpen("update_menu") {
 				t.Fatal("manual update status did not open")

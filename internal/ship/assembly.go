@@ -219,7 +219,7 @@ func Compose(sources []Source) (*Assembly, error) {
 }
 
 // Display converts ownership-tagged cells into a render-only DMM. The original
-// files are opened separately for edits, using StrongDMM's normal save and undo.
+// files are opened separately for edits, using Voidworks's normal save and undo.
 func (a *Assembly) Display(dme *dmenv.Dme) (*dmmap.Dmm, error) {
 	data := &dmmdata.DmmData{Filepath: filepath.Join(dme.RootDir, "assembled-ship-preview"), MaxX: a.MaxX, MaxY: a.MaxY, MaxZ: a.MaxZ, Dictionary: dmmdata.DataDictionary{}, Grid: dmmdata.DataGrid{}}
 	for y := 1; y <= a.MaxY; y++ {

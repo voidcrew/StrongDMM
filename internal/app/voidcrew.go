@@ -49,7 +49,7 @@ func (a *app) DoNewRuin() {
 	}
 }
 
-// Project directories may be dropped directly onto StrongDMM.exe.
+// Project directories may be dropped directly onto Voidworks.exe.
 func projectArgument(path string) string {
 	if info, err := os.Stat(path); err == nil && info.IsDir() {
 		return filepath.Join(path, "tgstation.dme")

@@ -15,8 +15,8 @@ import (
 )
 
 const updateExitCode = 85
-const requestEnvironment = "STRONGDMM_UPDATE_REQUEST"
-const cleanupEnvironment = "STRONGDMM_UPDATE_CLEANUP"
+const requestEnvironment = "VOIDWORKS_UPDATE_REQUEST"
+const cleanupEnvironment = "VOIDWORKS_UPDATE_CLEANUP"
 
 var updateScheduled bool
 
@@ -31,7 +31,7 @@ func CanRestartForUpdate() bool { return selfupdate.Supported() && os.Getenv(req
 // The child then disposes the graphics context and saves its profile normally.
 func ScheduleUpdate(staged selfupdate.Staged, args []string) error {
 	if !CanRestartForUpdate() {
-		return fmt.Errorf("restart StrongDMM.exe normally before applying updates")
+		return fmt.Errorf("restart Voidworks.exe normally before applying updates")
 	}
 	data, err := json.Marshal(updateRequest{Staged: staged, Args: args})
 	if err != nil {
@@ -56,7 +56,8 @@ func updateEnvironment(extra ...string) []string {
 	var result []string
 	for _, value := range os.Environ() {
 		name, _, _ := strings.Cut(value, "=")
-		if !strings.EqualFold(name, requestEnvironment) && !strings.EqualFold(name, cleanupEnvironment) {
+		if !strings.EqualFold(name, requestEnvironment) && !strings.EqualFold(name, cleanupEnvironment) &&
+			!strings.EqualFold(name, "STRONGDMM_UPDATE_REQUEST") && !strings.EqualFold(name, "STRONGDMM_UPDATE_CLEANUP") {
 			result = append(result, value)
 		}
 	}
@@ -93,7 +94,7 @@ func applyUpdateRequest(path, executable string, file *os.File) error {
 	if err != nil {
 		// Report the specific error before reopening the previous installation.
 		fmt.Fprintln(file, "Update failed:", err)
-		showError("Unable to apply the update.\n\n" + err.Error() + "\n\nStrongDMM will try to reopen the previous build.")
+		showError("Unable to apply the update.\n\n" + err.Error() + "\n\nVoidworks will try to reopen the previous build.")
 		return restartProcess(executable, request.Args, "")
 	}
 	return nil
@@ -119,8 +120,15 @@ func installAndRestart(request updateRequest, executable string, file *os.File) 
 	return err
 }
 
+func cleanupDirectory() string {
+	if folder := os.Getenv(cleanupEnvironment); folder != "" {
+		return folder
+	}
+	return os.Getenv("STRONGDMM_UPDATE_CLEANUP")
+}
+
 func cleanupUpdate(executable string) {
-	folder := os.Getenv(cleanupEnvironment)
+	folder := cleanupDirectory()
 	if folder == "" {
 		return
 	}

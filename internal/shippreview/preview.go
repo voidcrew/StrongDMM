@@ -68,7 +68,11 @@ func (c *Client) folder(root string) string {
 }
 
 func python() (string, []string, error) {
-	if configured := os.Getenv("STRONGDMM_PYTHON"); configured != "" {
+	configured := os.Getenv("VOIDWORKS_PYTHON")
+	if configured == "" {
+		configured = os.Getenv("STRONGDMM_PYTHON") // Existing local preview overrides.
+	}
+	if configured != "" {
 		path, err := exec.LookPath(configured)
 		return path, nil, err
 	}

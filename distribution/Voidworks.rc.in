@@ -11,11 +11,11 @@ BEGIN
         BLOCK "040904b0"
         BEGIN
             VALUE "CompanyName", "Voidcrew\0"
-            VALUE "FileDescription", "StrongDMM - Voidcrew\0"
+            VALUE "FileDescription", "Voidworks\0"
             VALUE "FileVersion", "@VERSION@\0"
-            VALUE "InternalName", "StrongDMM\0"
-            VALUE "OriginalFilename", "StrongDMM.exe\0"
-            VALUE "ProductName", "StrongDMM Voidcrew\0"
+            VALUE "InternalName", "Voidworks\0"
+            VALUE "OriginalFilename", "Voidworks.exe\0"
+            VALUE "ProductName", "Voidworks\0"
             VALUE "ProductVersion", "@VERSION@\0"
             VALUE "LegalCopyright", "SpaiR and StrongDMM contributors; Voidcrew fork contributors. GPL-3.0.\0"
         END
