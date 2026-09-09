@@ -57,7 +57,7 @@ func (ws *WsChangelog) showContent() {
 		w.SameLine(),
 		w.Group{
 			w.Custom(func() {
-				markdown.ShowHeader("StrongDMM Changelog", window.FontH3)
+				markdown.ShowHeader("Voidworks Changelog", window.FontH3)
 			}),
 			w.Separator(),
 			w.TextWrapped(rsc.ChangelogHeaderTxt),

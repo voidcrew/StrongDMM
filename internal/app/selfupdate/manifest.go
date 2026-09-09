@@ -14,8 +14,8 @@ import (
 	"sdmm/internal/env"
 )
 
-const releaseAPI = "https://api.github.com/repos/voidcrew/StrongDMM/releases/latest"
-const releaseDownloads = "https://github.com/voidcrew/StrongDMM/releases/download/"
+const releaseAPI = "https://api.github.com/repos/voidcrew/Voidworks/releases/latest"
+const releaseDownloads = "https://github.com/voidcrew/Voidworks/releases/download/"
 const maxDownload = 256 << 20
 
 type Release struct {
@@ -87,7 +87,7 @@ func Newer(candidate, current string) bool {
 	return next.beta == 0 || (previous.beta != 0 && next.beta > previous.beta)
 }
 
-func packageName(version string) string { return "StrongDMM-Voidcrew-" + version + "-windows-x64" }
+func packageName(version string) string { return "Voidworks-" + version + "-windows-x64" }
 
 func parseRelease(data []byte, current string) (Release, error) {
 	var source githubRelease
@@ -131,7 +131,7 @@ func parseChannelRelease(source githubRelease, current string, channel Channel) 
 			return Release{}, fmt.Errorf("release package has no valid SHA-256 digest")
 		}
 		if asset.URL != releaseDownloads+source.Tag+"/"+name {
-			return Release{}, fmt.Errorf("release package is outside voidcrew/StrongDMM")
+			return Release{}, fmt.Errorf("release package is outside voidcrew/Voidworks")
 		}
 		if asset.Size <= 0 || asset.Size > maxDownload {
 			return Release{}, fmt.Errorf("release package size is invalid")
@@ -167,7 +167,7 @@ func get(ctx context.Context, client *http.Client, url string) (*http.Response, 
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "StrongDMM-Voidcrew/"+env.Version)
+	req.Header.Set("User-Agent", "Voidworks/"+env.Version)
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("connect to GitHub: %w", err)

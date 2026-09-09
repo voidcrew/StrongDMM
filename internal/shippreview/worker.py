@@ -210,7 +210,7 @@ def generate(root, environment, folder, force=False):
         tool = shutil.which("dmm-tools")
         if tool:
             os.environ["DMM_TOOLS"] = tool
-    with tempfile.TemporaryDirectory(prefix=".strongdmm-previews-", dir=output.parent) as temp:
+    with tempfile.TemporaryDirectory(prefix=".voidworks-previews-", dir=output.parent) as temp:
         stage = Path(temp)
         settings["OUTPUT_DIR"] = stage
         settings["ENVIRONMENT"] = str(environment)

@@ -1,12 +1,12 @@
-STRONGDMM VOIDCREW SOURCE
+VOIDWORKS SOURCE
 
-Modified StrongDMM sources for 0.1.0 (2026-09-07).
+Voidworks, based on StrongDMM.
 Upstream commit: 5241698aeca9e83fd61048d835e9318d3610c16a
 Upstream repository: https://github.com/SpaiR/StrongDMM
 
 The changes add Voidcrew ship authoring, source-aware assembled editing,
 cross-file history and saves, registration generation and a ship checker.
-The fork has its own application profile and disables upstream self-updates.
+Voidworks uses its own profile and stable/beta release channels.
 GPL-3.0 terms are in LICENSE; existing source notices are retained.
 
 BUILD ON WINDOWS X64
@@ -42,4 +42,4 @@ This test requires a working OpenGL 3.3 desktop session. It creates a hidden
 window and temporary ship fixtures. Without that variable it is skipped.
 
 The Windows resource template and user instructions are under distribution/.
-The editor is dst/StrongDMM.exe; launch it directly to open a project.
+The editor is dst/Voidworks.exe; launch it directly to open a project.

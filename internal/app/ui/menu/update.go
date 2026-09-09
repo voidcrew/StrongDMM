@@ -57,7 +57,7 @@ func (m *Menu) showUpdateMenu() {
 		}
 		imgui.Separator()
 		if m.updateVersion != "" {
-			imgui.TextColored(style.Amber, "StrongDMM "+m.updateVersion)
+			imgui.TextColored(style.Amber, "Voidworks "+m.updateVersion)
 		}
 		if m.updateDescription != "" {
 			imgui.BeginChildV("release_notes", imgui.Vec2{X: width, Y: 125 * window.PointSize()}, false, 0)

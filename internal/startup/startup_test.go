@@ -13,7 +13,7 @@ import (
 func TestEditorProcessReporting(t *testing.T) {
 	for _, mode := range []string{"normal", "panic"} {
 		t.Run(mode, func(t *testing.T) {
-			t.Setenv("STRONGDMM_REPORT_TEST", mode)
+			t.Setenv("VOIDWORKS_REPORT_TEST", mode)
 			file, err := os.Create(filepath.Join(t.TempDir(), "session.log"))
 			if err != nil {
 				t.Fatal(err)
@@ -39,7 +39,7 @@ func TestEditorProcessReporting(t *testing.T) {
 }
 
 func TestReportChild(t *testing.T) {
-	mode := os.Getenv("STRONGDMM_REPORT_TEST")
+	mode := os.Getenv("VOIDWORKS_REPORT_TEST")
 	if mode == "" {
 		return
 	}

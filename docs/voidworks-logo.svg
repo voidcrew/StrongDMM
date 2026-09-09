@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-label="Voidworks">
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="#111f2b"/>
+  <polygon points="40,83 75,83 102,169 128,104 155,104 112,209 82,209" fill="#55d6be"/>
+  <polygon points="121,130 144,104 168,169 194,83 221,83 182,209 152,209" fill="#a7f3dd"/>
+  <polygon points="170,31 178,50 198,58 178,66 170,85 162,66 142,58 162,50" fill="#f0b86e"/>
+</svg>

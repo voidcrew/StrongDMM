@@ -1,21 +1,22 @@
-STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.14-beta.1 - Planet Workshop beta
+VOIDWORKS - WINDOWS X64
+Version: 0.5.15-beta.1 - Planet Workshop beta
 
 START
 1. Extract the whole ZIP into its own writable folder, beside your stable editor.
 2. Use a test branch or separate copy of your Voidcrew repository.
-3. Double-click StrongDMM.exe, click Open Project, and select tgstation.dme.
-   You can also drag a project folder, .dme, or .dmm onto StrongDMM.exe.
+3. Double-click Voidworks.exe, click Open Project, and select tgstation.dme.
+   You can also drag a project folder, .dme, or .dmm onto Voidworks.exe.
 4. Open Ship Workshop or New Ship from the project page or Voidcrew menu.
    Open Planet Workshop to edit an existing planet or create a new one.
-   Open Map and New Map use the normal StrongDMM editor.
+   Open Map and New Map use the normal Voidworks editor.
 
 The game repository and its icons/maps are required and are not included.
-No Go, Rust, BYOND or existing StrongDMM installation is needed to run the
+No Go, Rust, BYOND or existing editor installation is needed to run the
 editor. Compiling and playing the game still require the game's usual tools.
 This build needs 64-bit Windows and a graphics driver supporting OpenGL 3.3.
 
 UPDATES
+Voidworks checks for updates in the installed release channel.
 Use Help > Updates & Release Channel to check for updates or switch between
 Stable and Beta. Choose a channel, download it, then switch and restart. Beta
 includes features still being tested; returning to Stable is supported even
@@ -23,6 +24,9 @@ when its version number is lower. Each installation receives updates for its
 installed channel. Automatic checks and downloads can be changed in Preferences
 > Application. Keep the installation folder writable. Save prompts appear
 before restarting, and your project reopens after the update.
+
+Existing Voidcrew editor settings and backups are copied into the Voidworks
+profile on first launch. Old shortcuts continue to work after an automatic update.
 
 PLANET WORKSHOP
 Choose an existing planet or start a new planet, then edit its biomes and
@@ -52,7 +56,7 @@ SHIP WORKSHOP
    For a new ship, enter its name, pick a canvas size, and start building.
    File identifiers and the docking port are created automatically.
 2. Build: choose the Part to edit, then place pieces on the assembled map.
-   Use the normal StrongDMM tools for floors, walls, objects and utilities.
+   Use the normal Voidworks tools for floors, walls, objects and utilities.
    Use Grab (3) to select tiles, then choose Make an upgrade room or
    Make or assign an area. The selection carries into the action.
    Creating an area with a selection assigns it in the same undoable action.
@@ -89,7 +93,7 @@ the previous images and does not undo your ship save.
 Status and Retry previews appear in Ship Workshop. Help > Ship Purchase Previews
 also shows status, logs and Rebuild all previews. Use a full rebuild after
 changing icons or rendering code. Further saves queue another refresh.
-Preview tools are included in StrongDMM.exe. No Python, Pillow, or dmm-tools
+Preview tools are included in Voidworks.exe. No Python, Pillow, or dmm-tools
 installation is needed. The first preview extracts the tools into the editor's
 local profile; later previews reuse them. Your system Python setup is not used.
 
@@ -134,18 +138,18 @@ Include:
 - Steps, expected result, actual result, and a screenshot if useful.
 - Relevant .dmm/.dm/.ship.json diff and any checker report.
 - Latest editor log from:
-  %APPDATA%\StrongDMM-Voidcrew\logs
+  %APPDATA%\Voidworks\logs
   Review logs before sharing; they can contain local paths.
 
 IF IT CLOSES AT STARTUP
-StrongDMM.exe reports startup failures in a Windows dialog with the location
+Voidworks.exe reports startup failures in a Windows dialog with the location
 of a session log. That log captures the editor output and crash details.
 Logs are local and are never uploaded automatically. You can also open the
 log folder from Help > Open Logs Folder. Cancelling project selection returns
 you to the editor's project page.
 
 SOURCE AND LICENSE
-This is a modified StrongDMM build. Upstream: https://github.com/SpaiR/StrongDMM
+Voidworks is based on StrongDMM. Upstream: https://github.com/SpaiR/StrongDMM
 The license is in LICENSE. Matching source, dependency source/notices and
 build instructions are in Source.zip. Testers do not need to extract it.
 BUILD-INFO.json identifies this package; SHA256SUMS.txt lists file hashes.

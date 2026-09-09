@@ -18,7 +18,7 @@ import (
 	"sdmm/internal/env"
 )
 
-const updateTestEnvironment = "STRONGDMM_SUPERVISOR_UPDATE_TEST"
+const updateTestEnvironment = "VOIDWORKS_SUPERVISOR_UPDATE_TEST"
 
 // This helper runs the production supervisor/editor protocol from a copied,
 // running Windows executable. Its editor callback avoids creating an OpenGL UI.
@@ -52,7 +52,7 @@ func TestMain(m *testing.M) {
 				// Give the supervisor's cleanup worker time to remove the old image.
 				deadline := time.Now().Add(10 * time.Second)
 				for time.Now().Before(deadline) {
-					if _, err := os.Stat(filepath.Join(folder, ".strongdmm-update-fixture")); os.IsNotExist(err) {
+					if _, err := os.Stat(filepath.Join(folder, ".voidworks-update-fixture")); os.IsNotExist(err) {
 						return
 					}
 					time.Sleep(50 * time.Millisecond)
@@ -74,15 +74,17 @@ func TestWindowsUpdateAndRestart(t *testing.T) {
 		{"return to stable", "0.5.14-beta.1", "0.5.13"},
 		{"beta update", "0.5.14-beta.1", "0.5.14-beta.2"},
 	} {
-		t.Run(test.name, func(t *testing.T) { testWindowsUpdateAndRestart(t, test.current, test.target) })
+		for _, executable := range []string{"Voidworks.exe", "StrongDMM.exe"} {
+			t.Run(test.name+"/"+executable, func(t *testing.T) { testWindowsUpdateAndRestart(t, test.current, test.target, executable) })
+		}
 	}
 }
 
-func testWindowsUpdateAndRestart(t *testing.T, current, target string) {
+func testWindowsUpdateAndRestart(t *testing.T, current, target, executable string) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows supervisor")
 	}
-	folder := filepath.Join(t.TempDir(), "StrongDMM update & [test]")
+	folder := filepath.Join(t.TempDir(), "Voidworks update & [test]")
 	if err := os.Mkdir(folder, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -90,7 +92,7 @@ func testWindowsUpdateAndRestart(t *testing.T, current, target string) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	exe := filepath.Join(folder, "StrongDMM.exe")
+	exe := filepath.Join(folder, executable)
 	if err := os.WriteFile(exe, binary, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -98,7 +100,7 @@ func testWindowsUpdateAndRestart(t *testing.T, current, target string) {
 		t.Fatal(err)
 	}
 	files := map[string][]byte{
-		"StrongDMM.exe": binary, "shipcheck.exe": binary, "LICENSE": []byte("license"),
+		"Voidworks.exe": binary, "shipcheck.exe": binary, "LICENSE": []byte("license"),
 		"Source.zip": []byte("source"), "START-HERE.txt": []byte("instructions"), "BUILD-INFO.json": []byte(fmt.Sprintf(`{"version":%q}`, target)),
 	}
 	var checksums strings.Builder
@@ -109,7 +111,7 @@ func testWindowsUpdateAndRestart(t *testing.T, current, target string) {
 	var archive bytes.Buffer
 	writer := zip.NewWriter(&archive)
 	for name, data := range files {
-		entry, err := writer.CreateHeader(&zip.FileHeader{Name: "StrongDMM-Voidcrew-" + target + "-windows-x64/" + name, Method: zip.Store})
+		entry, err := writer.CreateHeader(&zip.FileHeader{Name: "Voidworks-" + target + "-windows-x64/" + name, Method: zip.Store})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -120,7 +122,7 @@ func testWindowsUpdateAndRestart(t *testing.T, current, target string) {
 	if err := writer.Close(); err != nil {
 		t.Fatal(err)
 	}
-	stageDir := filepath.Join(folder, ".strongdmm-update-fixture")
+	stageDir := filepath.Join(folder, ".voidworks-update-fixture")
 	if err := os.Mkdir(stageDir, 0700); err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +158,13 @@ func testWindowsUpdateAndRestart(t *testing.T, current, target string) {
 			}
 			// Wait until the replacement supervisor has released its image, too.
 			for time.Now().Before(deadline) {
-				if err := os.Remove(exe); err == nil {
+				canonicalErr := os.Remove(filepath.Join(folder, "Voidworks.exe"))
+				if canonicalErr == nil || os.IsNotExist(canonicalErr) {
+					if executable != "Voidworks.exe" {
+						if err := os.Remove(exe); err != nil {
+							t.Fatal(err)
+						}
+					}
 					return
 				}
 				time.Sleep(50 * time.Millisecond)

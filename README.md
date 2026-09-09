@@ -1,17 +1,17 @@
-# StrongDMM - Voidcrew &middot; [![GitHub release](https://img.shields.io/github/v/release/voidcrew/StrongDMM?label=StrongDMM%20Voidcrew)](https://github.com/voidcrew/StrongDMM/releases) [![Github All Releases](https://img.shields.io/github/downloads/voidcrew/StrongDMM/total.svg?logo=github)](https://github.com/voidcrew/StrongDMM/releases)
+# Voidworks &middot; [![GitHub release](https://img.shields.io/github/v/release/voidcrew/Voidworks?label=Voidworks)](https://github.com/voidcrew/Voidworks/releases) [![Github All Releases](https://img.shields.io/github/downloads/voidcrew/Voidworks/total.svg?logo=github)](https://github.com/voidcrew/Voidworks/releases)
 
-<p align="center"><b>Download StrongDMM Voidcrew</b></p>
+<p align="center"><b>Download Voidworks</b></p>
 <p align="center">
-  <a href="https://github.com/voidcrew/StrongDMM/releases">
+  <a href="https://github.com/voidcrew/Voidworks/releases">
     <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows download link"/>
   </a>
 </p>
 
 ---
 
-<img align="right" width="150" src="https://raw.githubusercontent.com/SpaiR/StrongDMM/master/docs/sdmm-logo.png" alt="StrongDMM Logo">
+<img align="right" width="150" src="docs/voidworks-logo.svg" alt="Voidworks logo">
 
-Voidcrew's maintained fork of [StrongDMM](https://github.com/SpaiR/StrongDMM), a map editor for BYOND.
+Voidworks is Voidcrew's mapping toolkit, based on [StrongDMM](https://github.com/SpaiR/StrongDMM), a map editor for BYOND.
 
 Open Voidcrew projects, browse maps, and access project tools from the Voidcrew menu. Ship Workshop adds assembled modular ship editing and new ship creation, with edits saved to the hull and module source files. The normal mapping tools, undo/redo, and visibility shortcuts remain available.
 
@@ -38,26 +38,26 @@ The editor offers a range of new features:
 
 ## How to Use
 
-Extract the Windows x64 ZIP and run **StrongDMM.exe**. Choose **Open Project** and select your Voidcrew checkout's `tgstation.dme`. The project page offers map browsing, Ship Workshop, and new ship creation; project tools also live in the **Voidcrew** menu. See `START-HERE.txt` for details.
+Extract the Windows x64 ZIP and run **Voidworks.exe**. Choose **Open Project** and select your Voidcrew checkout's `tgstation.dme`. The project page offers map browsing, Ship Workshop, and new ship creation; project tools also live in the **Voidcrew** menu. See `START-HERE.txt` for details. Use **Help → Updates & Release Channel** to switch between Stable and the Planet Workshop beta.
 
 **Download Links:**
 
-* [Windows](https://github.com/voidcrew/StrongDMM/releases)
+* [Windows](https://github.com/voidcrew/Voidworks/releases)
 
-[Release](https://github.com/voidcrew/StrongDMM/releases) page contains all distributed files. It also has `sha256` hashes info for every executable for validation purposes.
+[Release](https://github.com/voidcrew/Voidworks/releases) page contains all distributed files. It also has `sha256` hashes info for every executable for validation purposes.
 
 ### CLI Usage
 
-StrongDMM do support CLI to quickly open maps. Provide `.dme` or `.dmm` files as program arguments:
+Voidworks supports the command line to quickly open maps. Provide `.dme` or `.dmm` files as program arguments:
 
 ###### With DME
 ```
-strongdmm.exe path/to/environment.dme ./map1.dmm ../path/map2.dmm
+Voidworks.exe path/to/environment.dme ./map1.dmm ../path/map2.dmm
 ```
 
 ###### Without DME
 ```
-strongdmm.exe ./map1.dmm ../path/map2.dmm
+Voidworks.exe ./map1.dmm ../path/map2.dmm
 ```
 
 When providing `.dmm` files without `.dme`, a proper environment file will be found automatically.
@@ -69,7 +69,7 @@ StrongDMM was developed without any monetization in mind. The main motivation is
 Your support can demonstrate your appreciation and will motivate further development of the project.
 
 Additionally, if you have specific features in mind that you'd like implemented in the editor, we can focus on your needs.\
-Report Voidcrew editor bugs in [this fork's issues](https://github.com/voidcrew/StrongDMM/issues).
+Report Voidcrew editor bugs in [this fork's issues](https://github.com/voidcrew/Voidworks/issues).
 
 ## FAQ
 
@@ -77,16 +77,16 @@ Report Voidcrew editor bugs in [this fork's issues](https://github.com/voidcrew/
 **A.** Yes, it's a false positive reaction to the way Golang, the development language, creates binaries. Read more: [Golang FAQ](https://go.dev/doc/faq#virus)
 
 **Q.** How do I verify my executables?\
-**A.** Verify them using `sha256` hashes, available on the [releases page](https://github.com/voidcrew/StrongDMM/releases).
+**A.** Verify them using `sha256` hashes, available on the [releases page](https://github.com/voidcrew/Voidworks/releases).
 
 **Q.** But how can I trust executables on the release page?\
-**A.** Executables are built with the [CI pipeline](https://github.com/SpaiR/StrongDMM/actions/workflows/ci.yml). You can verify the process yourself or build the executables manually from the source code.
+**A.** Release ZIPs include the matching source, dependencies, and `BUILDING.txt` instructions so you can rebuild them.
 
 **Q.** How to uninstall the editor?\
-**A.** StrongDMM doesn't require installation, so no specific uninstallation process is needed. Simply delete the executable and, if desired, its directory on your OS to remove editor data.
+**A.** Voidworks doesn't require installation, so no specific uninstallation process is needed. Simply delete the executable and, if desired, its directory on your OS to remove editor data.
 
 **Q.** Where do I find editor data?\
-**A.** For Windows: `C:\Users\USER\AppData\Roaming\StrongDMM`, for Linux/macOS: `~/.strongdmm`.
+**A.** For Windows: `%APPDATA%\Voidworks`, for Linux/macOS: `~/.voidworks`. Existing Voidcrew editor settings and backups are copied on first launch; the original profile is preserved.
 
 **Q.** How to move the map?\
 **A.** Drag the map using the **middle mouse button**, or by holding the **space key**. Alternatively, you can use the **arrow keys**.
@@ -167,7 +167,7 @@ With Task installed:
         * **Windows:** `set RUSTUP_TOOLCHAIN=stable-x86_64-pc-windows-gnu && cargo build --release`
         * **Linux / macOS:** `cargo build --release`
 2. In the root directory:
-    * `go build .`: Builds the editor (executable named `sdmm.exe`/`sdmm` in the root).
+    * `go build -o Voidworks.exe .`: Builds the editor on Windows (use `-o Voidworks` on Linux/macOS).
     * `go run .`: Runs the editor.
 
 Step #1 is required only when the **sdmmparser** is modified.
@@ -181,9 +181,9 @@ avoiding compatibility issues and ensuring smooth integration.
 
 ## Credits
 
-StrongDMM uses [SpacemanDMM](https://github.com/SpaceManiac/SpacemanDMM) parser made
+Voidworks uses [SpacemanDMM](https://github.com/SpaceManiac/SpacemanDMM) parser made
 by [SpaceManiac](https://github.com/SpaceManiac). \
-The application icon is designed by [Clément "Topy"](https://github.com/clement-or).
+The original StrongDMM icon was designed by [ClÃ©ment "Topy"](https://github.com/clement-or).
 
 ## License
 

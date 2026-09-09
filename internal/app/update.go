@@ -160,7 +160,7 @@ func (a *app) restartForUpdate() {
 		return
 	}
 	if !startup.CanRestartForUpdate() {
-		a.menu.SetRestartError("Restart StrongDMM.exe normally before applying updates.")
+		a.menu.SetRestartError("Restart Voidworks.exe normally before applying updates.")
 		return
 	}
 	a.updates.restartRequested = true

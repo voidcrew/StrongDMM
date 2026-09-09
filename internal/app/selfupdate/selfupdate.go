@@ -16,12 +16,12 @@ import (
 	"strings"
 )
 
-const stagePrefix = ".strongdmm-update-"
+const stagePrefix = ".voidworks-update-"
 const maxExpanded = 512 << 20
 
 // The editor goes last, so failed companion-file replacements never install a
 // new executable. User projects and profile data are outside this allowlist.
-var packageFiles = []string{"LICENSE", "START-HERE.txt", "BUILD-INFO.json", "Source.zip", "SHA256SUMS.txt", "shipcheck.exe", "StrongDMM.exe"}
+var packageFiles = []string{"LICENSE", "START-HERE.txt", "BUILD-INFO.json", "Source.zip", "SHA256SUMS.txt", "shipcheck.exe", "Voidworks.exe"}
 
 type Staged struct {
 	Directory string
@@ -40,8 +40,8 @@ func regularFile(path string) error {
 }
 
 func installDirectory(executable string) (string, error) {
-	if !strings.EqualFold(filepath.Base(executable), "StrongDMM.exe") {
-		return "", fmt.Errorf("run StrongDMM.exe from an extracted Windows package to update")
+	if !strings.EqualFold(filepath.Base(executable), "Voidworks.exe") {
+		return "", fmt.Errorf("run Voidworks.exe from an extracted Windows package to update")
 	}
 	if err := regularFile(executable); err != nil {
 		return "", err
@@ -62,7 +62,7 @@ func stage(ctx context.Context, client *http.Client, release Release, executable
 	}
 	folder, err := os.MkdirTemp(dir, stagePrefix)
 	if err != nil {
-		return nil, fmt.Errorf("the installation folder must be writable; extract StrongDMM to a folder you own: %w", err)
+		return nil, fmt.Errorf("the installation folder must be writable; extract Voidworks to a folder you own: %w", err)
 	}
 	defer func() {
 		if err != nil {
@@ -238,7 +238,7 @@ func verifyContents(folder, version string) error {
 	if err := json.Unmarshal(data, &build); err != nil || build.Version != version {
 		return fmt.Errorf("package version does not match the release")
 	}
-	for _, name := range []string{"StrongDMM.exe", "shipcheck.exe"} {
+	for _, name := range []string{"Voidworks.exe", "shipcheck.exe"} {
 		binary, err := pe.Open(filepath.Join(folder, name))
 		if err != nil {
 			return fmt.Errorf("invalid Windows executable %s: %w", name, err)
@@ -269,7 +269,9 @@ func validateStage(folder, executable string) error {
 	if err != nil {
 		return err
 	}
-	if !strings.EqualFold(filepath.Dir(resolved), dir) || !strings.HasPrefix(filepath.Base(resolved), stagePrefix) {
+	// The bridge release is staged by older installed StrongDMM supervisors.
+	name := filepath.Base(resolved)
+	if !strings.EqualFold(filepath.Dir(resolved), dir) || (!strings.HasPrefix(name, stagePrefix) && !strings.HasPrefix(name, ".strongdmm-update-")) {
 		return fmt.Errorf("update staging folder is outside the installation")
 	}
 	return nil
