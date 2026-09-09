@@ -40,6 +40,8 @@ The editor offers a range of new features:
 
 Extract the Windows x64 ZIP and run **Voidworks.exe**. Choose **Open Project** and select your Voidcrew checkout's `tgstation.dme`. The project page offers map browsing, Ship Workshop, and new ship creation; project tools also live in the **Voidcrew** menu. See `START-HERE.txt` for details. Use **Help → Updates & Release Channel** to switch between Stable and the Planet Workshop beta.
 
+Older StrongDMM builds need one manual download after the repository rename. Run **Voidworks.exe**; future updates use the Voidworks release channels.
+
 **Download Links:**
 
 * [Windows](https://github.com/voidcrew/Voidworks/releases)
@@ -183,7 +185,7 @@ avoiding compatibility issues and ensuring smooth integration.
 
 Voidworks uses [SpacemanDMM](https://github.com/SpaceManiac/SpacemanDMM) parser made
 by [SpaceManiac](https://github.com/SpaceManiac). \
-The original StrongDMM icon was designed by [ClÃ©ment "Topy"](https://github.com/clement-or).
+The original StrongDMM icon was designed by [Clément "Topy"](https://github.com/clement-or).
 
 ## License
 
