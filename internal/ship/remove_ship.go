@@ -58,13 +58,20 @@ func (c *Catalog) Removal(dme *dmenv.Dme, h Hull, draft bool) (*RemovalPlan, err
 		}
 		// Unsaved edits may have removed a theme or module from the live hull.
 		// Include the on-disk layout so its previously saved maps are removed too.
-		if data, err := os.ReadFile(filepath.Join(c.Root, "voidcrew/mapping/ship_projects", id+".ship.json")); err == nil {
+		fileID := id
+		if _, data, err := readShipProject(c, other); err == nil {
 			var settings Settings
 			if err := json.Unmarshal(data, &settings); err != nil {
 				return nil, err
 			}
 			if settings.Hull.Type != other.Type {
 				return nil, fmt.Errorf("ship metadata does not match %s", other.Type)
+			}
+			if settings.FileID != "" {
+				if err := ValidID(settings.FileID); err != nil {
+					return nil, err
+				}
+				fileID = settings.FileID
 			}
 			files, err := c.removalMapPaths(settings.Hull)
 			if err != nil {
@@ -75,11 +82,11 @@ func (c *Catalog) Removal(dme *dmenv.Dme, h Hull, draft bool) (*RemovalPlan, err
 			return nil, err
 		}
 		for _, suffix := range []string{".ship.json", ".areas.json", ".crew.json"} {
-			spec.Metadata = append(spec.Metadata, filepath.Join(c.Root, "voidcrew/mapping/ship_projects", id+suffix))
+			spec.Metadata = append(spec.Metadata, filepath.Join(c.Root, "voidcrew/mapping/ship_projects", fileID+suffix))
 		}
 		shipPath := strings.TrimPrefix(other.Type, HullType+"/")
 		spec.Helpers = append(spec.Helpers, "/area/shuttle/voidcrew/"+shipPath, "/obj/docking_port/mobile/voidcrew/"+shipPath)
-		if data, err := os.ReadFile(filepath.Join(c.Root, "voidcrew/mapping/ship_projects", id+".crew.json")); err == nil {
+		if data, err := os.ReadFile(filepath.Join(c.Root, "voidcrew/mapping/ship_projects", fileID+".crew.json")); err == nil {
 			var crew CrewConfig
 			if err := json.Unmarshal(data, &crew); err != nil {
 				return nil, err

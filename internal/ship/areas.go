@@ -25,7 +25,7 @@ type areaSettings struct {
 }
 
 func (p *Project) areaPaths() (string, string, error) {
-	id := strings.ReplaceAll(strings.TrimPrefix(p.Hull.Type, HullType+"/"), "/", "__")
+	id := p.fileID()
 	if err := ValidID(id); err != nil {
 		return "", "", err
 	}
@@ -287,12 +287,12 @@ func renderRoomAreas(areas []RoomArea) []byte {
 }
 
 func (p *Project) areaChanges(changes []FileChange) ([]FileChange, error) {
-	if bytes.Equal(p.areaBytes(), p.savedAreas) {
-		return changes, nil
-	}
 	meta, code, err := p.areaPaths()
 	if err != nil {
 		return nil, err
+	}
+	if bytes.Equal(p.areaBytes(), p.savedAreas) && (len(p.RoomAreas) == 0 || p.files[meta].Existed) {
+		return changes, nil
 	}
 	if err = p.checkGenerated(code); err != nil {
 		return nil, err

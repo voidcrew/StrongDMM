@@ -78,7 +78,7 @@ func (p *Project) crewScope(id string) (CrewScope, error) {
 	return CrewScope{}, fmt.Errorf("crew scope no longer exists")
 }
 func (p *Project) crewPaths() (string, string) {
-	id, _ := p.roomID()
+	id := p.fileID()
 	meta, _ := Inside(p.Catalog.Root, "voidcrew/mapping/ship_projects/"+id+".crew.json")
 	code, _ := Inside(p.Catalog.Root, "voidcrew/mapping/ship_crew/"+id+".dm")
 	return meta, code

@@ -325,7 +325,7 @@ func (ws *WsShip) buildControls() {
 	}
 	space()
 	heading("CONFIGURATION")
-	if workshop.Row("open-costs", "Part costs", "Hull, variants & room options", ">", false, style.Amber, 0) {
+	if workshop.Row("open-costs", "Ship & upgrade prices", "Base ship, variants & room options", ">", false, style.Amber, 0) {
 		ws.beginCosts("ship")
 	}
 	if workshop.DangerButton("Remove ship...") {

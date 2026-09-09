@@ -78,7 +78,7 @@ func New(app App, busy ...func(string) bool) *WsShip {
 }
 func (ws *WsShip) Name() string {
 	prefix := ""
-	dirty := ws.app.CommandStorage().IsModified(ws.CommandStackId()) || (ws.task == taskCrew && ws.crew.dirty) || (ws.task == taskCosts && ws.costs.dirty) || ws.renamePending()
+	dirty := ws.app.CommandStorage().IsModified(ws.CommandStackId()) || (ws.task == taskCrew && ws.crew.dirty) || (ws.task == taskCosts && ws.costs.dirty) || ws.renamePending() || ws.settingsPending()
 	for _, project := range ws.projects {
 		for _, d := range project.Documents {
 			if d.Active && !d.Existed {
@@ -105,7 +105,7 @@ func (ws *WsShip) Map() *pmap.PaneMap {
 }
 func (ws *WsShip) CommandStackId() string { return "ship:" + ws.Id() }
 func (ws *WsShip) IsModified() bool {
-	if ws.renamePending() {
+	if ws.renamePending() || ws.settingsPending() {
 		return true
 	}
 	if ws.task == taskCrew && ws.crew.dirty {

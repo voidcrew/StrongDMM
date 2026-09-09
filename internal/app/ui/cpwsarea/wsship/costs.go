@@ -27,7 +27,7 @@ type costEditor struct {
 }
 
 func (ws *WsShip) commitDraft() bool {
-	return ws.commitCrew() && ws.commitCosts() && ws.commitRename()
+	return ws.commitCrew() && ws.commitCosts() && ws.commitRename() && ws.commitSettings()
 }
 
 func (ws *WsShip) beginCosts(scope string) {
@@ -177,7 +177,9 @@ func (ws *WsShip) costsContent() {
 	entry := c.entries[c.selected]
 	workshop.Section(strings.ToUpper(entry.scope.Kind), style.Amber)
 	title(entry.scope.Name)
-	if entry.scope.Default {
+	if entry.scope.ID == "ship" {
+		hint("Set the price to unlock this base ship.")
+	} else if entry.scope.Default {
 		hint("Base hulls and default components normally stay free.")
 	} else {
 		hint("Alternative variants and room options normally have an unlock cost.")

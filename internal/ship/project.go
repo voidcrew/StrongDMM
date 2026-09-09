@@ -37,6 +37,7 @@ type Settings struct {
 	Crew            int
 	Hidden          bool
 	Cost            int
+	FileID          string               `json:",omitempty"`
 	PartCosts       map[string]PartCosts `json:",omitempty"`
 	PortDirection   int
 }
@@ -65,6 +66,8 @@ type Project struct {
 	costOriginal        map[string]costSource
 	costSources         map[string][]byte
 	costEdited          map[string]bool
+	renamedMaps         map[string]bool
+	renamedSources      map[string]bool
 }
 
 var identifier = regexp.MustCompile(`^[a-z][a-z0-9_]{0,47}$`)
@@ -101,8 +104,7 @@ func (d *Document) Modified() bool {
 
 func OpenProject(c *Catalog, dme *dmenv.Dme, h Hull) (*Project, error) {
 	p := &Project{Catalog: c, Dme: dme, Hull: h, Documents: map[string]*Document{}, files: map[string]FileChange{}}
-	path, _ := Inside(c.Root, "voidcrew/mapping/ship_projects/"+strings.TrimPrefix(h.Type, HullType+"/")+".ship.json")
-	data, err := os.ReadFile(path)
+	path, data, err := readShipProject(c, h)
 	if err == nil {
 		var s Settings
 		if err = json.Unmarshal(data, &s); err != nil {
@@ -113,6 +115,11 @@ func OpenProject(c *Catalog, dme *dmenv.Dme, h Hull) (*Project, error) {
 		}
 		if err := ValidID(s.ID); err != nil {
 			return nil, err
+		}
+		if s.FileID != "" {
+			if err := ValidID(s.FileID); err != nil {
+				return nil, err
+			}
 		}
 		if s.Hull.Type != HullType+"/"+s.ID {
 			return nil, fmt.Errorf("project ID does not match its template")
@@ -218,8 +225,10 @@ func (p *Project) moduleFile(m Module, theme string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if theme == "" && p.Documents[base] != nil && p.Documents[base].Active {
-		return base, nil
+	if p.Documents[base] != nil && p.Documents[base].Active {
+		if _, err := os.Stat(themed); theme == "" || os.IsNotExist(err) {
+			return base, nil
+		}
 	}
 	return p.Catalog.ModuleFile(m, theme)
 }
@@ -424,6 +433,9 @@ func (p *Project) settingsBytes() []byte {
 	return append(b, '\n')
 }
 func (p *Project) Modified() bool {
+	if p.hasMapRenames() {
+		return true
+	}
 	if p.registrationUpgrade {
 		return true
 	}
@@ -453,7 +465,7 @@ func (p *Project) outputPaths() []string {
 	if p.Settings == nil {
 		return nil
 	}
-	id := p.Settings.ID
+	id := p.fileID()
 	result := []string{}
 	for _, rel := range []string{"voidcrew/mapping/ship_projects/" + id + ".ship.json", "voidcrew/mapping/shuttles/" + id + ".dm", "voidcrew/modules/ship_upgrades/ships/" + id + ".dm"} {
 		file, _ := Inside(p.Catalog.Root, rel)
@@ -472,7 +484,14 @@ func (p *Project) track(path string) error {
 
 func (p *Project) Changes() ([]FileChange, error) {
 	var changes []FileChange
+	referenced := p.referencedMaps()
 	for path, d := range p.Documents {
+		if p.renamedMaps[path] && !referenced[path] {
+			if d.Existed {
+				changes = append(changes, FileChange{Path: path, Before: d.Before, Existed: true, Delete: true})
+			}
+			continue
+		}
 		if !d.Modified() {
 			continue
 		}
@@ -542,6 +561,10 @@ func (p *Project) Changes() ([]FileChange, error) {
 	if err != nil {
 		return nil, err
 	}
+	changes, err = p.sourceRenameChanges(changes)
+	if err != nil {
+		return nil, err
+	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Path < changes[j].Path })
 	return changes, nil
 }
@@ -552,6 +575,10 @@ func (p *Project) Save() error {
 func (p *Project) accept(changes []FileChange) error {
 	for _, c := range changes {
 		if d := p.Documents[c.Path]; d != nil {
+			if c.Delete {
+				d.Before, d.Existed, d.Active = nil, false, false
+				continue
+			}
 			d.Before = c.After
 			d.Existed = true
 			var err error
@@ -565,7 +592,8 @@ func (p *Project) accept(changes []FileChange) error {
 				p.expectGenerated(c.Path, c.After)
 			}
 			c.Before = c.After
-			c.Existed = true
+			c.Existed = !c.Delete
+			c.Delete = false
 			c.After = nil
 			p.files[c.Path] = c
 		}
@@ -587,6 +615,7 @@ func SaveProjects(projects []*Project) error {
 	}
 	root := projects[0].Catalog.Root
 	files := map[string]FileChange{}
+	removedIncludes := map[string]map[string]bool{}
 	for _, p := range projects {
 		if p.Catalog.Root != root {
 			return fmt.Errorf("save projects from one environment at a time")
@@ -596,6 +625,21 @@ func SaveProjects(projects []*Project) error {
 			return err
 		}
 		for _, c := range changes {
+			if c.Path == p.Dme.RootFile {
+				if removedIncludes[c.Path] == nil {
+					removedIncludes[c.Path] = map[string]bool{}
+				}
+				after := map[string]bool{}
+				for _, line := range strings.Split(string(c.After), "\n") {
+					after[strings.TrimSpace(line)] = true
+				}
+				for _, line := range strings.Split(string(c.Before), "\n") {
+					line = strings.TrimSpace(line)
+					if strings.HasPrefix(line, "#include ") && !after[line] {
+						removedIncludes[c.Path][line] = true
+					}
+				}
+			}
 			if prior, ok := files[c.Path]; ok {
 				if c.Path != p.Dme.RootFile || !bytes.Equal(c.Before, prior.Before) {
 					return fmt.Errorf("conflicting save destination %s", c.Path)
@@ -626,6 +670,15 @@ func SaveProjects(projects []*Project) error {
 	}
 	changes := []FileChange{}
 	for _, c := range files {
+		if removed := removedIncludes[c.Path]; len(removed) > 0 {
+			var lines []string
+			for _, line := range strings.SplitAfter(string(c.After), "\n") {
+				if !removed[strings.TrimSpace(line)] {
+					lines = append(lines, line)
+				}
+			}
+			c.After = []byte(strings.Join(lines, ""))
+		}
 		changes = append(changes, c)
 	}
 	sort.Slice(changes, func(i, j int) bool { return changes[i].Path < changes[j].Path })
