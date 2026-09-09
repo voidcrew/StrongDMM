@@ -1,12 +1,13 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.11
+Version: 0.5.12-beta.1 - Planet Workshop beta
 
 START
-1. Extract the whole ZIP into a writable folder.
+1. Extract the whole ZIP into its own writable folder, beside your stable editor.
 2. Use a test branch or separate copy of your Voidcrew repository.
 3. Double-click StrongDMM.exe, click Open Project, and select tgstation.dme.
    You can also drag a project folder, .dme, or .dmm onto StrongDMM.exe.
 4. Open Ship Workshop or New Ship from the project page or Voidcrew menu.
+   Open Planet Workshop to edit an existing planet or create a new one.
    Open Map and New Map use the normal StrongDMM editor.
 
 The game repository and its icons/maps are required and are not included.
@@ -15,12 +16,20 @@ editor. Compiling and playing the game still require the game's usual tools.
 This build needs 64-bit Windows and a graphics driver supporting OpenGL 3.3.
 
 UPDATES
-StrongDMM checks for new Voidcrew releases and downloads verified updates in
-the background. Choose Update & restart when ready; unsaved work prompts you
-to save, discard, or cancel. Your project reopens after the update.
-Use Help > Check for Updates at any time. Automatic checks and downloads can
-be changed in Preferences > Application. Keep the installation folder writable.
-Builds before 0.5.2 need this ZIP downloaded and extracted once.
+This beta is a separate manual download. Stable installations will not update
+to it. Beta builds do not receive automatic updates; download later betas or
+the stable release yourself. Your stable editor can stay in its own folder.
+
+PLANET WORKSHOP
+Choose an existing planet or start a new planet, then edit its biomes and
+contents. Click a turf, feature, plant or mob in the preview to edit its group.
+Biomes can be deleted, and unsaved changes can be discarded. Planet settings
+contains terrain, rivers, environment and ruins where the game supports them.
+Ruin Workshop also offers View on planet for compatible planet ruins.
+Advanced river, environment and ruin controls require a compatible game
+codebase with declarative planet settings. The game changes are not included.
+The seeded preview is an editing aid; runtime generation and gameplay can
+differ. Save into a testing checkout and compile/playtest before using changes.
 
 MAP PREVIEW
 Open any map and click Preview beside the mapping tools. The separate tab

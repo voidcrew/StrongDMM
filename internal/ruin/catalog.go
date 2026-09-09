@@ -71,8 +71,19 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 	planetAreas := map[string]string{}
 	for path, obj := range dme.Objects {
 		if strings.HasPrefix(path, "/datum/overmap/planet/") {
-			if trait := obj.Vars.ValueV("ruin_type", "null"); trait != "null" {
-				planetAreas[trait] = obj.Vars.ValueV("surface_area", "")
+			trait, area := obj.Vars.ValueV("ruin_type", "null"), obj.Vars.ValueV("surface_area", "")
+			if definition := dme.Objects[obj.Vars.ValueV("planet_template", "null")]; definition != nil && definition.Vars.IntV("definition_version", 0) == 1 {
+				if ruins := dme.Objects[definition.Vars.ValueV("ruin_settings", "null")]; ruins != nil {
+					trait = ruins.Vars.ValueV("theme", "null")
+				}
+				if environment := dme.Objects[definition.Vars.ValueV("environment", "null")]; environment != nil {
+					area = environment.Vars.ValueV("area_type", "")
+				}
+			}
+			if trait != "null" && area != "" && area != "null" {
+				if previous, exists := planetAreas[trait]; !exists || area < previous {
+					planetAreas[trait] = area
+				}
 			}
 		}
 	}
@@ -92,7 +103,7 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 		}
 		key := strings.TrimPrefix(path, Type+"/")
 		outdoor := obj.Vars.ValueV("default_area", "")
-		if len(planetAreas) > 0 {
+		if len(planetAreas) > 0 && key != "space" {
 			var ok bool
 			outdoor, ok = planetAreas[obj.Vars.ValueV("ruin_type", "null")]
 			if !ok {

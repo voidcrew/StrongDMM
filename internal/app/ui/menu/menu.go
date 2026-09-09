@@ -25,6 +25,8 @@ type app interface {
 	DoOpenShipWorkspace()
 	DoNewShip()
 	DoOpenRuinWorkspace()
+	DoOpenPlanetWorkspace()
+	HasPlanetProject() bool
 	DoNewRuin()
 	DoOpenProject()
 	DoOpen()
@@ -184,6 +186,7 @@ func (m *Menu) Process() {
 			w.MenuItem("Open Project...", m.app.DoOpenProject).Icon(icon.FolderOpen),
 			w.Separator(),
 			w.MenuItem("Ship Workshop", m.app.DoOpenShipWorkspace).IconEmpty().Enabled(m.app.HasVoidcrewProject()),
+			w.MenuItem("Planet Workshop", m.app.DoOpenPlanetWorkspace).IconEmpty().Enabled(m.app.HasPlanetProject()),
 			w.MenuItem("New Ship...", m.app.DoNewShip).IconEmpty().Enabled(m.app.HasVoidcrewProject()),
 			w.Separator(),
 			w.MenuItem("Ruin Workshop", m.app.DoOpenRuinWorkspace).IconEmpty().Enabled(m.app.HasRuinProject()),

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidatePattern('^\d+\.\d+\.\d+$')][string]$Version = '0.5.11',
+    [ValidatePattern('^\d+\.\d+\.\d+(-[0-9A-Za-z]+([.-][0-9A-Za-z]+)*)?$')][string]$Version = '0.5.12-beta.1',
     [string]$Revision = 'source',
     [switch]$Test
 )
@@ -42,7 +42,8 @@ try {
     $sharedFlags = "-s -w -X sdmm/internal/env.Version=$Version -X sdmm/internal/env.Revision=$Revision -extldflags=-static"
     [void][System.IO.Directory]::CreateDirectory((Join-Path $PSScriptRoot 'dst'))
     $resourceText = [System.IO.File]::ReadAllText((Join-Path $PSScriptRoot 'distribution/StrongDMM.rc.in'))
-    $resourceText = $resourceText.Replace('@VERSION@', $Version).Replace('@VERSION_NUMBERS@', (($Version -split '\.') -join ',') + ',0')
+    $resourceVersion = ($Version -split '-', 2)[0]
+    $resourceText = $resourceText.Replace('@VERSION@', $Version).Replace('@VERSION_NUMBERS@', (($resourceVersion -split '\.') -join ',') + ',0')
     [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'dst/version.rc'), $resourceText)
     & windres -i dst/version.rc -o resource_windows_amd64.syso -O coff --target=pe-x86-64
     if ($LASTEXITCODE -ne 0) { throw 'Windows resource build failed.' }

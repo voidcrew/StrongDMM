@@ -29,6 +29,20 @@ func initialMap(source *dmmap.Dmm, dme *dmenv.Dme, notes map[string]bool) *dmmap
 		var instances dmmap.Instances
 		for _, instance := range tile.Instances() {
 			p := instance.Prefab()
+			if dm.IsPath(p.Path(), "/area/overmap_encounter/planetoid") && !dm.IsPath(p.Path(), "/area/overmap_encounter/planetoid/cave") {
+				if definition := dme.Objects[p.Vars().ValueV("planet_type", "null")]; definition != nil && definition.Vars.IntV("definition_version", 0) == 1 {
+					if environment := dme.Objects[definition.Vars.ValueV("environment", "null")]; environment != nil {
+						fields := map[string]string{"static_lighting": "0", "ambient_lighting": "1", "base_lighting_color": environment.Vars.ValueV("light_color", `"#FFFFFF"`), "base_lighting_alpha": environment.Vars.ValueV("light_alpha", "255")}
+						// A Planet Workshop preview already supplies its live draft's
+						// area overrides. Keep those over the saved definition.
+						for _, field := range p.Vars().Iterate() {
+							delete(fields, field)
+						}
+						p = withVars(p, fields)
+						instance.SetPrefab(p)
+					}
+				}
+			}
 			if covered && (dm.IsPath(p.Path(), "/obj/structure/cable") ||
 				(dm.IsPath(p.Path(), "/obj/machinery/atmospherics/pipe") && p.Vars().IntV("hide", 0) != 0)) {
 				continue

@@ -9,11 +9,14 @@ import (
 	"github.com/SpaiR/imgui-go"
 	"sdmm/internal/app/ui/cpwsarea/workspace"
 	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
+	"sdmm/internal/app/ui/cpwsarea/wspreview"
 	"sdmm/internal/app/ui/dialog"
 	"sdmm/internal/app/ui/workshop"
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmenv"
+	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/imguiext/style"
+	"sdmm/internal/planet"
 	"sdmm/internal/ruin"
 )
 
@@ -61,6 +64,17 @@ type WsRuin struct {
 	customID                                  bool
 	SourceBusy                                func(string) bool
 	removalBackup                             string
+	LiveMap                                   func(string) *dmmap.Dmm
+	PlanetDrafts                              func() []planet.State
+	planetCatalog                             *planet.Catalog
+	planetPreview                             *wspreview.Preview
+	viewOnPlanet, planetRefresh, planetCaves  bool
+	planetPath                                string
+	planetSeeds                               *planet.Seeds
+	planetLevel                               int
+	planetLevels                              int
+	planetHosts                               []planet.State
+	planetTraits                              map[string]bool
 }
 
 func New(app App) *WsRuin {
@@ -73,6 +87,15 @@ func (ws *WsRuin) refresh() {
 	ws.catalog, err = ruin.Discover(ws.app.LoadedEnvironment())
 	if err != nil {
 		ws.message = err.Error()
+	}
+	ws.planetTraits = map[string]bool{}
+	ws.planetCatalog, _ = planet.Discover(ws.app.LoadedEnvironment())
+	if ws.catalog != nil {
+		for path, obj := range ws.catalog.Dme.Objects {
+			if strings.HasPrefix(path, "/datum/overmap/planet/") && obj.Vars.ValueV("planet_template", "null") != "null" {
+				ws.planetTraits[obj.Vars.ValueV("ruin_type", "null")] = true
+			}
+		}
 	}
 }
 func (ws *WsRuin) Name() string {
@@ -87,6 +110,12 @@ func (ws *WsRuin) IsModified() bool { return ws.form != ws.initial || ws.creatin
 func (ws *WsRuin) OnFocusChange(focused bool) {
 	if focused {
 		tools.SetEnabled(false)
+		ws.planetRefresh = true
+	}
+}
+func (ws *WsRuin) Dispose() {
+	if ws.planetPreview != nil {
+		ws.planetPreview.Dispose()
 	}
 }
 
@@ -109,6 +138,7 @@ func (ws *WsRuin) BeginNewRuin() {
 			return
 		}
 		ws.selected = nil
+		ws.viewOnPlanet = false
 		ws.project = nil
 		ws.creating = true
 		ws.step = 0
@@ -185,6 +215,7 @@ func (ws *WsRuin) selectRuin(t ruin.Template) {
 	ws.navigate(func() {
 		ws.creating = false
 		ws.selected = &t
+		ws.viewOnPlanet = false
 		ws.message = ""
 		ws.form = form{}
 		ws.initial = ws.form
@@ -287,6 +318,8 @@ func (ws *WsRuin) Process() {
 	workshop.Panel("ruin-details", imgui.Vec2{}, false)
 	if ws.creating {
 		ws.wizard()
+	} else if ws.viewOnPlanet && ws.selected != nil {
+		ws.planetView()
 	} else if ws.selected != nil {
 		ws.details()
 	} else {
@@ -581,6 +614,9 @@ func (ws *WsRuin) details() {
 	imgui.BeginDisabledV(ws.selected.Problem != "")
 	if button("Open map for editing") {
 		ws.app.DoLoadResource(ws.selected.File)
+	}
+	if ws.hasPlanetDestination() && button("View on planet") {
+		ws.beginPlanetView()
 	}
 	imgui.EndDisabled()
 	if ws.selected.Problem == "" && imgui.CollapsingHeader("Areas for this ruin") {

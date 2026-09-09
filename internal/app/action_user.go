@@ -102,6 +102,15 @@ func (a *app) DoOpenShipWorkspace() {
 	}
 }
 
+func (a *app) DoOpenPlanetWorkspace() {
+	if a.HasPlanetProject() {
+		a.layout.WsArea.OpenPlanet()
+	}
+}
+func (a *app) HasPlanetProject() bool {
+	return a.loadedEnvironment != nil && a.loadedEnvironment.Objects["/datum/map_generator/planet_generator"] != nil
+}
+
 // DoClearRecentMaps clears recently opened maps.
 func (a *app) DoClearRecentMaps() {
 	log.Print("clear recent maps")

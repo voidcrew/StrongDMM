@@ -95,7 +95,7 @@ func buildLighting(source *dmmap.Dmm, powered, exterior bool) (*Lighting, int) {
 			prefab := instance.Prefab()
 			v := prefab.Vars()
 			if dm.IsPath(prefab.Path(), "/area") {
-				lightmap.Fullbright[index] = v.IntV("static_lighting", v.IntV("dynamic_lighting", 1)) == 0
+				lightmap.Fullbright[index] = v.IntV("static_lighting", v.IntV("dynamic_lighting", 1)) == 0 && v.IntV("ambient_lighting", 0) == 0
 				color := colorRGB(v.TextV("base_lighting_color", "#ffffff"))
 				alpha := v.FloatV("base_lighting_alpha", 0) / 255
 				for c := range color {

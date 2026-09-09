@@ -28,6 +28,8 @@ type App interface {
 	DoOpenShipWorkspace()
 	DoNewShip()
 	DoOpenRuinWorkspace()
+	DoOpenPlanetWorkspace()
+	HasPlanetProject() bool
 	DoNewRuin()
 	HasRuinProject() bool
 	DoNewMap()
@@ -147,9 +149,14 @@ func (ws *WsEmpty) showContent() {
 			},
 		)
 	} else {
-		if ws.app.HasVoidcrewProject() || ws.app.HasRuinProject() {
+		if ws.app.HasVoidcrewProject() || ws.app.HasRuinProject() || ws.app.HasPlanetProject() {
 			workshop.PushStyle()
 			workshop.Banner("Voidcrew", "Project workspace", style.Teal)
+			if ws.app.HasPlanetProject() {
+				if workshop.Row("planets", "Planet Workshop", "Live terrain, biomes & wildlife", ">", false, style.Teal, 0) {
+					ws.app.DoOpenPlanetWorkspace()
+				}
+			}
 			available := imgui.ContentRegionAvail().X
 			both := ws.app.HasVoidcrewProject() && ws.app.HasRuinProject()
 			sideBySide := both && available >= 640*window.PointSize()

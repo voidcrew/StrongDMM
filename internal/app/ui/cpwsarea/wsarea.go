@@ -10,11 +10,13 @@ import (
 	"sdmm/internal/app/ui/cpwsarea/wscreatemap"
 	"sdmm/internal/app/ui/cpwsarea/wsempty"
 	"sdmm/internal/app/ui/cpwsarea/wsmap"
+	"sdmm/internal/app/ui/cpwsarea/wsplanet"
 	"sdmm/internal/app/ui/cpwsarea/wsprefs"
 	"sdmm/internal/app/ui/cpwsarea/wspreview"
 	"sdmm/internal/app/ui/cpwsarea/wsruin"
 	"sdmm/internal/app/ui/cpwsarea/wsship"
 	"sdmm/internal/app/ui/dialog"
+	"sdmm/internal/planet"
 	"sdmm/internal/rsc"
 	"sdmm/internal/util"
 
@@ -62,6 +64,10 @@ func (w *WsArea) Init(app App) {
 
 func (w *WsArea) Free() {
 	for _, ws := range append([]*workspace.Workspace(nil), w.workspaces...) {
+		if _, ok := ws.Content().(*wsplanet.Workspace); ok {
+			w.closeWorkspace(ws)
+			continue
+		}
 		if _, ok := ws.Content().(*wspreview.Preview); ok {
 			w.closeWorkspace(ws)
 			continue
@@ -83,6 +89,20 @@ func (w *WsArea) OpenPreview(source *dmmap.Dmm) {
 	ws := workspace.New(wspreview.New(source, w.app.LoadedEnvironment()))
 	w.addWorkspace(ws)
 	ws.SetTriggerFocus(true)
+}
+
+func (w *WsArea) OpenPlanet() *wsplanet.Workspace {
+	for _, ws := range w.workspaces {
+		if content, ok := ws.Content().(*wsplanet.Workspace); ok {
+			ws.SetTriggerFocus(true)
+			return content
+		}
+	}
+	content := wsplanet.New(w.app)
+	ws := workspace.New(content)
+	w.addWorkspace(ws)
+	ws.SetTriggerFocus(true)
+	return content
 }
 
 func (w *WsArea) OpenShip() *wsship.WsShip {
@@ -114,6 +134,22 @@ func (w *WsArea) OpenRuin() *wsruin.WsRuin {
 		}
 	}
 	content := wsruin.New(w.app)
+	content.LiveMap = func(file string) *dmmap.Dmm {
+		for _, ws := range w.workspaces {
+			if m, ok := ws.Content().(*wsmap.WsMap); ok && util.SamePath(m.Map().Dmm().Path.Absolute, file) {
+				return m.Map().Dmm()
+			}
+		}
+		return nil
+	}
+	content.PlanetDrafts = func() []planet.State {
+		for _, ws := range w.workspaces {
+			if p, ok := ws.Content().(*wsplanet.Workspace); ok {
+				return p.PreviewStates()
+			}
+		}
+		return nil
+	}
 	content.SourceBusy = func(file string) bool {
 		for _, ws := range w.workspaces {
 			if m, ok := ws.Content().(*wsmap.WsMap); ok && util.SamePath(m.Map().Dmm().Path.Absolute, file) {
@@ -409,6 +445,10 @@ func (w *WsArea) findMapWorkspace(path dmmap.DmmPath) (*workspace.Workspace, boo
 func (w *WsArea) findMapWorkspaces() []*workspace.Workspace {
 	var workspaces []*workspace.Workspace
 	for _, ws := range w.workspaces {
+		if _, ok := ws.Content().(*wsplanet.Workspace); ok {
+			workspaces = append(workspaces, ws)
+			continue
+		}
 		if _, ok := ws.Content().(*wsruin.WsRuin); ok {
 			workspaces = append(workspaces, ws)
 			continue
@@ -490,6 +530,9 @@ func (w *WsArea) switchActiveWorkspace(activeWs *workspace.Workspace) {
 }
 
 func (w *WsArea) isWorkspaceUnsaved(ws *workspace.Workspace) bool {
+	if planet, ok := ws.Content().(*wsplanet.Workspace); ok {
+		return planet.IsModified()
+	}
 	if ruin, ok := ws.Content().(*wsruin.WsRuin); ok {
 		return ruin.IsModified()
 	}

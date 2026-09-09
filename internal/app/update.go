@@ -7,6 +7,7 @@ import (
 
 	"sdmm/internal/app/selfupdate"
 	"sdmm/internal/app/ui/cpwsarea/wsmap"
+	"sdmm/internal/app/ui/cpwsarea/wsplanet"
 	"sdmm/internal/app/ui/cpwsarea/wsruin"
 	"sdmm/internal/app/ui/cpwsarea/wsship"
 	"sdmm/internal/app/window"
@@ -139,6 +140,8 @@ func (a *app) updateRestartArgs() []string {
 	}
 	for _, ws := range a.layout.WsArea.MapWorkspaces() {
 		switch content := ws.Content().(type) {
+		case *wsplanet.Workspace:
+			args = append(args, "--planet-workspace")
 		case *wsship.WsShip:
 			args = append(args, "--ship-workspace")
 		case *wsruin.WsRuin:

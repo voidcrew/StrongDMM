@@ -15,6 +15,7 @@ use icon::parse_icon_metadata;
 
 mod environment;
 mod icon;
+mod planet_noise;
 
 #[no_mangle]
 #[allow(non_snake_case)]

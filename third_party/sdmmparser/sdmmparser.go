@@ -24,6 +24,16 @@ type ObjectTreeType struct {
 	Children []ObjectTreeType
 }
 
+// PlanetNoise samples the same normalized Perlin field as rust-g 4.0.
+func PlanetNoise(seed uint32, x, y, step float64, width, height int) []float64 {
+	if width < 1 || height < 1 || width > 1024 || height > 1024 {
+		return nil
+	}
+	result := make([]float64, width*height)
+	C.SdmmPlanetNoise(C.uint(seed), C.double(x), C.double(y), C.double(step), C.uint(width), C.uint(height), (*C.double)(unsafe.Pointer(&result[0])))
+	return result
+}
+
 type Location struct {
 	File   string
 	Line   uint32

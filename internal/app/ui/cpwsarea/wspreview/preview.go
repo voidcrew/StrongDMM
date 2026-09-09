@@ -36,8 +36,12 @@ type Preview struct {
 }
 
 func New(source *dmmap.Dmm, dme *dmenv.Dme) *Preview {
+	return NewWithOptions(source, dme, mappreview.Options{Smoothing: true, Lighting: true, PoweredFixtures: true, ExteriorLight: true})
+}
+
+func NewWithOptions(source *dmmap.Dmm, dme *dmenv.Dme, options mappreview.Options) *Preview {
 	p := &Preview{source: source, dme: dme, canvas: canvas.New(), control: canvas.NewControl(), fit: true,
-		options: mappreview.Options{Smoothing: true, Lighting: true, PoweredFixtures: true, ExteriorLight: true}}
+		options: options}
 	p.control.AtCursor = true
 	if compiled, err := dme.PreviewEnvironment(); err == nil {
 		p.source = mappreview.CompiledAppearances(source, dme, compiled)
@@ -60,7 +64,14 @@ func (*Preview) OnFocusChange(focused bool) {
 		tools.SetEnabled(false)
 	}
 }
-func (p *Preview) Dispose()                   { p.canvas.Dispose() }
+func (p *Preview) Dispose() { p.canvas.Dispose() }
+
+// ReplaceSource refreshes an embedded preview while retaining its view controls.
+func (p *Preview) ReplaceSource(source *dmmap.Dmm, editor *dmenv.Dme) {
+	p.fit = p.source.MaxX != source.MaxX || p.source.MaxY != source.MaxY
+	p.source = mappreview.CompiledAppearances(source, editor, p.dme)
+	p.rebuild()
+}
 func (*Preview) ProcessUnit(u unit.Unit) bool { return mappreview.Visible(u.Instance().Prefab()) }
 
 func hasState(icon, state string) bool {

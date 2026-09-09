@@ -7,15 +7,20 @@ import (
 )
 
 type startupArgs struct {
-	project       string
-	maps          []string
-	shipWorkspace bool
-	ruinWorkspace bool
+	project         string
+	maps            []string
+	shipWorkspace   bool
+	ruinWorkspace   bool
+	planetWorkspace bool
 }
 
 func parseStartupArgs(args []string) startupArgs {
 	var parsed startupArgs
 	for _, arg := range args {
+		if arg == "--planet-workspace" {
+			parsed.planetWorkspace = true
+			continue
+		}
 		if arg == "--ruin-workspace" {
 			parsed.ruinWorkspace = true
 			continue
@@ -42,6 +47,9 @@ func (a *app) checkProgramArgs() {
 	}
 	if args.project != "" {
 		a.loadEnvironmentV(args.project, func() {
+			if args.planetWorkspace {
+				a.DoOpenPlanetWorkspace()
+			}
 			if args.shipWorkspace {
 				a.DoOpenShipWorkspace()
 			}

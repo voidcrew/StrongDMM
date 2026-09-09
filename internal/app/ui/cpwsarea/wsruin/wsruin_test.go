@@ -16,6 +16,7 @@ import (
 	"sdmm/internal/app/ui/dialog"
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmenv"
+	"sdmm/internal/dmapi/dmicon"
 	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/dmapi/dmmap/dmmdata"
 	"sdmm/internal/platform"
@@ -171,6 +172,11 @@ func TestNativeRuinWorkshop(t *testing.T) {
 	if ws.project == nil {
 		t.Fatal(ws.message)
 	}
+	dmmap.PrefabStorage.Free()
+	dmicon.Cache.Free()
+	dmmap.Init(dme)
+	dmicon.Cache.SetRootDirPath(dme.RootDir)
+	testPlanetRuinPreview(t, ws, capture)
 	ws.BeginNewRuin()
 	ws.form.Name = "Ruin Workshop Test"
 	ws.form.Description = "An abandoned survey camp."
