@@ -3,10 +3,14 @@ package startup
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
 func TestLegacyShortcutInstallsOnceAndFollowsCurrentExecutable(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("Windows executable migration")
+	}
 	folder := t.TempDir()
 	legacy := filepath.Join(folder, "StrongDMM.exe")
 	if err := os.WriteFile(legacy, []byte("bridge build"), 0700); err != nil {
