@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.12-beta.1 - Planet Workshop beta
+Version: 0.5.13-beta.1 - Planet Workshop beta
 
 START
 1. Extract the whole ZIP into its own writable folder, beside your stable editor.
