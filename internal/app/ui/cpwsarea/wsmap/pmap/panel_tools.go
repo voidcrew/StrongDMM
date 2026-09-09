@@ -5,6 +5,7 @@ import (
 	"sdmm/internal/imguiext/icon"
 	"sdmm/internal/imguiext/style"
 	w "sdmm/internal/imguiext/widget"
+	"sdmm/internal/mappreview"
 
 	"github.com/rs/zerolog/log"
 )
@@ -166,6 +167,11 @@ func (p *PaneMap) panelToolsLayoutSettings() w.Layout {
 		bntStyle = style.ButtonDefault{}
 	}
 	return w.Layout{
+		w.Button("Preview", func() {
+			tools.FinishStroke()
+			p.app.DoPreviewMap(mappreview.Snapshot(p.ViewDmm(), p.activeLevel))
+		}).Tooltip("Preview smoothing and lighting"),
+		w.SameLine(),
 		w.Button(icon.Cog, p.doToggleSettings).
 			Tooltip("Settings").
 			Style(bntStyle).

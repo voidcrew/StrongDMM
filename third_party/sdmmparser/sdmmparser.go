@@ -54,10 +54,23 @@ func IsParserError(err error) bool {
 }
 
 func ParseEnvironment(environmentPath string) (*ObjectTreeType, error) {
+	return parseEnvironment(environmentPath, false)
+}
+
+func ParsePreviewEnvironment(environmentPath string) (*ObjectTreeType, error) {
+	return parseEnvironment(environmentPath, true)
+}
+
+func parseEnvironment(environmentPath string, preview bool) (*ObjectTreeType, error) {
 	nativePath := C.CString(environmentPath)
 	defer C.free(unsafe.Pointer(nativePath))
 
-	nativeStr := C.SdmmParseEnvironment(nativePath)
+	var nativeStr *C.char
+	if preview {
+		nativeStr = C.SdmmParsePreviewEnvironment(nativePath)
+	} else {
+		nativeStr = C.SdmmParseEnvironment(nativePath)
+	}
 	defer C.SdmmFreeStr(nativeStr)
 
 	str := C.GoString(nativeStr)

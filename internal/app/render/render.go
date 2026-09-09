@@ -4,6 +4,7 @@ import (
 	"sdmm/internal/app/render/brush"
 	"sdmm/internal/app/render/bucket"
 	"sdmm/internal/dmapi/dmmap"
+	"sdmm/internal/mappreview"
 	"sdmm/internal/util"
 
 	"github.com/go-gl/gl/v3.3-core/gl"
@@ -14,8 +15,9 @@ type Render struct {
 
 	bucket *bucket.Bucket
 
-	overlay       overlay
-	unitProcessor unitProcessor
+	overlay         overlay
+	unitProcessor   unitProcessor
+	previewLighting *mappreview.Lighting
 }
 
 func New() *Render {
@@ -77,6 +79,7 @@ func (r *Render) draw(width, height float32) {
 	r.batchOverlayAreasBorders()
 	r.batchOverlayAreas()
 	brush.Draw(width, height, r.Camera.ShiftX, r.Camera.ShiftY, r.Camera.Scale)
+	r.drawPreviewLighting(width, height)
 }
 
 // Clean OpenGL state after rendering.

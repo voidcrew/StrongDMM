@@ -6,6 +6,7 @@ import (
 	"sdmm/internal/app/prefs"
 	"sdmm/internal/dmapi/dm"
 	"sdmm/internal/dmapi/dmenv"
+	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/dmapi/dmmap/dmmdata/dmmprefab"
 	"sdmm/internal/dmapi/dmmap/dmminstance"
 	"sdmm/internal/dmapi/dmmclip"
@@ -24,6 +25,8 @@ type previewApp struct {
 }
 
 func (a *previewApp) ShipFilesSaved() { a.previewRequests++ }
+
+func (a *previewApp) DoPreviewMap(*dmmap.Dmm) {}
 
 func (a *previewApp) ShipPreviewStatus() shippreview.Status { return a.previewStatus }
 

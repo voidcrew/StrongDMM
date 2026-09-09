@@ -35,6 +35,7 @@ type App interface {
 	LoadedEnvironment() *dmenv.Dme
 
 	DoSelectPrefab(prefab *dmmprefab.Prefab)
+	DoPreviewMap(*dmmap.Dmm)
 	DoEditInstance(*dmminstance.Instance)
 
 	SelectedPrefab() (*dmmprefab.Prefab, bool)

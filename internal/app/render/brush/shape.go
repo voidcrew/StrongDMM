@@ -2,8 +2,25 @@ package brush
 
 import (
 	"sdmm/internal/dmapi/dmicon"
+	"sdmm/internal/mappreview"
 	"sdmm/internal/util"
 )
+
+// RectGradient interpolates the four lighting corners in map coordinate order.
+func RectGradient(x1, y1, x2, y2 float32, colors [4]mappreview.RGB) {
+	if batching.mode != mtRect || batching.texture != 0 {
+		batching.flush()
+	}
+	batching.texture, batching.mode = 0, mtRect
+	points := [4][2]float32{{x1, y1}, {x2, y1}, {x1, y2}, {x2, y2}}
+	for i, point := range points {
+		c := colors[i]
+		batching.data = append(batching.data, point[0], point[1], c[0], c[1], c[2], 1, 0, 0)
+	}
+	batching.indices = append(batching.indices, batching.idx, batching.idx+1, batching.idx+2, batching.idx+1, batching.idx+3, batching.idx+2)
+	batching.idx += rectVerticesLen
+	batching.len += rectIndicesLen
+}
 
 const (
 	rectVerticesLen = 4 // Rect contains of 4 vertices.

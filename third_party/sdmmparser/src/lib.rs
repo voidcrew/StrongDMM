@@ -19,7 +19,13 @@ mod icon;
 #[no_mangle]
 #[allow(non_snake_case)]
 pub extern fn SdmmParseEnvironment(native_path: *const c_char) -> *const c_char {
-    to_ptr(parse_environment(to_string(native_path)))
+    to_ptr(parse_environment(to_string(native_path), false))
+}
+
+#[no_mangle]
+#[allow(non_snake_case)]
+pub extern fn SdmmParsePreviewEnvironment(native_path: *const c_char) -> *const c_char {
+    to_ptr(parse_environment(to_string(native_path), true))
 }
 
 #[no_mangle]

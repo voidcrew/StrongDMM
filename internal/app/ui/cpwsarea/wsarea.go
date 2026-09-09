@@ -11,6 +11,7 @@ import (
 	"sdmm/internal/app/ui/cpwsarea/wsempty"
 	"sdmm/internal/app/ui/cpwsarea/wsmap"
 	"sdmm/internal/app/ui/cpwsarea/wsprefs"
+	"sdmm/internal/app/ui/cpwsarea/wspreview"
 	"sdmm/internal/app/ui/cpwsarea/wsruin"
 	"sdmm/internal/app/ui/cpwsarea/wsship"
 	"sdmm/internal/app/ui/dialog"
@@ -61,6 +62,10 @@ func (w *WsArea) Init(app App) {
 
 func (w *WsArea) Free() {
 	for _, ws := range append([]*workspace.Workspace(nil), w.workspaces...) {
+		if _, ok := ws.Content().(*wspreview.Preview); ok {
+			w.closeWorkspace(ws)
+			continue
+		}
 		if _, ok := ws.Content().(*wsruin.WsRuin); ok {
 			w.closeWorkspace(ws)
 			continue
@@ -72,6 +77,12 @@ func (w *WsArea) Free() {
 	w.closeWorkspaces(w.findMapWorkspaces())
 	w.closeWorkspaces(w.findCreateMapWorkspaces()) // close new map creation as well
 	log.Print("workspace area free")
+}
+
+func (w *WsArea) OpenPreview(source *dmmap.Dmm) {
+	ws := workspace.New(wspreview.New(source, w.app.LoadedEnvironment()))
+	w.addWorkspace(ws)
+	ws.SetTriggerFocus(true)
 }
 
 func (w *WsArea) OpenShip() *wsship.WsShip {

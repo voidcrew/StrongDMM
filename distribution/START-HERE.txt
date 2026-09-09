@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.8
+Version: 0.5.9
 
 START
 1. Extract the whole ZIP into a writable folder.
@@ -21,6 +21,18 @@ to save, discard, or cancel. Your project reopens after the update.
 Use Help > Check for Updates at any time. Automatic checks and downloads can
 be changed in Preferences > Application. Keep the installation folder writable.
 Builds before 0.5.2 need this ZIP downloaded and extracted once.
+
+MAP PREVIEW
+Open any map and click Preview beside the mapping tools. The separate tab
+previews tg bitmask smoothing and estimated lighting on the current Z level,
+including unsaved edits. Reopen Preview to capture later edits. Smoothing and
+lighting can be toggled independently; Export PNG saves a full-size image.
+Powered fixtures assumes intact mapped light fixtures have power.
+Exterior light illuminates the exposed hull edges and is enabled by default.
+Pan with the middle mouse button or Space; scroll to zoom and use Fit to reset.
+The preview does not run the game: custom smoothing code, runtime overlays,
+underfloor hiding, power state and multi-Z lighting may differ in game.
+Preview never saves these appearances into your map.
 
 SHIP WORKSHOP
 1. Choose a ship: open an existing ship or choose Create a new ship.

@@ -4,7 +4,7 @@ const Undefined = "undefined"
 
 var (
 	Title    = "StrongDMM - Voidcrew"
-	Version  = "0.5.8"
+	Version  = "0.5.9"
 	Revision = Undefined
 	GitHub   = "https://github.com/voidcrew/StrongDMM"
 	Support  = "https://ko-fi.com/spair"

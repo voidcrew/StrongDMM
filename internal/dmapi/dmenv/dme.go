@@ -14,9 +14,25 @@ type Dme struct {
 	RootDir  string
 	RootFile string
 	Objects  map[string]*Object
+	preview  *Dme
 }
 
 func New(path string) (*Dme, error) {
+	return newEnvironment(path, sdmmparser.ParseEnvironment)
+}
+
+// PreviewEnvironment is cached for this loaded project and never replaces the
+// editor's definitions. Reopening the project invalidates the cache naturally.
+func (d *Dme) PreviewEnvironment() (*Dme, error) {
+	if d.preview != nil {
+		return d.preview, nil
+	}
+	var err error
+	d.preview, err = newEnvironment(d.RootFile, sdmmparser.ParsePreviewEnvironment)
+	return d.preview, err
+}
+
+func newEnvironment(path string, parse func(string) (*sdmmparser.ObjectTreeType, error)) (*Dme, error) {
 	dme := Dme{
 		Name:     filepath.Base(path),
 		RootDir:  filepath.Dir(path),
@@ -24,7 +40,7 @@ func New(path string) (*Dme, error) {
 		Objects:  make(map[string]*Object),
 	}
 
-	objectTreeType, err := sdmmparser.ParseEnvironment(path)
+	objectTreeType, err := parse(path)
 	if err != nil {
 		return nil, err
 	}

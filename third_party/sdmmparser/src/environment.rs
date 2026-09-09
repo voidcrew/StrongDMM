@@ -29,8 +29,8 @@ struct ObjectTreeVar {
     is_static: bool,
 }
 
-pub fn parse_environment(path: String) -> String {
-    match panic::catch_unwind(|| match parse(&path) {
+pub fn parse_environment(path: String, preview: bool) -> String {
+    match panic::catch_unwind(|| match parse(&path, preview) {
         Some(json) => json,
         None => format!("parser error: unable to parse environment {}", path),
     }) {
@@ -45,9 +45,18 @@ pub fn parse_environment(path: String) -> String {
     }
 }
 
-fn parse(env_path: &str) -> Option<String> {
+fn parse(env_path: &str, preview: bool) -> Option<String> {
     let ctx = Context::default();
-    let objtree = ctx.parse_environment(env_path.as_ref()).ok()?;
+    let objtree = if preview {
+        // tg's MAP_SWITCH uses CBT to distinguish compiled appearances from
+        // editor markers. Keep this alternate parse entirely in memory.
+        let source = std::fs::read_to_string(env_path).ok()?;
+        let input = format!("#define CBT\n{}", source.trim_start_matches('\u{feff}'));
+        let preprocessor = dm::preprocessor::Preprocessor::from_buffer(&ctx, env_path.into(), input);
+        dm::parser::parse(&ctx, dm::indents::IndentProcessor::new(&ctx, preprocessor))
+    } else {
+        ctx.parse_environment(env_path.as_ref()).ok()?
+    };
 
     if let Some(m) = errors_message(&ctx) {
         return Some(m);
