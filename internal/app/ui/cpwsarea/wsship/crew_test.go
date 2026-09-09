@@ -40,6 +40,19 @@ func exerciseCrew(t *testing.T, ws *WsShip, render func(), legacy bool) {
 	if len(ws.crew.jobs) < 2 {
 		t.Fatal("default crew missing")
 	}
+	for _, path := range []string{"/obj/item/clothing/suit/armor", "/obj/item/clothing/suit/armor/abductor", "/obj/item/clothing/under"} {
+		if ws.project.Dme.Objects[path] == nil {
+			t.Fatalf("missing item fixture: %s", path)
+		}
+		if ws.crewItemSprite(path) != nil {
+			t.Fatalf("iconless parent appears in the crew item library: %s", path)
+		}
+	}
+	for _, path := range []string{"/obj/item/clothing/suit/armor/abductor/vest", "/obj/item/clothing/under/color", "/obj/item/clothing/under/color/blue", "/obj/item/crowbar"} {
+		if ws.crewItemSprite(path) == nil {
+			t.Fatalf("usable item is missing from the crew item library: %s", path)
+		}
+	}
 	ws.crew.selected = 1
 	ws.crew.jobs[1].Name = "Salvage Engineer"
 	ws.crew.jobs[1].Outfit = "/datum/outfit/job/engineer"

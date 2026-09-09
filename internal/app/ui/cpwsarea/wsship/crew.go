@@ -507,6 +507,28 @@ func (ws *WsShip) crewItemFits(path string) bool {
 	}
 	return s.Flag == 0 || int(o.Vars.FloatV("slot_flags", 0))&s.Flag != 0
 }
+func (ws *WsShip) crewItemSprite(path string) *dmicon.Sprite {
+	o := ws.project.Dme.Objects[path]
+	if o == nil {
+		return nil
+	}
+	stateName := o.Vars.TextV("icon_state", "")
+	// Base items may use an empty state that only draws a diagnostic sprite.
+	if stateName == "" {
+		return nil
+	}
+	dmi, err := dmicon.Cache.Get(o.Vars.TextV("icon", ""))
+	if err != nil {
+		return nil
+	}
+	// Check the inherited state directly: the map renderer's empty-state and
+	// placeholder fallbacks can make abstract item types appear usable here.
+	state := dmi.States[stateName]
+	if state == nil || state.Frames == 0 || len(state.Sprites) == 0 {
+		return nil
+	}
+	return state.Sprite()
+}
 func (ws *WsShip) chooseCrewItem(path string) {
 	c := &ws.crew
 	if c.selected < 0 || c.selected >= len(c.jobs) {
@@ -628,8 +650,10 @@ func (ws *WsShip) crewPicker() {
 			continue
 		}
 
-		o := ws.project.Dme.Objects[path]
-		sprite := dmicon.Cache.GetSpriteOrPlaceholder(o.Vars.TextV("icon", ""), o.Vars.TextV("icon_state", ""))
+		sprite := ws.crewItemSprite(path)
+		if sprite == nil {
+			continue
+		}
 		pos := imgui.CursorScreenPos()
 		selected := c.contents == 0 && currentItem == path
 		badge := ""
