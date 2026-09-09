@@ -1,8 +1,10 @@
 package menu
 
 import (
+	"sdmm/internal/app/selfupdate"
 	"sdmm/internal/app/ui/workshop"
 	"sdmm/internal/app/window"
+	"sdmm/internal/env"
 	"sdmm/internal/imguiext/icon"
 	"sdmm/internal/imguiext/style"
 	w "sdmm/internal/imguiext/widget"
@@ -34,6 +36,26 @@ func (m *Menu) showUpdateMenu() {
 	if imgui.BeginPopup("update_menu") {
 		width := 380 * window.PointSize()
 		imgui.PushTextWrapPosV(width)
+		imgui.TextDisabled("Installed: " + env.Version + " (" + selfupdate.CurrentChannel(env.Version).Label() + ")")
+		if m.updateStatus == upStatusChecking || m.updateStatus == upStatusUpdating {
+			imgui.Text("Release channel: " + m.updateChannel.Label())
+		} else {
+			imgui.Text("Release channel")
+			imgui.SetNextItemWidth(width)
+			if imgui.BeginCombo("##release_channel", m.updateChannel.Label()) {
+				for _, channel := range []selfupdate.Channel{selfupdate.Stable, selfupdate.Beta} {
+					if imgui.SelectableV(channel.Label(), channel == m.updateChannel, 0, imgui.Vec2{}) && channel != m.updateChannel {
+						m.app.DoSelectUpdateChannel(channel)
+					}
+				}
+				imgui.EndCombo()
+			}
+		}
+		switching := m.updateChannel.Valid() && m.updateChannel != selfupdate.CurrentChannel(env.Version)
+		if m.updateChannel == selfupdate.Beta {
+			imgui.TextWrapped("Beta includes features still being tested.")
+		}
+		imgui.Separator()
 		if m.updateVersion != "" {
 			imgui.TextColored(style.Amber, "StrongDMM "+m.updateVersion)
 		}
@@ -54,16 +76,26 @@ func (m *Menu) showUpdateMenu() {
 			imgui.Text("You're using the latest available version.")
 			w.Button("Done", m.doHideUpdateButton).Build()
 		case upStatusAvailable:
-			if workshop.Button("Download update", true) {
+			label := "Download update"
+			if switching {
+				label = "Download " + m.updateChannel.Label()
+			}
+			if workshop.Button(label, true) {
 				m.app.DoSelfUpdate()
 			}
-			w.Button("Skip this version", m.doIgnoreUpdate).Build()
+			if !switching {
+				w.Button("Skip this version", m.doIgnoreUpdate).Build()
+			}
 		case upStatusUpdating:
 			imgui.Text("Downloading and verifying the update...")
 			imgui.Text("You can keep working.")
 		case upStatusUpdated:
 			imgui.Text("The update is ready. Save prompts appear before restarting.")
-			if workshop.Button("Update & restart", true) {
+			label := "Update & restart"
+			if switching {
+				label = "Switch to " + m.updateChannel.Label() + " & restart"
+			}
+			if workshop.Button(label, true) {
 				imgui.CloseCurrentPopup()
 				m.app.DoRestart()
 			}
@@ -79,7 +111,8 @@ func (m *Menu) showUpdateMenu() {
 	workshop.PopStyle()
 }
 
-func (m *Menu) ShowUpdatePopup() { m.updateOpen = true }
+func (m *Menu) ShowUpdatePopup()                            { m.updateOpen = true }
+func (m *Menu) SetUpdateChannel(channel selfupdate.Channel) { m.updateChannel = channel }
 func (m *Menu) SetChecking() {
 	m.updateStatus = upStatusChecking
 	m.updateError, m.updateDescription, m.updateVersion = "", "", ""

@@ -31,9 +31,40 @@ type updateState struct {
 	// Written by the download worker; read on the UI thread only after its
 	// completion callback or after workers.Wait during shutdown.
 	downloaded *selfupdate.Staged
+	channel    selfupdate.Channel
 }
 
 func (a *app) checkForUpdatesV(manual bool) {
+	a.checkForUpdatesOnChannel(manual, a.selectedUpdateChannel())
+}
+
+func (a *app) selectedUpdateChannel() selfupdate.Channel {
+	if a.updates.channel.Valid() {
+		return a.updates.channel
+	}
+	return selfupdate.CurrentChannel(env.Version)
+}
+
+func (a *app) DoSelectUpdateChannel(channel selfupdate.Channel) {
+	if !channel.Valid() || a.updates.busy || a.updates.restartRequested {
+		return
+	}
+	if a.updates.ready {
+		executable, err := os.Executable()
+		if err == nil {
+			err = a.updates.downloaded.Discard(executable)
+		}
+		if err != nil {
+			a.menu.SetRestartError(err.Error())
+			return
+		}
+		a.updates.downloaded = nil
+		a.updates.ready = false
+	}
+	a.checkForUpdatesOnChannel(true, channel)
+}
+
+func (a *app) checkForUpdatesOnChannel(manual bool, channel selfupdate.Channel) {
 	if a.updates.busy || a.updates.ready {
 		if manual {
 			if a.updates.checking {
@@ -44,6 +75,9 @@ func (a *app) checkForUpdatesV(manual bool) {
 		}
 		return
 	}
+	a.updates.channel = channel
+	a.updates.release = selfupdate.Release{}
+	a.menu.SetUpdateChannel(channel)
 	a.updates.busy = true
 	a.updates.checking = true
 	a.updates.manualCheck = manual
@@ -54,7 +88,7 @@ func (a *app) checkForUpdatesV(manual bool) {
 	a.updates.workers.Add(1)
 	go func() {
 		defer a.updates.workers.Done()
-		release, err := selfupdate.Check(a.updates.ctx, env.Version)
+		release, err := selfupdate.CheckChannel(a.updates.ctx, env.Version, channel)
 		window.RunLater(func() {
 			a.updates.busy = false
 			a.updates.checking = false
@@ -80,7 +114,7 @@ func (a *app) checkForUpdatesV(manual bool) {
 				return
 			}
 			a.menu.SetUpdateAvailable(release.Version, release.Description)
-			if a.Prefs().Application.AutoUpdate {
+			if a.Prefs().Application.AutoUpdate && release.SwitchFrom == "" {
 				a.selfUpdate()
 			}
 		})

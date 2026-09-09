@@ -312,8 +312,8 @@ func install(s Staged, executable string, rename func(string, string) error) (*I
 		if err := json.Unmarshal(data, &current); err != nil {
 			return nil, fmt.Errorf("read installed build information: %w", err)
 		}
-		if !Newer(s.Release.Version, current.Version) {
-			return nil, fmt.Errorf("this installation already has version %s or newer", current.Version)
+		if !CanInstall(s.Release, current.Version) {
+			return nil, fmt.Errorf("update no longer applies to installed version %s; check for updates again", current.Version)
 		}
 	} else if !os.IsNotExist(err) {
 		return nil, err

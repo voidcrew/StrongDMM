@@ -5,7 +5,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -25,6 +24,7 @@ type Release struct {
 	URL         string
 	SHA256      string
 	Size        int64
+	SwitchFrom  string
 }
 
 type githubRelease struct {
@@ -42,8 +42,7 @@ type githubRelease struct {
 
 func Supported() bool { return runtime.GOOS == "windows" && runtime.GOARCH == "amd64" }
 
-// Only numbered stable builds participate in automatic updates. Development
-// builds and prereleases must never silently replace a user's installation.
+// Stable version components are also used by numbered beta releases.
 func versionNumbers(version string) ([3]uint64, error) {
 	var result [3]uint64
 	parts := strings.Split(strings.TrimPrefix(version, "v"), ".")
@@ -69,20 +68,23 @@ func versionNumbers(version string) ([3]uint64, error) {
 }
 
 func Newer(candidate, current string) bool {
-	next, err := versionNumbers(candidate)
+	next, err := parseVersion(candidate)
 	if err != nil {
 		return false
 	}
-	previous, err := versionNumbers(current)
+	previous, err := parseVersion(current)
 	if err != nil {
 		return false
 	}
-	for i := range next {
-		if next[i] != previous[i] {
-			return next[i] > previous[i]
+	for i := range next.numbers {
+		if next.numbers[i] != previous.numbers[i] {
+			return next.numbers[i] > previous.numbers[i]
 		}
 	}
-	return false
+	if next.beta == previous.beta {
+		return false
+	}
+	return next.beta == 0 || (previous.beta != 0 && next.beta > previous.beta)
 }
 
 func packageName(version string) string { return "StrongDMM-Voidcrew-" + version + "-windows-x64" }
@@ -92,13 +94,25 @@ func parseRelease(data []byte, current string) (Release, error) {
 	if err := json.Unmarshal(data, &source); err != nil {
 		return Release{}, fmt.Errorf("read release details: %w", err)
 	}
-	if source.Draft || source.Prerelease {
-		return Release{}, fmt.Errorf("the latest release is not a stable build")
-	}
-	if _, err := versionNumbers(source.Tag); err != nil {
+	return parseChannelRelease(source, current, Stable)
+}
+
+func parseChannelRelease(source githubRelease, current string, channel Channel) (Release, error) {
+	v, err := parseVersion(source.Tag)
+	if err != nil {
 		return Release{}, err
 	}
-	if !Newer(source.Tag, current) {
+	if !channel.Valid() || source.Draft || v.channel() != channel || source.Prerelease != (channel == Beta) {
+		return Release{}, fmt.Errorf("release is not a published %s build", channel.Label())
+	}
+	previous, err := parseVersion(current)
+	if err != nil {
+		return Release{}, err
+	}
+	switchFrom := ""
+	if previous.channel() != channel {
+		switchFrom = strings.TrimPrefix(current, "v")
+	} else if !Newer(source.Tag, current) {
 		return Release{}, nil
 	}
 	version := strings.TrimPrefix(source.Tag, "v")
@@ -122,7 +136,7 @@ func parseRelease(data []byte, current string) (Release, error) {
 		if asset.Size <= 0 || asset.Size > maxDownload {
 			return Release{}, fmt.Errorf("release package size is invalid")
 		}
-		result = Release{Version: version, Description: source.Body, URL: asset.URL, SHA256: strings.ToLower(digest), Size: asset.Size}
+		result = Release{Version: version, Description: source.Body, URL: asset.URL, SHA256: strings.ToLower(digest), Size: asset.Size, SwitchFrom: switchFrom}
 	}
 	if result.Version == "" {
 		return Release{}, fmt.Errorf("the latest release has no Windows x64 package")
@@ -169,25 +183,5 @@ func get(ctx context.Context, client *http.Client, url string) (*http.Response, 
 }
 
 func Check(ctx context.Context, current string) (Release, error) {
-	if !Supported() {
-		return Release{}, fmt.Errorf("automatic updates require Windows x64")
-	}
-	if _, err := versionNumbers(current); err != nil {
-		return Release{}, fmt.Errorf("development builds do not receive automatic updates")
-	}
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Second)
-	defer cancel()
-	resp, err := get(ctx, httpClient(), releaseAPI)
-	if err != nil {
-		return Release{}, err
-	}
-	defer resp.Body.Close()
-	data, err := io.ReadAll(io.LimitReader(resp.Body, (1<<20)+1))
-	if err != nil {
-		return Release{}, err
-	}
-	if len(data) > 1<<20 {
-		return Release{}, fmt.Errorf("release details are too large")
-	}
-	return parseRelease(data, current)
+	return CheckChannel(ctx, current, CurrentChannel(current))
 }

@@ -100,8 +100,8 @@ func applyUpdateRequest(path, executable string, file *os.File) error {
 }
 
 func installAndRestart(request updateRequest, executable string, file *os.File) error {
-	if !selfupdate.Newer(request.Staged.Release.Version, env.Version) {
-		return fmt.Errorf("refusing to install an older or non-stable build")
+	if !selfupdate.CanInstall(request.Staged.Release, env.Version) {
+		return fmt.Errorf("update is not newer in this channel or an explicitly requested channel switch")
 	}
 	unlock, err := lockUpdate(executable)
 	if err != nil {

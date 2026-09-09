@@ -34,9 +34,17 @@ func TestMain(m *testing.M) {
 		if err := json.Unmarshal(data, &info); err != nil {
 			panic(err)
 		}
+		data, err = os.ReadFile(filepath.Join(folder, "staged.json"))
+		if err != nil {
+			panic(err)
+		}
+		var staged selfupdate.Staged
+		if err := json.Unmarshal(data, &staged); err != nil {
+			panic(err)
+		}
 		env.Version = info.Version
 		os.Exit(Run(func() {
-			if info.Version == "0.5.2" {
+			if info.Version == staged.Release.Version {
 				data, _ := json.Marshal(os.Args[1:])
 				if err := os.WriteFile(filepath.Join(folder, "restarted.json"), data, 0600); err != nil {
 					panic(err)
@@ -51,14 +59,6 @@ func TestMain(m *testing.M) {
 				}
 				panic("old executable staging folder was not cleaned")
 			}
-			data, err := os.ReadFile(filepath.Join(folder, "staged.json"))
-			if err != nil {
-				panic(err)
-			}
-			var staged selfupdate.Staged
-			if err := json.Unmarshal(data, &staged); err != nil {
-				panic(err)
-			}
 			if err := ScheduleUpdate(staged, []string{filepath.Join(folder, "project & [test] ü.dme"), "--ship-workspace"}); err != nil {
 				panic(err)
 			}
@@ -68,6 +68,17 @@ func TestMain(m *testing.M) {
 }
 
 func TestWindowsUpdateAndRestart(t *testing.T) {
+	for _, test := range []struct{ name, current, target string }{
+		{"stable update", "0.5.1", "0.5.2"},
+		{"switch to beta", "0.5.13", "0.5.14-beta.1"},
+		{"return to stable", "0.5.14-beta.1", "0.5.13"},
+		{"beta update", "0.5.14-beta.1", "0.5.14-beta.2"},
+	} {
+		t.Run(test.name, func(t *testing.T) { testWindowsUpdateAndRestart(t, test.current, test.target) })
+	}
+}
+
+func testWindowsUpdateAndRestart(t *testing.T, current, target string) {
 	if runtime.GOOS != "windows" {
 		t.Skip("Windows supervisor")
 	}
@@ -83,12 +94,12 @@ func TestWindowsUpdateAndRestart(t *testing.T) {
 	if err := os.WriteFile(exe, binary, 0700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(folder, "BUILD-INFO.json"), []byte(`{"version":"0.5.1"}`), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(folder, "BUILD-INFO.json"), []byte(fmt.Sprintf(`{"version":%q}`, current)), 0600); err != nil {
 		t.Fatal(err)
 	}
 	files := map[string][]byte{
 		"StrongDMM.exe": binary, "shipcheck.exe": binary, "LICENSE": []byte("license"),
-		"Source.zip": []byte("source"), "START-HERE.txt": []byte("instructions"), "BUILD-INFO.json": []byte(`{"version":"0.5.2"}`),
+		"Source.zip": []byte("source"), "START-HERE.txt": []byte("instructions"), "BUILD-INFO.json": []byte(fmt.Sprintf(`{"version":%q}`, target)),
 	}
 	var checksums strings.Builder
 	for name, data := range files {
@@ -98,7 +109,7 @@ func TestWindowsUpdateAndRestart(t *testing.T) {
 	var archive bytes.Buffer
 	writer := zip.NewWriter(&archive)
 	for name, data := range files {
-		entry, err := writer.CreateHeader(&zip.FileHeader{Name: "StrongDMM-Voidcrew-0.5.2-windows-x64/" + name, Method: zip.Store})
+		entry, err := writer.CreateHeader(&zip.FileHeader{Name: "StrongDMM-Voidcrew-" + target + "-windows-x64/" + name, Method: zip.Store})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -116,7 +127,10 @@ func TestWindowsUpdateAndRestart(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(stageDir, "package.zip"), archive.Bytes(), 0600); err != nil {
 		t.Fatal(err)
 	}
-	staged := selfupdate.Staged{Directory: stageDir, Release: selfupdate.Release{Version: "0.5.2", SHA256: fmt.Sprintf("%x", sha256.Sum256(archive.Bytes())), Size: int64(archive.Len())}}
+	staged := selfupdate.Staged{Directory: stageDir, Release: selfupdate.Release{Version: target, SHA256: fmt.Sprintf("%x", sha256.Sum256(archive.Bytes())), Size: int64(archive.Len())}}
+	if selfupdate.CurrentChannel(current) != selfupdate.CurrentChannel(target) {
+		staged.Release.SwitchFrom = current
+	}
 	data, _ := json.Marshal(staged)
 	if err := os.WriteFile(filepath.Join(folder, "staged.json"), data, 0600); err != nil {
 		t.Fatal(err)

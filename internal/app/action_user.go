@@ -1,6 +1,7 @@
 package app
 
 import (
+	"sdmm/internal/app/selfupdate"
 	"strconv"
 
 	"sdmm/internal/app/prefs"
@@ -358,7 +359,13 @@ func (a *app) DoCheckForUpdates() {
 	a.checkForUpdatesV(true)
 }
 
-func (a *app) DoOpenUpdateDownload() { _ = open.Run(env.GitHub + "/releases/latest") }
+func (a *app) DoOpenUpdateDownload() {
+	path := "/releases/latest"
+	if a.selectedUpdateChannel() == selfupdate.Beta {
+		path = "/releases"
+	}
+	_ = open.Run(env.GitHub + path)
+}
 
 // DoOpenJumpWindow opens a window where the user can jump to the inputted coordinates.
 func (a *app) DoOpenJumpWindow() {

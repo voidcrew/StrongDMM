@@ -1,5 +1,5 @@
 STRONGDMM VOIDCREW - WINDOWS X64
-Version: 0.5.12
+Version: 0.5.13
 
 START
 1. Extract the whole ZIP into a writable folder.
@@ -18,8 +18,12 @@ UPDATES
 StrongDMM checks for new Voidcrew releases and downloads verified updates in
 the background. Choose Update & restart when ready; unsaved work prompts you
 to save, discard, or cancel. Your project reopens after the update.
-Use Help > Check for Updates at any time. Automatic checks and downloads can
-be changed in Preferences > Application. Keep the installation folder writable.
+Use Help > Updates & Release Channel to check for updates or switch between
+Stable and Beta. Choose a channel, download it, then switch and restart. Beta
+includes features still being tested; returning to Stable is supported even
+when its version number is lower. Each installation receives updates for its
+installed channel. Automatic checks and downloads can be changed in Preferences
+> Application. Keep the installation folder writable.
 Builds before 0.5.2 need this ZIP downloaded and extracted once.
 
 MAP PREVIEW
