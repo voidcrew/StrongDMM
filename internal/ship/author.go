@@ -280,7 +280,7 @@ func (p *Project) AddTheme(baseIndex int, id, name string) error {
 	if err != nil {
 		return err
 	}
-	theme := Theme{ID: id, Name: name, Suffix: p.Settings.ID + "_" + id, Slots: append([]string{}, p.Hull.SlotsFor(base)...)}
+	theme := Theme{ID: id, Name: name, Suffix: p.fileID() + "_" + id, Slots: append([]string{}, p.Hull.SlotsFor(base)...)}
 	file, err := p.Catalog.HullFile(p.Hull, base)
 	if err != nil {
 		return err
@@ -395,6 +395,12 @@ func (p *Project) Restore(state State) {
 		if p.Documents[file] == nil {
 			copy := m.Copy()
 			p.Documents[file] = &Document{Map: &copy, Active: true}
+		}
+	}
+	referenced := p.referencedMaps()
+	for file := range p.renamedMaps {
+		if d := p.Documents[file]; d != nil {
+			d.Active = referenced[file]
 		}
 	}
 }

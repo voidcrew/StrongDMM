@@ -34,7 +34,7 @@ func (p *Project) RenameNameError(scope, name string) error {
 	return p.moduleNameError(name, strings.TrimPrefix(scope, "module/"))
 }
 
-// Rename changes only the display name; map paths, IDs and room slots stay stable.
+// Rename updates the label and map filenames, preserving IDs and room slots.
 func (p *Project) Rename(scope, name string) error {
 	if err := p.RenameNameError(scope, name); err != nil {
 		return err
@@ -74,8 +74,14 @@ func (p *Project) Rename(scope, name string) error {
 					return err
 				}
 				p.rooms.names[scope] = nameTarget{file: file, typePath: typePath}
+				if err = p.prepareMapField(scope, typePath); err != nil {
+					return err
+				}
 			}
 		}
+	}
+	if err := p.renameComponentMaps(scope, name); err != nil {
+		return err
 	}
 	for i, theme := range p.Hull.Themes {
 		if scope == "theme/"+theme.ID {

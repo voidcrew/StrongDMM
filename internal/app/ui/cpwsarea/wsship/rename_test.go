@@ -8,7 +8,63 @@ import (
 	"testing"
 
 	"sdmm/internal/dmapi/dmenv"
+	"sdmm/internal/ship"
 )
+
+func exerciseShipDetails(t *testing.T, ws *WsShip, render func()) {
+	t.Helper()
+	ws.setStage(stepBuild)
+	oldName := ws.project.Hull.Name
+	ws.beginTask(taskSettings)
+	ws.settings.name = "Renamed Workshop Ship"
+	ws.settings.costs = ship.PartCosts{"combat": 2, "science": 3, "trade": 4, "misc": 5}
+	for i := 0; i < 3; i++ {
+		render()
+	}
+	if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
+		captureFrame(t, filepath.Join(dst, "ship-details-price.png"), 1400, 960)
+	}
+	if !ws.IsModified() || !ws.Save() {
+		t.Fatalf("details draft did not save: %s", ws.message)
+	}
+	fresh, err := dmenv.New(ws.project.Dme.RootFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	p, err := ship.OpenProject(ws.catalog, fresh, ws.project.Hull)
+	if err != nil {
+		t.Fatal(err)
+	}
+	costs, err := p.PartCosts("ship")
+	if err != nil || !costs.Equal(ws.settings.costs) || p.Hull.Name != "Renamed Workshop Ship" {
+		t.Fatal("saved ship details were lost on reload")
+	}
+	if !strings.Contains(fresh.Objects[p.Hull.Type].Vars.ValueV("part_requirements", ""), "science") {
+		t.Fatal("base ship price did not reach the game registration")
+	}
+	ws.app.CommandStorage().Undo()
+	if !ws.Save() || ws.project.Hull.Name != oldName {
+		t.Fatalf("could not undo ship details: %s", ws.message)
+	}
+	ws.app.CommandStorage().Redo()
+	if !ws.Save() {
+		t.Fatal(ws.message)
+	}
+	ws.app.CommandStorage().Undo()
+	if !ws.Save() {
+		t.Fatal(ws.message)
+	}
+	ws.beginTask(taskSettings)
+	ws.settings.costs["combat"] = -1
+	if ws.Save() || ws.task != taskSettings {
+		t.Fatal("Save accepted an invalid base ship price")
+	}
+	ws.settings.costs, err = ws.project.PartCosts("ship")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws.finishTask()
+}
 
 // Exercise form validation, editing labels, persistence and the actual undo stack
 // in the native rendering fixture, including a freshly parsed handwritten ship.

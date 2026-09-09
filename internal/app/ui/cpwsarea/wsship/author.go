@@ -33,6 +33,7 @@ type settingsForm struct {
 	name, description string
 	crew              int32
 	hidden            bool
+	costs             ship.PartCosts
 }
 
 // IDs are a storage detail. Names remain unrestricted; generated IDs are valid,
@@ -247,7 +248,11 @@ func (ws *WsShip) beginTask(task buildTask) {
 	}
 	if task == taskSettings {
 		s := ws.project.Settings
-		ws.settings = settingsForm{ws.project.Hull.Name, s.Description, int32(s.Crew), s.Hidden}
+		costs, err := ws.project.PartCosts("ship")
+		if err != nil {
+			ws.message = err.Error()
+		}
+		ws.settings = settingsForm{name: ws.project.Hull.Name, description: s.Description, crew: int32(s.Crew), hidden: s.Hidden, costs: costs}
 	}
 	if task == taskResize && ws.assembly != nil {
 		s := ws.assembly.Sources[0]
@@ -560,6 +565,21 @@ func (ws *WsShip) settingsControls() {
 	s := &ws.settings
 	textField("Ship name", "Name shown to players", &s.name)
 	textField("Description", "What is this ship for?", &s.description)
+	heading("BASE SHIP PRICE")
+	width := (imgui.ContentRegionAvail().X - imgui.CurrentStyle().ItemSpacing().X) / 2
+	for i, class := range ship.PartClasses {
+		imgui.BeginGroup()
+		imgui.Text(class.Name + " parts")
+		value := int32(s.costs[class.ID])
+		imgui.SetNextItemWidth(width)
+		imgui.InputIntV("##base-cost-"+class.ID, &value, 0, 0, imgui.InputTextFlagsNone)
+		s.costs[class.ID] = int(value)
+		imgui.EndGroup()
+		if i%2 == 0 {
+			imgui.SameLine()
+		}
+	}
+	hint(s.costs.Summary())
 	if ws.project.Crew == nil {
 		numberField("Starting crew capacity", &s.crew)
 	} else {
@@ -568,7 +588,11 @@ func (ws *WsShip) settingsControls() {
 	imgui.Checkbox("Hide from the player ship list", &s.hidden)
 	hint("Keep this checked while your ship is a work in progress.")
 	nameErr := ship.ShipNameError(ws.catalog, ws.app.LoadedEnvironment(), s.name, ws.project.Hull.Type)
-	valid := nameErr == nil && s.crew >= 1 && s.crew <= 32
+	costErr := s.costs.Validate()
+	valid := nameErr == nil && costErr == nil && s.crew >= 1 && s.crew <= 32
+	if costErr != nil {
+		hint(costErr.Error())
+	}
 	if strings.TrimSpace(s.name) != "" && nameErr != nil {
 		hint(nameErr.Error())
 	}
@@ -578,16 +602,50 @@ func (ws *WsShip) settingsControls() {
 	space()
 	imgui.BeginDisabledV(!valid)
 	if actionButton("Apply ship details", true) {
-		ws.change("Ship details", func() error {
-			ws.project.Hull.Name = strings.TrimSpace(s.name)
-			settings := ws.project.Settings
-			settings.Description, settings.Crew = s.description, int(s.crew)
-			settings.Hidden = s.hidden
-			return nil
-		})
-		if ws.message == "" {
+		if ws.commitSettings() {
 			ws.finishTask()
 		}
 	}
 	imgui.EndDisabled()
+}
+
+func (ws *WsShip) settingsPending() bool {
+	if ws.task != taskSettings || ws.project == nil || ws.project.Settings == nil {
+		return false
+	}
+	s, original := ws.settings, ws.project.Settings
+	costs, err := ws.project.PartCosts("ship")
+	return err != nil || strings.TrimSpace(s.name) != ws.project.Hull.Name || s.description != original.Description || int(s.crew) != original.Crew || s.hidden != original.Hidden || !s.costs.Equal(costs)
+}
+
+func (ws *WsShip) commitSettings() bool {
+	if !ws.settingsPending() {
+		return true
+	}
+	s := ws.settings
+	if err := s.costs.Validate(); err != nil {
+		ws.message = err.Error()
+		return false
+	}
+	if s.crew < 1 || s.crew > 32 {
+		ws.message = "Enter 1 to 32 crew."
+		return false
+	}
+	ws.message = ""
+	ws.change("Ship details", func() error {
+		if err := ws.project.RenameShip(s.name); err != nil {
+			return err
+		}
+		if err := ws.project.SetPartCosts("ship", s.costs); err != nil {
+			return err
+		}
+		settings := ws.project.Settings
+		settings.Description, settings.Crew, settings.Hidden = s.description, int(s.crew), s.hidden
+		return nil
+	})
+	if ws.message != "" {
+		return false
+	}
+	ws.task = taskPaint
+	return true
 }

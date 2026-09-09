@@ -17,6 +17,7 @@ type roomEditing struct {
 	targets      map[string]string     // theme ID -> DM type; empty ID edits the base hull
 	names        map[string]nameTarget // component scope -> original name definition
 	descriptions map[string]nameTarget
+	mapFields    map[string]nameTarget
 	code         string
 }
 
@@ -84,11 +85,11 @@ func roomModuleType(shipID, id string) string {
 }
 
 func (p *Project) newRoomModule(theme Theme, id, name, slot string) (Module, string, error) {
-	shipID, err := p.roomID()
+	_, err := p.roomID()
 	if err != nil {
 		return Module{}, "", err
 	}
-	dir := shipID + "/"
+	dir := p.fileID() + "/"
 	if p.Settings == nil {
 		dir += "workshop/"
 	}
@@ -224,6 +225,18 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 		}
 		var err error
 		contents[target.file], err = rewriteName(contents[target.file], target.typePath, before, name)
+		if err != nil {
+			return nil, err
+		}
+	}
+	for scope, target := range p.rooms.mapFields {
+		field, before := mapField(p.rooms.base, scope)
+		_, after := mapField(p.Hull, scope)
+		if before == after {
+			continue
+		}
+		var err error
+		contents[target.file], err = rewriteTextField(contents[target.file], target.typePath, field, before, after)
 		if err != nil {
 			return nil, err
 		}

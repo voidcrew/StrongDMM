@@ -63,18 +63,25 @@ func TestRenameComponentsSaveAndUndo(t *testing.T) {
 			}
 			expected := cloneHull(before.Hull)
 			expected.Themes[0].Name = "Scout [A]"
+			expected.Suffix = "loaded_rooms_scout_a"
+			expected.Themes[0].Suffix = expected.Suffix
 			expected.Modules[0].Name = `Medical "Bay"`
+			expected.Modules[0].File = "loaded_rooms/medical_bay.dmm"
 			if !reflect.DeepEqual(expected, p.Hull) {
-				t.Fatal("rename changed component IDs, paths, slots or other metadata")
+				t.Fatal("rename changed component IDs, slots or unrelated metadata")
 			}
 			changes, err := p.Changes()
 			if err != nil {
 				t.Fatal(err)
 			}
+			moved := false
 			for _, change := range changes {
-				if strings.HasSuffix(change.Path, ".dmm") {
-					t.Fatal("rename changed a map")
+				if change.Delete && strings.HasSuffix(change.Path, ".dmm") {
+					moved = true
 				}
+			}
+			if !moved {
+				t.Fatal("rename did not remove the old map paths")
 			}
 			if err = p.Save(); err != nil || p.Modified() {
 				t.Fatalf("rename did not save cleanly: %v", err)
@@ -82,8 +89,10 @@ func TestRenameComponentsSaveAndUndo(t *testing.T) {
 			saved, _ := os.ReadFile(sourceFile)
 			wantSource := bytes.Replace(beforeSource, []byte("name = "+dmQuote(before.Hull.Themes[0].Name)), []byte("name = "+dmQuote(expected.Themes[0].Name)), 1)
 			wantSource = bytes.Replace(wantSource, []byte("name = "+dmQuote(module.Name)), []byte("name = "+dmQuote(expected.Modules[0].Name)), 1)
+			wantSource = bytes.Replace(wantSource, []byte("template_suffix = "+dmQuote(before.Hull.Themes[0].Suffix)), []byte("template_suffix = "+dmQuote(expected.Themes[0].Suffix)), 1)
+			wantSource = bytes.Replace(wantSource, []byte("map_file = "+dmQuote(module.File)), []byte("map_file = "+dmQuote(expected.Modules[0].File)), 1)
 			if !bytes.Equal(saved, wantSource) {
-				t.Fatal("save changed more than the two display names")
+				t.Fatal("save changed more than the names and map references")
 			}
 			reopened, err := OpenProject(p.Catalog, p.Dme, p.Hull)
 			if err != nil || !reflect.DeepEqual(reopened.Hull, expected) || reopened.Modified() {
