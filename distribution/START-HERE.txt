@@ -24,9 +24,10 @@ includes features still being tested; returning to Stable is supported even
 when its version number is lower. Each installation receives updates for its
 installed channel. Automatic checks and downloads can be changed in Preferences
 > Application. Keep the installation folder writable.
-Builds before 0.5.2 need this ZIP downloaded and extracted once.
 Existing Voidcrew editor settings and backups are copied into the Voidworks
-profile on first launch. Old shortcuts continue to work after an automatic update.
+profile on first launch. Older StrongDMM builds need one manual download of
+this ZIP after the repository rename. Run Voidworks.exe; future updates use
+the Voidworks release channels.
 
 MAP PREVIEW
 Open any map and click Preview beside the mapping tools. The separate tab
