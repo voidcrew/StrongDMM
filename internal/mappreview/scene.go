@@ -49,9 +49,10 @@ func Snapshot(source *dmmap.Dmm, z int) *dmmap.Dmm {
 }
 
 func Build(source *dmmap.Dmm, dme *dmenv.Dme, options Options, hasState HasState) *Scene {
+	notes := map[string]bool{}
+	source = initialMap(source, dme, notes)
 	copy := source.Copy()
 	scene := &Scene{Map: &copy}
-	notes := map[string]bool{}
 	if options.Smoothing {
 		rules := loadRules(dme.RootDir)
 		for _, tile := range scene.Map.Tiles {
@@ -100,6 +101,7 @@ func Build(source *dmmap.Dmm, dme *dmenv.Dme, options Options, hasState HasState
 	if options.Lighting {
 		scene.Lighting, scene.Lights = buildLighting(source, options.PoweredFixtures, options.ExteriorLight)
 	}
+	addAirlockOverlays(scene.Map, hasState)
 	for note := range notes {
 		scene.Notes = append(scene.Notes, note)
 	}

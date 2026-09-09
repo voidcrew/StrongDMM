@@ -209,6 +209,8 @@ func TestRenderPreview(t *testing.T) {
 	if err := gl.GetError(); err != gl.NO_ERROR {
 		t.Fatalf("OpenGL error: %x", err)
 	}
+	exerciseDoorOcclusion(t, dme)
+	exerciseAssembledPreview(t, dme, dst)
 	if file := os.Getenv("MAP_PREVIEW_TEST_MAP"); file != "" {
 		original, err := os.ReadFile(file)
 		if err != nil {

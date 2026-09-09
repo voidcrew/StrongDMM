@@ -68,6 +68,9 @@ func (w *WsArea) showWorkspaceWindow(dockId int, ws *workspace.Workspace) (open 
 	}
 
 	if ws.Focused() {
+		// Appearing windows can receive focus before the explicit request runs.
+		// Consume it so a later toolbar click does not lose focus mid-press.
+		ws.SetTriggerFocus(false)
 		w.switchActiveWorkspace(ws)
 		tmpFocusedWs = ws
 	} else if ws.TriggerFocus() {
