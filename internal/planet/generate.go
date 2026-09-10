@@ -33,12 +33,33 @@ type ClimateCell struct {
 	Caves    bool
 }
 
-func ClimateAt(heat, moisture float64, caves bool) ClimateCell {
-	row := band(heat, .2, .4, .6, .65, .8)
+func ClimateAt(g Generator, heat, moisture float64, caves bool) ClimateCell {
+	surface, deep, wet := g.HeatShares(), g.CaveHeatShares(), g.MoistureShares()
+	row := band(heat, cuts(surface[:])...)
 	if caves {
-		row = band(heat, .25, .5, .75)
+		row = band(heat, cuts(deep[:])...)
 	}
-	return ClimateCell{Row: row, Col: band(moisture, .2, .4, .6, .8), Caves: caves}
+	return ClimateCell{Row: row, Col: band(moisture, cuts(wet[:])...), Caves: caves}
+}
+
+// cuts is the upper edge of every band but the last, accumulated in the same
+// order as the game generator so both sides agree on boundary tiles.
+func cuts(shares []float64) []float64 {
+	total := 0.0
+	for _, share := range shares {
+		total += share
+	}
+	out := make([]float64, len(shares)-1)
+	acc := 0.0
+	for i := range out {
+		acc += shares[i]
+		if total > 0 {
+			out[i] = acc / total
+		} else {
+			out[i] = float64(i+1) / float64(len(shares))
+		}
+	}
+	return out
 }
 
 type Preview struct {
@@ -204,7 +225,7 @@ func Generate(c *Catalog, s State, dme *dmenv.Dme, o PreviewOptions) (*Preview, 
 			dy := float64(gy + int(roll(s.Seeds.Detail, gx, gy, 1)*5) - 2)
 			cell := Cell{Heat: heat.sample(dx, dy), Moisture: wet.sample(dx, dy), Height: high.sample(float64(gx), float64(gy))}
 			isCave := len(s.Definition.Caves) > 0 && (o.Caves || len(s.Definition.Surface) == 0 || cell.Height > s.Definition.Settings.Mountain)
-			cell.Climate = ClimateAt(cell.Heat, cell.Moisture, isCave)
+			cell.Climate = ClimateAt(s.Definition.Settings, cell.Heat, cell.Moisture, isCave)
 			if o.Biome != "" {
 				cell.Biome = o.Biome
 				isCave = s.Biomes[o.Biome].Cave

@@ -297,7 +297,8 @@ func (w *WsArea) makeCloseWorkspacesDialog(wsToClose, unsavedWorkspaces []*works
 
 	dType.ActionYes = func() {
 		for _, ws := range unsavedWorkspaces {
-			if !ws.Save() {
+			// Closing must not drop a workshop's hidden drafts.
+			if !ws.SaveAll() {
 				if callback != nil {
 					callback(false)
 				}
@@ -345,9 +346,13 @@ func (w *WsArea) closeWorkspaceGentlyV(ws *workspace.Workspace, callback func(cl
 		return
 	}
 
+	dialog.Open(w.makeCloseWorkspaceDialog(ws, callback))
+}
+
+func (w *WsArea) makeCloseWorkspaceDialog(ws *workspace.Workspace, callback func(closed bool)) dialog.TypeConfirmation {
 	dType := makeSaveSingleWorkspaceDialogType(ws)
 	dType.ActionYes = func() {
-		if !ws.Save() {
+		if !ws.SaveAll() {
 			if callback != nil {
 				callback(false)
 			}
@@ -371,7 +376,7 @@ func (w *WsArea) closeWorkspaceGentlyV(ws *workspace.Workspace, callback func(cl
 		}
 	}
 
-	dialog.Open(dType)
+	return dType
 }
 
 func makeSaveSingleWorkspaceDialogType(ws *workspace.Workspace) dialog.TypeConfirmation {

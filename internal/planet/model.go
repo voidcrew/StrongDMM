@@ -44,7 +44,126 @@ type Biome struct {
 type Generator struct {
 	Zoom, Mountain, Closed   float64
 	Iterations, Birth, Death int
+	// Shares are each climate band's part of the map, in percent. Unset (all
+	// zero) shares mean the generator's built-in cut points.
+	Heat     [6]float64
+	CaveHeat [4]float64
+	Moisture [5]float64
 }
+
+// The generator's historical cut points, expressed as band shares.
+var DefaultHeatShares = [6]float64{20, 20, 20, 5, 15, 20}
+var DefaultCaveHeatShares = [4]float64{25, 25, 25, 25}
+var DefaultMoistureShares = [5]float64{20, 20, 20, 20, 20}
+
+func (g Generator) HeatShares() [6]float64 {
+	if g.Heat == ([6]float64{}) {
+		return DefaultHeatShares
+	}
+	return g.Heat
+}
+func (g Generator) CaveHeatShares() [4]float64 {
+	if g.CaveHeat == ([4]float64{}) {
+		return DefaultCaveHeatShares
+	}
+	return g.CaveHeat
+}
+func (g Generator) MoistureShares() [5]float64 {
+	if g.Moisture == ([5]float64{}) {
+		return DefaultMoistureShares
+	}
+	return g.Moisture
+}
+
+// BiasedShares reshapes base toward one end of its scale: bias 1 favours the
+// last band, -1 the first, and 0 returns base itself. Both heat scales and the
+// moisture scale use it, so one pad position means the same thing everywhere.
+func BiasedShares(base []float64, bias float64) []float64 {
+	out := biasedShares(base, bias)
+	for i := range out {
+		out[i] = math.Round(out[i]*10) / 10
+	}
+	return out
+}
+
+func biasedShares(base []float64, bias float64) []float64 {
+	out := make([]float64, len(base))
+	total := 0.0
+	for i, share := range base {
+		out[i] = share * math.Exp(3*bias*bandCentre(i, len(base)))
+		total += out[i]
+	}
+	for i := range out {
+		out[i] = out[i] / total * 100
+	}
+	return out
+}
+
+// bandCentre places band i on a -1..1 scale from the first band to the last.
+func bandCentre(i, n int) float64 {
+	if n < 2 {
+		return 0
+	}
+	return float64(2*i)/float64(n-1) - 1
+}
+
+func shareCentre(shares []float64) float64 {
+	total, sum := 0.0, 0.0
+	for i, share := range shares {
+		total += share
+		sum += share * bandCentre(i, len(shares))
+	}
+	if total <= 0 {
+		return 0
+	}
+	return sum / total
+}
+
+// ShareBias is the pad position whose BiasedShares sit at the same centre of
+// mass as shares, so a handle reads back the bands however they were edited.
+func ShareBias(shares, base []float64) float64 {
+	target := shareCentre(shares)
+	lo, hi := -1.0, 1.0
+	if target <= shareCentre(biasedShares(base, lo)) {
+		return lo
+	}
+	if target >= shareCentre(biasedShares(base, hi)) {
+		return hi
+	}
+	for i := 0; i < 40; i++ {
+		mid := (lo + hi) / 2
+		if shareCentre(biasedShares(base, mid)) < target {
+			lo = mid
+		} else {
+			hi = mid
+		}
+	}
+	return (lo + hi) / 2
+}
+
+// BalanceShares sets one band and scales the others so the total stays 100.
+func BalanceShares(shares []float64, changed int, value float64) {
+	value = math.Max(0, math.Min(100, value))
+	others := 0.0
+	for i, share := range shares {
+		if i != changed {
+			others += share
+		}
+	}
+	rest := 100 - value
+	for i := range shares {
+		if i == changed {
+			continue
+		}
+		if others > 0 {
+			shares[i] = math.Round(shares[i]/others*rest*10) / 10
+		} else {
+			shares[i] = math.Round(rest/float64(len(shares)-1)*10) / 10
+		}
+	}
+	shares[changed] = math.Round(value*10) / 10
+}
+
 type Seeds struct{ Height, Heat, Moisture, Detail uint32 }
 type Definition struct {
 	Schema, GameSize                     int
@@ -62,6 +181,9 @@ type Catalog struct {
 	Planets []Definition
 	Biomes  map[string]Biome
 	Errors  []string
+	// ClimateShares is true when the project's planet generator declares the
+	// band share lists, so the workshop may write them.
+	ClimateShares bool
 }
 type State struct {
 	Version                              int
@@ -71,6 +193,9 @@ type State struct {
 	Size                                 int
 	New                                  bool
 	BaseArea, BaseOvermap, BaseGenerator string
+	// BiomeOrder is the mapper's arrangement of the biome list. It only shapes
+	// the workshop's lists; generated DM keeps its stable sorted layout.
+	BiomeOrder []string `json:",omitempty"`
 }
 
 var tableSpecs = []Table{
@@ -243,6 +368,7 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 		return nil, fmt.Errorf("This project has no Voidcrew planet generator.")
 	}
 	c := &Catalog{Dme: dme, Biomes: map[string]Biome{}}
+	_, c.ClimateShares = dme.Objects[GeneratorType].Vars.Value("heat_shares")
 	paths := make([]string, 0, len(dme.Objects))
 	for path := range dme.Objects {
 		paths = append(paths, path)
@@ -331,7 +457,34 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 	return c, nil
 }
 func readGenerator(v *dmvars.Variables) Generator {
-	return Generator{Zoom: float64(v.FloatV("perlin_zoom", 65)), Mountain: float64(v.FloatV("mountain_height", .85)), Closed: float64(v.FloatV("initial_closed_chance", 45)), Iterations: v.IntV("smoothing_iterations", 20), Birth: v.IntV("birth_limit", 4), Death: v.IntV("death_limit", 3)}
+	g := Generator{Zoom: float64(v.FloatV("perlin_zoom", 65)), Mountain: float64(v.FloatV("mountain_height", .85)), Closed: float64(v.FloatV("initial_closed_chance", 45)), Iterations: v.IntV("smoothing_iterations", 20), Birth: v.IntV("birth_limit", 4), Death: v.IntV("death_limit", 3)}
+	g.Heat, g.CaveHeat, g.Moisture = DefaultHeatShares, DefaultCaveHeatShares, DefaultMoistureShares
+	readShares(v, "heat_shares", g.Heat[:])
+	readShares(v, "cave_heat_shares", g.CaveHeat[:])
+	readShares(v, "humidity_shares", g.Moisture[:])
+	return g
+}
+
+// readShares fills out from a numeric DM list; absent or malformed lists keep
+// the defaults, matching how the game generator falls back.
+func readShares(v *dmvars.Variables, name string, out []float64) {
+	text, ok := v.Value(name)
+	if !ok {
+		return
+	}
+	items, err := list(text)
+	if err != nil || len(items) != len(out) {
+		return
+	}
+	parsed := make([]float64, len(out))
+	for i, item := range items {
+		f, err := strconv.ParseFloat(strings.TrimSpace(item), 64)
+		if err != nil || !finite(f) || f < 0 {
+			return
+		}
+		parsed[i] = f
+	}
+	copy(out, parsed)
 }
 func NewState(c *Catalog, d Definition) State {
 	s := State{Version: 1, Definition: d, Biomes: map[string]Biome{}, Size: 123, Seeds: Seeds{Height: 12345, Heat: 23456, Moisture: 34567, Detail: 45678}, BaseArea: d.Area, BaseOvermap: d.Overmap, BaseGenerator: d.Generator}
@@ -380,6 +533,11 @@ func (s *State) LocalBiome(path string) string {
 	}
 	b.Path, b.Local, b.Parent = local, true, path
 	s.remapRiverBiome(path, local)
+	for i, p := range s.BiomeOrder {
+		if p == path {
+			s.BiomeOrder[i] = local
+		}
+	}
 	b.Tables = append([]Table(nil), b.Tables...)
 	for i := range b.Tables {
 		b.Tables[i].Entries = append([]Entry(nil), b.Tables[i].Entries...)
@@ -411,7 +569,49 @@ func (s *State) VisibleBiomes() []string {
 		}
 	}
 	sort.Strings(extra)
-	return append(paths, extra...)
+	paths = append(paths, extra...)
+	if len(s.BiomeOrder) == 0 {
+		return paths
+	}
+	// Arranged biomes come first; anything new keeps its default place after.
+	present := map[string]bool{}
+	for _, path := range paths {
+		present[path] = true
+	}
+	placed := map[string]bool{}
+	var out []string
+	for _, path := range s.BiomeOrder {
+		if present[path] && !placed[path] {
+			placed[path] = true
+			out = append(out, path)
+		}
+	}
+	for _, path := range paths {
+		if !placed[path] {
+			out = append(out, path)
+		}
+	}
+	return out
+}
+
+// MoveBiome shifts a listed biome by offset places and keeps the arrangement.
+func (s *State) MoveBiome(path string, offset int) bool {
+	paths := s.VisibleBiomes()
+	at := -1
+	for i, p := range paths {
+		if p == path {
+			at = i
+		}
+	}
+	to := at + offset
+	if at < 0 || to < 0 || to >= len(paths) || offset == 0 {
+		return false
+	}
+	moved := paths[at]
+	paths = append(paths[:at], paths[at+1:]...)
+	paths = append(paths[:to], append([]string{moved}, paths[to:]...)...)
+	s.BiomeOrder = paths
+	return true
 }
 func (s *State) Validate(c *Catalog) error {
 	if err := s.Definition.validateSettings(*s, c); err != nil {
@@ -423,6 +623,22 @@ func (s *State) Validate(c *Catalog) error {
 	g := s.Definition.Settings
 	if !finite(g.Zoom) || g.Zoom < 1 || g.Zoom > 500 || !finite(g.Mountain) || g.Mountain < 0 || g.Mountain > 1 || !finite(g.Closed) || g.Closed < 0 || g.Closed > 100 || g.Iterations < 0 || g.Iterations > 50 || g.Birth < 0 || g.Birth > 8 || g.Death < 0 || g.Death > 8 {
 		return fmt.Errorf("Terrain settings are outside the supported range.")
+	}
+	heat, cave, wet := g.HeatShares(), g.CaveHeatShares(), g.MoistureShares()
+	for _, shares := range [][]float64{heat[:], cave[:], wet[:]} {
+		total := 0.0
+		for _, share := range shares {
+			if !finite(share) || share < 0 || share > 100 {
+				return fmt.Errorf("Climate shares must be between 0%% and 100%%.")
+			}
+			total += share
+		}
+		if total <= 0 {
+			return fmt.Errorf("At least one climate band needs a share above zero.")
+		}
+	}
+	if !c.ClimateShares && (heat != DefaultHeatShares || cave != DefaultCaveHeatShares || wet != DefaultMoistureShares) {
+		return fmt.Errorf("This project's planet generator has no climate shares yet. Update the game code before changing the climate balance.")
 	}
 	if s.Size < 24 || s.Size > 256 {
 		return fmt.Errorf("Preview size must be between 24 and 256 tiles.")

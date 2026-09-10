@@ -127,6 +127,14 @@ func (s *Storage) HasUndo() bool {
 	return s.HasUndoV(s.currentStackId)
 }
 
+// UndoName is the label of the command the next Undo would run.
+func (s *Storage) UndoName() string {
+	if stack, ok := s.commandStacks[s.currentStackId]; ok && len(stack.undo) > 0 {
+		return stack.undo[len(stack.undo)-1].ReadableName()
+	}
+	return ""
+}
+
 func (s *Storage) HasUndoV(id string) bool {
 	if stack, ok := s.commandStacks[id]; ok {
 		return len(stack.undo) > 0

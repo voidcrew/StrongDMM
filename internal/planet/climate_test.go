@@ -12,10 +12,10 @@ func TestClimateBandsAndPreviewProvenance(t *testing.T) {
 			ends = []float64{.25, .5, .75}
 		}
 		for row, end := range ends {
-			if at := ClimateAt(end, .4, caves); at.Row != row || at.Col != 1 || at.Caves != caves {
+			if at := ClimateAt(Generator{}, end, .4, caves); at.Row != row || at.Col != 1 || at.Caves != caves {
 				t.Fatalf("wrong inclusive boundary: %+v", at)
 			}
-			if at := ClimateAt(math.Nextafter(end, 1), math.Nextafter(.4, 1), caves); at.Row != row+1 || at.Col != 2 {
+			if at := ClimateAt(Generator{}, math.Nextafter(end, 1), math.Nextafter(.4, 1), caves); at.Row != row+1 || at.Col != 2 {
 				t.Fatalf("wrong upper neighbor: %+v", at)
 			}
 		}
@@ -30,7 +30,7 @@ func TestClimateBandsAndPreviewProvenance(t *testing.T) {
 		}
 		for _, cell := range p.Cells {
 			isCave := caves || cell.Height > s.Definition.Settings.Mountain
-			want := ClimateAt(cell.Heat, cell.Moisture, isCave)
+			want := ClimateAt(s.Definition.Settings, cell.Heat, cell.Moisture, isCave)
 			if cell.Climate != want {
 				t.Fatalf("tile lost its source rule: %+v", cell)
 			}

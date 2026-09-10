@@ -73,9 +73,10 @@ func (w *Workspace) library() {
 	workshop.Gap()
 	workshop.Section("BIOMES", style.Teal)
 	if w.preview != nil {
-		workshop.Muted(fmt.Sprintf("%d biomes in this planet", len(w.project.State.UsedBiomes())))
+		workshop.Muted(fmt.Sprintf("%d biomes in this planet. Drag to reorder.", len(w.project.State.UsedBiomes())))
 	}
 	imgui.BeginChildV("biome-list", imgui.Vec2{Y: max(130*window.PointSize(), imgui.ContentRegionAvail().Y-280*window.PointSize())}, false, 0)
+	dragging := false
 	for _, path := range w.project.State.VisibleBiomes() {
 		b := w.project.State.Biomes[path]
 		badge := ""
@@ -97,9 +98,21 @@ func (w *Workspace) library() {
 				w.climateView.painting = true
 			}
 		}
+		// Row centres let native acceptance drag with a real pointer.
+		if w.biomeRows == nil {
+			w.biomeRows = map[string]imgui.Vec2{}
+		}
+		w.biomeRows[path] = imgui.Vec2{X: (imgui.ItemRectMin().X + imgui.ItemRectMax().X) / 2, Y: (imgui.ItemRectMin().Y + imgui.ItemRectMax().Y) / 2}
+		if w.dragBiome(path) {
+			dragging = true
+		}
 		w.sprite(w.biomeGround(b), imgui.Vec2{X: pos.X + 9*window.PointSize(), Y: pos.Y + 12*window.PointSize()}, 32*window.PointSize())
 	}
 	imgui.EndChild()
+	if w.reordering && !dragging {
+		w.reordering = false
+		w.recordNamed("Reorder biomes")
+	}
 	if workshop.Button("+ Add biome", false) {
 		w.addBiome()
 	}
@@ -122,6 +135,29 @@ func (w *Workspace) library() {
 	if w.message != "" {
 		workshop.Muted(w.message)
 	}
+}
+
+// A pressed row that leaves its own bounds swaps with the neighbour in the
+// drag direction. The row stays active for the whole drag, which holds back
+// the per-frame undo snapshot until the arrangement is final.
+func (w *Workspace) dragBiome(path string) bool {
+	if !imgui.IsItemActive() {
+		return false
+	}
+	if imgui.IsItemHovered() {
+		return true
+	}
+	offset := 0
+	if delta := imgui.MouseDragDelta(int(imgui.MouseButtonLeft), 0).Y; delta < 0 {
+		offset = -1
+	} else if delta > 0 {
+		offset = 1
+	}
+	if offset != 0 && w.project.State.MoveBiome(path, offset) {
+		w.reordering = true
+		imgui.ResetMouseDragDelta(int(imgui.MouseButtonLeft))
+	}
+	return true
 }
 
 func (w *Workspace) createForm() {
@@ -194,6 +230,31 @@ func (w *Workspace) terrain() {
 	slider("Mountain threshold", &g.Mountain, 0, 1, "%.2f")
 	workshop.Tooltip("Land above this height uses cave biomes. Lower values make more mountains.")
 	slider("Initial rock coverage", &g.Closed, 0, 100, "%.0f%%")
+	if !w.catalog.ClimateShares {
+		workshop.Muted("Climate balance needs a planet generator with heat_shares, cave_heat_shares and humidity_shares. Update the game code to unlock it.")
+	} else if imgui.CollapsingHeaderV("Climate balance", imgui.TreeNodeFlagsDefaultOpen) {
+		workshop.Muted("Drag the handle: right makes hot bands cover more of the map, up makes wet bands cover more. A band at 0% never appears. The Climate view's heat and moisture lenses show the result.")
+		w.climatePad(g)
+		if imgui.CollapsingHeader("Fine-tune bands") {
+			workshop.Muted("Each band's share of the map. Drag one and the others rebalance. Moving the handle afterwards reshapes them again.")
+			heat, cave, wet := g.HeatShares(), g.CaveHeatShares(), g.MoistureShares()
+			workshop.Muted("Surface heat")
+			if shareSliders("heat", planet.HeatNames, heat[:]) {
+				g.Heat = heat
+			}
+			workshop.Muted("Moisture")
+			if shareSliders("moisture", planet.MoistureNames, wet[:]) {
+				g.Moisture = wet
+			}
+			workshop.Muted("Cave heat")
+			if shareSliders("cave", planet.CaveNames, cave[:]) {
+				g.CaveHeat = cave
+			}
+		}
+		if workshop.Button("Reset climate balance", false) {
+			g.Heat, g.CaveHeat, g.Moisture = planet.DefaultHeatShares, planet.DefaultCaveHeatShares, planet.DefaultMoistureShares
+		}
+	}
 	if imgui.CollapsingHeader("Cave shaping") {
 		for _, field := range []struct {
 			name  string
@@ -220,14 +281,17 @@ func (w *Workspace) terrain() {
 	}
 	if workshop.Button("Reroll landscape", false) {
 		seed := uint32(time.Now().UnixNano())
-		w.project.State.Seeds = planet.Seeds{Height: seed % 50001, Heat: (seed ^ 0x846ca68b) % 50001, Moisture: (seed ^ 0x9e3779b9) % 50001, Detail: seed}
+		w.project.State.Seeds = planet.Seeds{Height: seed % 50001, Heat: (seed ^ 0x846ca68b) % 50001, Moisture: (seed ^ 0x9e3779b9) % 50001, Detail: (seed ^ 0x27d4eb2f) % 50001}
 	}
-	if imgui.CollapsingHeader("Seed values") {
+	if imgui.CollapsingHeader("Layout seeds (advanced)") {
+		workshop.Muted("Seeds only pick a different random arrangement of the same climate. They never change how hot or wet the planet is; use Climate balance for that. The game rolls fresh seeds every round.")
 		for _, f := range []struct {
-			name  string
-			value *uint32
-		}{{"Height", &w.project.State.Seeds.Height}, {"Heat", &w.project.State.Seeds.Heat}, {"Moisture", &w.project.State.Seeds.Moisture}, {"Detail", &w.project.State.Seeds.Detail}} {
+			name, detail string
+			value        *uint32
+		}{{"Height", "where mountains and caves fall", &w.project.State.Seeds.Height}, {"Heat", "where the heat bands fall", &w.project.State.Seeds.Heat}, {"Moisture", "where the moisture bands fall", &w.project.State.Seeds.Moisture}, {"Detail", "cave fill and creature rolls", &w.project.State.Seeds.Detail}} {
 			imgui.Text(f.name)
+			imgui.SameLine()
+			workshop.Muted(f.detail)
 			v := fmt.Sprint(*f.value)
 			imgui.SetNextItemWidth(-1)
 			if imgui.InputText("##seed-"+f.name, &v) {
@@ -237,11 +301,73 @@ func (w *Workspace) terrain() {
 				}
 			}
 		}
-		workshop.Muted("Terrain uses rust-g Perlin noise. Cave fill and population use repeatable editor rolls; a game round also depends on world position and its random state.")
 	}
 	if workshop.Button("Back to biomes", false) {
 		w.mode = 0
 	}
+}
+
+// climatePad is a two-axis handle over the heat and moisture scales. Its
+// position is read back from the shares' centre of mass, so it agrees with the
+// sliders, and a drag reshapes every scale around the generator's defaults.
+func (w *Workspace) climatePad(g *planet.Generator) {
+	s := window.PointSize()
+	avail := imgui.ContentRegionAvail().X
+	size := min(avail, 240*s)
+	origin := imgui.CursorScreenPos()
+	origin.X += (avail - size) / 2
+	imgui.SetCursorScreenPos(origin)
+	imgui.InvisibleButton("##climate-pad", imgui.Vec2{X: size, Y: size})
+	w.padMin, w.padSize = origin, size
+	heat, wet := g.HeatShares(), g.MoistureShares()
+	x := float32(planet.ShareBias(heat[:], planet.DefaultHeatShares[:]))
+	y := float32(planet.ShareBias(wet[:], planet.DefaultMoistureShares[:]))
+	if imgui.IsItemActive() {
+		m := imgui.MousePos()
+		x = max(-1, min(1, (m.X-origin.X)/size*2-1))
+		y = max(-1, min(1, 1-(m.Y-origin.Y)/size*2))
+		copy(g.Heat[:], planet.BiasedShares(planet.DefaultHeatShares[:], float64(x)))
+		copy(g.CaveHeat[:], planet.BiasedShares(planet.DefaultCaveHeatShares[:], float64(x)))
+		copy(g.Moisture[:], planet.BiasedShares(planet.DefaultMoistureShares[:], float64(y)))
+	}
+	draw := imgui.WindowDrawList()
+	end := imgui.Vec2{X: origin.X + size, Y: origin.Y + size}
+	draw.AddRectFilledV(origin, end, imgui.PackedColorFromVec4(style.Raised), 6*s, 0)
+	// Tints: cold on the left, hot on the right, wet across the top.
+	cold, hot, damp := imgui.Vec4{X: .2, Y: .45, Z: .85, W: .25}, imgui.Vec4{X: .85, Y: .3, Z: .25, W: .25}, imgui.Vec4{X: .3, Y: .8, Z: .75, W: .18}
+	draw.AddRectFilledV(origin, imgui.Vec2{X: origin.X + size/2, Y: end.Y}, imgui.PackedColorFromVec4(cold), 6*s, imgui.DrawFlagsRoundCornersLeft)
+	draw.AddRectFilledV(imgui.Vec2{X: origin.X + size/2, Y: origin.Y}, end, imgui.PackedColorFromVec4(hot), 6*s, imgui.DrawFlagsRoundCornersRight)
+	draw.AddRectFilledV(origin, imgui.Vec2{X: end.X, Y: origin.Y + size/2}, imgui.PackedColorFromVec4(damp), 6*s, imgui.DrawFlagsRoundCornersTop)
+	grid := imgui.PackedColorFromVec4(imgui.Vec4{X: 1, Y: 1, Z: 1, W: .12})
+	for i := 1; i < 4; i++ {
+		t := float32(i) / 4
+		draw.AddLine(imgui.Vec2{X: origin.X + size*t, Y: origin.Y}, imgui.Vec2{X: origin.X + size*t, Y: end.Y}, grid)
+		draw.AddLine(imgui.Vec2{X: origin.X, Y: origin.Y + size*t}, imgui.Vec2{X: end.X, Y: origin.Y + size*t}, grid)
+	}
+	muted := imgui.PackedColorFromVec4(style.Muted)
+	draw.AddText(imgui.Vec2{X: origin.X + 6*s, Y: end.Y - imgui.TextLineHeight() - 4*s}, muted, "Colder")
+	draw.AddText(imgui.Vec2{X: end.X - imgui.CalcTextSize("Hotter", false, -1).X - 6*s, Y: end.Y - imgui.TextLineHeight() - 4*s}, muted, "Hotter")
+	draw.AddText(imgui.Vec2{X: origin.X + 6*s, Y: origin.Y + 4*s}, muted, "Wetter")
+	draw.AddText(imgui.Vec2{X: origin.X + 6*s, Y: end.Y - 2*imgui.TextLineHeight() - 8*s}, muted, "Drier")
+	knob := imgui.Vec2{X: origin.X + (x+1)/2*size, Y: origin.Y + (1-y)/2*size}
+	draw.AddCircleFilled(knob, 9*s, imgui.PackedColorFromVec4(style.Teal))
+	draw.AddCircle(knob, 9*s, imgui.PackedColorFromVec4(style.Text))
+	imgui.SetCursorScreenPos(imgui.Vec2{X: origin.X, Y: end.Y + 6*s})
+	workshop.Muted(fmt.Sprintf("Heat %+.0f%%   Moisture %+.0f%%", x*100, y*100))
+}
+
+// One row per band: the slider shows its share and the label names the band.
+func shareSliders(id string, names []string, shares []float64) bool {
+	changed := false
+	for i, name := range names {
+		v := float32(shares[i])
+		imgui.SetNextItemWidth(imgui.ContentRegionAvail().X - 96*window.PointSize())
+		if imgui.SliderFloatV(name+"##share-"+id+"-"+name, &v, 0, 100, "%.0f%%", 0) {
+			planet.BalanceShares(shares, i, float64(v))
+			changed = true
+		}
+	}
+	return changed
 }
 
 func (w *Workspace) editor() {

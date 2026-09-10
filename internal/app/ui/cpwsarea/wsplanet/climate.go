@@ -468,8 +468,8 @@ var heatColors = []uint32{0x3656b9, 0x27b7db, 0xa4ddd4, 0xffef9c, 0xf89a42, 0xdb
 var caveHeatColors = []uint32{0x3656b9, 0x27b7db, 0xffef9c, 0xdb424f}
 var moistureColors = []uint32{0xd9974f, 0xe9ca8a, 0x91d6c4, 0x3399cf, 0x354caf}
 
-func climateBandColor(c planet.Cell, lens int, caves bool) imgui.Vec4 {
-	band := planet.ClimateAt(c.Heat, c.Moisture, caves)
+func climateBandColor(g planet.Generator, c planet.Cell, lens int, caves bool) imgui.Vec4 {
+	band := planet.ClimateAt(g, c.Heat, c.Moisture, caves)
 	if lens == 2 {
 		return style.RGB(moistureColors[band.Col])
 	}
@@ -480,15 +480,24 @@ func climateBandColor(c planet.Cell, lens int, caves bool) imgui.Vec4 {
 }
 
 func (w *Workspace) climateLegend() {
-	labels, colors := planet.HeatNames, heatColors
-	ranges := []string{"0-20%", "20-40%", "40-60%", "60-65%", "65-80%", "80-100%"}
+	g := w.project.State.Definition.Settings
+	heat, cave, wet := g.HeatShares(), g.CaveHeatShares(), g.MoistureShares()
+	labels, colors, shares := planet.HeatNames, heatColors, heat[:]
 	if w.climateView.layer {
-		labels, colors = planet.CaveNames, caveHeatColors
-		ranges = []string{"0-25%", "25-50%", "50-75%", "75-100%"}
+		labels, colors, shares = planet.CaveNames, caveHeatColors, cave[:]
 	}
 	if w.climateView.lens == 2 {
-		labels, colors = planet.MoistureNames, moistureColors
-		ranges = []string{"0-20%", "20-40%", "40-60%", "60-80%", "80-100%"}
+		labels, colors, shares = planet.MoistureNames, moistureColors, wet[:]
+	}
+	total := 0.0
+	for _, share := range shares {
+		total += share
+	}
+	ranges := make([]string, len(shares))
+	for i, share := range shares {
+		if total > 0 {
+			ranges[i] = fmt.Sprintf("%.0f%% of the map", share/total*100)
+		}
 	}
 	s, start := window.PointSize(), imgui.CursorScreenPos()
 	width := imgui.ContentRegionAvail().X / float32(len(labels))
@@ -601,7 +610,7 @@ func (w *Workspace) climateOverlay() {
 			return imgui.Vec4{W: .73}
 		}
 		if v.lens == 1 || v.lens == 2 {
-			shade := climateBandColor(c, v.lens, v.layer)
+			shade := climateBandColor(w.project.State.Definition.Settings, c, v.lens, v.layer)
 			if focused && c.Climate != cell {
 				shade.X *= .45
 				shade.Y *= .45

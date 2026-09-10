@@ -101,3 +101,12 @@ func (ws *Workspace) Closed() bool {
 func (ws *Workspace) Save() bool {
 	return ws.Content().Save()
 }
+
+// SaveAll writes every draft a workshop holds. Save All and the close
+// confirmation use it; contents with a single document save as usual.
+func (ws *Workspace) SaveAll() bool {
+	if drafts, ok := ws.Content().(interface{ SaveAll() bool }); ok {
+		return drafts.SaveAll()
+	}
+	return ws.Save()
+}

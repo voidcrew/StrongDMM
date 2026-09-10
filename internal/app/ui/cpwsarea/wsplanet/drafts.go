@@ -4,9 +4,12 @@ import (
 	"sort"
 	"strings"
 
+	"sdmm/internal/app/ui/dialog"
 	"sdmm/internal/app/ui/workshop"
 	"sdmm/internal/dmapi/dmenv"
 	"sdmm/internal/planet"
+
+	"github.com/rs/zerolog/log"
 )
 
 type planetDraft struct {
@@ -173,6 +176,7 @@ func (w *Workspace) saveCurrent() bool {
 	if w.project == nil {
 		return true
 	}
+	w.finishClimateStroke()
 	if !w.commitName() {
 		return false
 	}
@@ -203,9 +207,45 @@ func (w *Workspace) saveCurrent() bool {
 	return true
 }
 
-// The workspace's normal Save/close action covers every open draft. The review
-// panel uses saveCurrent, matching the one planet whose files it displays.
+// A creation form with a typed name is unsaved work too.
+func (w *Workspace) pendingCreation() bool {
+	return w.creating && strings.TrimSpace(w.newName) != ""
+}
+
+// Save writes the visible planet with its pending edits, exactly like the
+// review panel's Save planet button. A creation form with a name is completed
+// first so File > Save never quietly skips the planet being built.
 func (w *Workspace) Save() bool {
+	if w.pendingCreation() {
+		name := strings.TrimSpace(w.newName)
+		w.createPlanet()
+		if w.creating {
+			w.reportSaveFailure(name)
+			return false
+		}
+	}
+	if w.project == nil {
+		return true
+	}
+	name := w.project.State.Definition.Name
+	if !w.currentModified() {
+		w.message = name + " has no unsaved changes."
+		return true
+	}
+	if !w.saveCurrent() {
+		w.reportSaveFailure(name)
+		return false
+	}
+	log.Print("planet saved:", w.project.GeneratedPath())
+	return true
+}
+
+// SaveAll also writes every hidden draft. Closing the workshop relies on it,
+// and a failure leaves the failing planet on screen with its edits intact.
+func (w *Workspace) SaveAll() bool {
+	if !w.Save() {
+		return false
+	}
 	w.rememberCurrent()
 	original := ""
 	if w.project != nil {
@@ -213,15 +253,24 @@ func (w *Workspace) Save() bool {
 	}
 	for _, d := range w.planetChoices() {
 		draft := w.drafts[d.Path]
-		if draft == nil || (!draft.nameDirty && !draft.project.Modified()) {
+		if draft == nil || draft.project == w.project || (!draft.nameDirty && !draft.project.Modified()) {
 			continue
 		}
 		w.switchPlanet(d.Path)
 		if !w.saveCurrent() {
+			w.reportSaveFailure(d.Name)
 			return false
 		}
+		log.Print("planet saved:", w.project.GeneratedPath())
 	}
 	w.switchPlanet(original)
 	w.message = "All open planets saved to the project."
 	return true
+}
+
+// Menu and shortcut saves have no panel of their own, so a failure is raised
+// where it cannot be missed. The reason stays in the library pane as well.
+func (w *Workspace) reportSaveFailure(name string) {
+	log.Printf("planet not saved: %s: %s", name, w.message)
+	dialog.Open(dialog.TypeInformation{Title: "Planet not saved", Information: name + " was not saved.\n" + w.message})
 }

@@ -5,98 +5,16 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
-	"strings"
 	"testing"
 
 	"sdmm/internal/dmapi/dmenv"
+	"sdmm/internal/planet/planettest"
 	"sdmm/third_party/sdmmparser"
 )
 
 func fixture(t *testing.T) *Catalog {
 	t.Helper()
-	root := t.TempDir()
-	source := `/datum/map_generator/planet_generator
-	var/perlin_zoom = 65
-	var/mountain_height = 0.85
-	var/initial_closed_chance = 45
-	var/smoothing_iterations = 20
-	var/birth_limit = 4
-	var/death_limit = 3
-/turf/open/grass
-/turf/open/sand
-/turf/closed/rock
-/obj/tree
-/mob/living/test
-/datum/biome
-	var/open_turf_types = list(/turf/open/grass = 1)
-	var/list/flora_spawn_list = list(/obj/tree = 1)
-	var/list/feature_spawn_list
-	var/list/mob_spawn_list = list(/mob/living/test = 1)
-	var/list/dangerous_mob_spawn_list
-	var/list/megafauna_spawn_list
-	var/flora_spawn_chance = 2
-	var/feature_spawn_chance = 0.1
-	var/mob_spawn_chance = 6
-/datum/biome/grass
-/datum/biome/cave
-	var/closed_turf_types = list(/turf/closed/rock = 1)
-/datum/biome/cave/rock
-/datum/planet
-	var/list/overworld_biomes
-	var/list/cave_biomes
-/datum/planet/test
-	// Keep my handwritten settings and comments.
-	var/custom = 17
-	overworld_biomes = SURFACE
-	cave_biomes = CAVES
-/datum/planet/other
-	overworld_biomes = SURFACE
-	cave_biomes = CAVES
-/area/overmap_encounter/planetoid
-	var/planet_type
-	var/map_generator
-/area/overmap_encounter/planetoid/test
-	planet_type = /datum/planet/test
-	map_generator = /datum/map_generator/planet_generator
-/area/overmap_encounter/planetoid/cave
-/datum/overmap/planet
-	var/name
-	var/planet_template
-	var/mapgen
-	var/target_area
-	var/surface_area
-/datum/overmap/planet/test
-	name = "Test planet"
-	planet_template = /datum/planet/test
-	mapgen = /datum/map_generator/planet_generator
-	target_area = /area/overmap_encounter/planetoid/test
-	surface_area = /area/overmap_encounter/planetoid/test
-/obj/structure/overmap/planet
-	var/planet
-`
-	grid := func(n int, path string) [][]string {
-		out := make([][]string, n)
-		for i := range out {
-			out[i] = []string{path, path, path, path, path}
-		}
-		return out
-	}
-	source = strings.ReplaceAll(source, "SURFACE", renderClimate(grid(6, "/datum/biome/grass"), HeatKeys))
-	source = strings.ReplaceAll(source, "CAVES", renderClimate(grid(4, "/datum/biome/cave/rock"), CaveKeys))
-	if err := os.WriteFile(filepath.Join(root, "content.dm"), []byte(source), 0600); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(root, "test.dme"), []byte("#include \"content.dm\"\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	registry := filepath.Join(root, markerRegistry)
-	if err := os.MkdirAll(filepath.Dir(registry), 0700); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(registry, []byte("/datum/controller/subsystem/overmap/proc/setup_planets()\n\tvar/list/dynamic_planet_markers = list(\n\t\t/obj/structure/overmap/planet/test,\n\t)\n"), 0600); err != nil {
-		t.Fatal(err)
-	}
-	return load(t, filepath.Join(root, "test.dme"))
+	return load(t, planettest.Write(t))
 }
 func load(t *testing.T, path string) *Catalog {
 	t.Helper()

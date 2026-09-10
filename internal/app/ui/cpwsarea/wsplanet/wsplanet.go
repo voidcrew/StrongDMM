@@ -65,12 +65,22 @@ type Workspace struct {
 	drafts                                                                map[string]*planetDraft
 	previousPlanet                                                        string
 	cancelling                                                            bool
+	reordering                                                            bool
+	biomeRows                                                             map[string]imgui.Vec2
+	padMin                                                                imgui.Vec2
+	padSize                                                               float32
 }
 
 func New(app App) *Workspace {
-	w := &Workspace{app: app, population: true, fit: true, replace: -1, blank: true, canvas: canvas.New(), control: canvas.NewControl()}
+	c := canvas.New()
+	c.ClearColor = canvas.Color{R: .035, G: .045, B: .05, A: 1}
+	return build(app, c)
+}
+
+// Drafts and saves need no GL context, so tests build without a canvas.
+func build(app App, c *canvas.Canvas) *Workspace {
+	w := &Workspace{app: app, population: true, fit: true, replace: -1, blank: true, canvas: c, control: canvas.NewControl()}
 	w.control.AtCursor = true
-	w.canvas.ClearColor = canvas.Color{R: .035, G: .045, B: .05, A: 1}
 	var err error
 	w.catalog, err = planet.Discover(app.LoadedEnvironment())
 	if err != nil {
@@ -113,7 +123,7 @@ func (w *Workspace) CommandStackId() string {
 }
 func (w *Workspace) planetStack(path string) string { return "planet:" + w.Id() + ":" + path }
 func (w *Workspace) IsModified() bool {
-	if w.currentModified() {
+	if w.pendingCreation() || w.currentModified() {
 		return true
 	}
 	for _, draft := range w.drafts {
@@ -134,7 +144,9 @@ func (*Workspace) OnFocusChange(f bool) {
 func (w *Workspace) Dispose() {
 	texture := w.climateTexture
 	window.RunLater(func() { gl.DeleteTextures(1, &texture) })
-	w.canvas.Dispose()
+	if w.canvas != nil {
+		w.canvas.Dispose()
+	}
 	for path := range w.drafts {
 		w.app.CommandStorage().DisposeStack(w.planetStack(path))
 	}

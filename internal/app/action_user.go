@@ -157,11 +157,11 @@ func (a *app) DoSave() {
 	}
 }
 
-// DoSaveAll saves all active maps.
+// DoSaveAll saves all active maps and every draft in open workshops.
 func (a *app) DoSaveAll() {
 	log.Print("do save all")
 	for _, ws := range a.layout.WsArea.MapWorkspaces() {
-		ws.Save()
+		ws.SaveAll()
 	}
 }
 

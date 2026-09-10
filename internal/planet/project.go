@@ -38,7 +38,7 @@ func Open(c *Catalog, d Definition) (*Project, error) {
 			return nil, fmt.Errorf("Invalid planet workshop project: %s", filepath.Base(p.meta))
 		}
 		// DM remains authoritative after a mapper or coder edits it outside the workshop.
-		p.State.Seeds, p.State.Size = saved.Seeds, saved.Size
+		p.State.Seeds, p.State.Size, p.State.BiomeOrder = saved.Seeds, saved.Size, saved.BiomeOrder
 		p.State.New, p.State.BaseArea, p.State.BaseOvermap, p.State.BaseGenerator = saved.New, saved.BaseArea, saved.BaseOvermap, saved.BaseGenerator
 		if err := p.capture(); err != nil {
 			return nil, err
@@ -72,6 +72,11 @@ func Create(c *Catalog, base Definition, name string, blank bool) (*Project, err
 		if strings.EqualFold(strings.Join(strings.Fields(d.Name), " "), strings.Join(strings.Fields(name), " ")) {
 			return nil, fmt.Errorf("A planet already uses that name.")
 		}
+	}
+	// Generated files carry the planet's own identifier, so a handwritten
+	// planet with that identifier would share them once opened here.
+	if c.Dme.Objects[PlanetType+"/"+id] != nil {
+		return nil, fmt.Errorf("An existing planet already uses the identifier %s. Choose a different name.", id)
 	}
 	p := &Project{Catalog: c, State: NewState(c, base), sources: map[string]ship.FileChange{}}
 	s := &p.State
@@ -131,10 +136,23 @@ func Create(c *Catalog, base Definition, name string, blank bool) (*Project, err
 	p.starting = Clone(p.State)
 	return p, nil
 }
+
+// Generated files are named after the planet itself. Projects saved by older
+// workshop versions keep their workshop_ prefixed files, so they stay readable
+// and never gain a second copy of their definitions.
 func (p *Project) paths() {
-	id := ID(strings.TrimPrefix(p.State.Definition.Path, PlanetType+"/"))
-	p.meta = filepath.Join(p.Catalog.Dme.RootDir, "voidcrew", "mapping", "planet_projects", id+".json")
-	p.code = filepath.Join(p.Catalog.Dme.RootDir, "voidcrew", "mapping", "planet_projects", id+".dm")
+	dir := filepath.Join(p.Catalog.Dme.RootDir, "voidcrew", "mapping", "planet_projects")
+	id := p.identifier()
+	if legacy := ID(strings.TrimPrefix(p.State.Definition.Path, PlanetType+"/")); legacy != id {
+		code := filepath.Join(dir, legacy+".dm")
+		if o := p.Catalog.Dme.Objects[p.State.Definition.Path]; o != nil && o.Location.File != "" && strings.EqualFold(filepath.Clean(filepath.Join(p.Catalog.Dme.RootDir, o.Location.File)), filepath.Clean(code)) {
+			id = legacy
+		} else if _, err := os.Stat(filepath.Join(dir, legacy+".json")); err == nil {
+			id = legacy
+		}
+	}
+	p.meta = filepath.Join(dir, id+".json")
+	p.code = filepath.Join(dir, id+".dm")
 }
 func (p *Project) capture() error {
 	paths := []string{p.meta, p.code, p.Catalog.Dme.RootFile}
@@ -224,7 +242,18 @@ func (p *Project) generated() []byte {
 	if customGenerator {
 		fmt.Fprintf(&b, "%s\n\tparent_type = %s\n", p.generatorPath(), s.BaseGenerator)
 		g := d.Settings
-		fmt.Fprintf(&b, "\tperlin_zoom = %s\n\tmountain_height = %s\n\tinitial_closed_chance = %s\n\tsmoothing_iterations = %d\n\tbirth_limit = %d\n\tdeath_limit = %d\n\n", number(g.Zoom), number(g.Mountain), number(g.Closed), g.Iterations, g.Birth, g.Death)
+		fmt.Fprintf(&b, "\tperlin_zoom = %s\n\tmountain_height = %s\n\tinitial_closed_chance = %s\n\tsmoothing_iterations = %d\n\tbirth_limit = %d\n\tdeath_limit = %d\n", number(g.Zoom), number(g.Mountain), number(g.Closed), g.Iterations, g.Birth, g.Death)
+		// Default shares stay implicit so earlier saves keep verifying unchanged.
+		if g.HeatShares() != DefaultHeatShares {
+			fmt.Fprintf(&b, "\theat_shares = %s\n", renderNumbers(g.Heat[:]))
+		}
+		if g.CaveHeatShares() != DefaultCaveHeatShares {
+			fmt.Fprintf(&b, "\tcave_heat_shares = %s\n", renderNumbers(g.CaveHeat[:]))
+		}
+		if g.MoistureShares() != DefaultMoistureShares {
+			fmt.Fprintf(&b, "\thumidity_shares = %s\n", renderNumbers(g.Moisture[:]))
+		}
+		b.WriteString("\n")
 	}
 	if s.New {
 		fmt.Fprintf(&b, "%s\n\toverworld_biomes = %s\n\tcave_biomes = %s\n", d.Path, renderClimate(d.Surface, HeatKeys), renderClimate(d.Caves, CaveKeys))
@@ -260,6 +289,13 @@ func number(n float64) string { return strconv.FormatFloat(n, 'f', -1, 64) }
 func quote(s string) string {
 	q := strconv.Quote(s)
 	return strings.ReplaceAll(strings.ReplaceAll(q, "[", `\[`), "]", `\]`)
+}
+func renderNumbers(values []float64) string {
+	var v []string
+	for _, value := range values {
+		v = append(v, number(value))
+	}
+	return "list(" + strings.Join(v, ", ") + ")"
 }
 func renderWeights(entries []Entry) string {
 	var v []string

@@ -152,6 +152,8 @@ func TestNativePlanetWorkshop(t *testing.T) {
 	}
 	testPreviewInspection(t, ws, io, render, capture, &viewWidth, &viewHeight)
 	testPlanetDraftNavigation(t, ws, capture)
+	testBiomeReorder(t, ws, io, render, capture)
+	testClimatePad(t, ws, io, render, capture)
 	testCavePicker(t, ws, capture)
 	testRiverPreview(t, ws, io, render, capture)
 	ws.mode = 1
