@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/SpaiR/imgui-go"
+	"github.com/go-gl/gl/v3.3-core/gl"
 	"sdmm/internal/planet"
 )
 
@@ -133,10 +134,130 @@ func testClimatePainting(t *testing.T, w *Workspace, io imgui.IO, render func(),
 		t.Fatal("map inspection edited the planet")
 	}
 	capture("climate-map-selection")
+	// A fast map drag must visit the actual terrain between mouse samples,
+	// rather than interpolate through unrelated climate-grid coordinates.
+	w.climateView.painting, w.climateView.brush = true, brush.Path
+	capture("climate-viewer-brush")
+	mapPoint := func(x, y int) imgui.Vec2 {
+		cam := w.canvas.Render().Camera
+		return imgui.Vec2{X: w.control.PosMin().X + ((float32(x)+.5)*32+cam.ShiftX)*cam.Scale, Y: w.control.PosMax().Y - ((float32(y)+.5)*32+cam.ShiftY)*cam.Scale}
+	}
+	mapBefore, mapCamera := planet.Clone(w.project.State), *w.canvas.Render().Camera
+	var touched map[planet.ClimateCell]bool
+	mapRow := 0
+	for y := 3; y < w.preview.Map.MaxY-3; y++ {
+		row := map[planet.ClimateCell]bool{}
+		for x := 3; x < w.preview.Map.MaxX-3; x++ {
+			row[w.preview.Cells[y*w.preview.Map.MaxX+x].Climate] = true
+		}
+		if len(row) > len(touched) {
+			touched, mapRow = row, y
+		}
+	}
+	if len(touched) < 3 {
+		t.Fatal("map brush fixture does not cross enough climate boundaries")
+	}
+	io.SetMousePosition(mapPoint(3, mapRow))
+	render()
+	io.SetMouseButtonDown(0, true)
+	render()
+	io.SetMousePosition(mapPoint(w.preview.Map.MaxX-4, mapRow))
+	render()
+	if !w.climateView.stroke || !w.climateView.strokeMap {
+		t.Fatal("map brush did not keep its drag active")
+	}
+	io.SetMousePosition(imgui.Vec2{X: -1000, Y: -1000})
+	io.SetMouseButtonDown(0, false)
+	capture("climate-viewer-painted")
+	for row, cells := range mapBefore.Definition.Surface {
+		for col, old := range cells {
+			want := old
+			if touched[planet.ClimateCell{Row: row, Col: col}] {
+				want = brush.Path
+			}
+			if w.project.State.Definition.Surface[row][col] != want {
+				t.Fatalf("map stroke changed the wrong rules at %d,%d", row, col)
+			}
+		}
+	}
+	if w.climateView.stroke || *w.canvas.Render().Camera != mapCamera || w.project.State.Seeds != mapBefore.Seeds {
+		t.Fatal("map stroke moved the camera or seed, or did not end")
+	}
+	mapAfter := planet.Clone(w.project.State)
+	w.app.CommandStorage().Undo()
+	if !reflect.DeepEqual(mapBefore, w.project.State) {
+		t.Fatal("one undo did not restore the entire map stroke")
+	}
+	w.app.CommandStorage().Redo()
+	if !reflect.DeepEqual(mapAfter, w.project.State) {
+		t.Fatal("redo did not restore the map stroke")
+	}
+	w.app.CommandStorage().Undo()
+	w.lastBuild = time.Time{}
+	render()
+	// Dragging into the viewer from another control must not start painting.
+	io.SetMouseButtonDown(0, true)
+	render()
+	io.SetMousePosition(mapPoint(25, 25))
+	render()
+	io.SetMouseButtonDown(0, false)
+	render()
+	if !reflect.DeepEqual(mapBefore, w.project.State) {
+		t.Fatal("entering the viewer with the button held painted terrain")
+	}
+	// Leaving the viewer breaks the interpolation path while retaining one undo.
+	ends := map[planet.ClimateCell]bool{
+		w.preview.Cells[mapRow*w.preview.Map.MaxX+3].Climate:                    true,
+		w.preview.Cells[mapRow*w.preview.Map.MaxX+w.preview.Map.MaxX-4].Climate: true,
+	}
+	io.SetMousePosition(mapPoint(3, mapRow))
+	render()
+	io.SetMouseButtonDown(0, true)
+	render()
+	io.SetMousePosition(imgui.Vec2{X: -1000, Y: -1000})
+	render()
+	io.SetMousePosition(mapPoint(w.preview.Map.MaxX-4, mapRow))
+	render()
+	io.SetMouseButtonDown(0, false)
+	render()
+	for row, cells := range mapBefore.Definition.Surface {
+		for col, old := range cells {
+			want := old
+			if ends[planet.ClimateCell{Row: row, Col: col}] {
+				want = brush.Path
+			}
+			if w.project.State.Definition.Surface[row][col] != want {
+				t.Fatal("map reentry painted across the skipped terrain")
+			}
+		}
+	}
+	w.app.CommandStorage().Undo()
+	if !reflect.DeepEqual(mapBefore, w.project.State) {
+		t.Fatal("reentry split the map stroke's undo")
+	}
+	io.SetMousePosition(mapPoint(25, 25))
+	render()
+	io.SetMouseButtonDown(1, true)
+	render()
+	io.SetMouseButtonDown(1, false)
+	render()
+	if w.climateView.brush != w.climatePath(w.preview.Cells[index].Climate) || !w.climateView.painting {
+		t.Fatal("viewer eyedropper did not select the hovered biome")
+	}
+	w.climateView.painting, w.climateView.brush = false, brush.Path
 	io.SetMousePosition(imgui.Vec2{X: -1000, Y: -1000})
 	w.climateView.focused = false
 	w.climateView.lens = 1
 	capture("climate-heat")
+	var previous, minFilter, magFilter int32
+	gl.GetIntegerv(gl.TEXTURE_BINDING_2D, &previous)
+	gl.BindTexture(gl.TEXTURE_2D, w.climateTexture)
+	gl.GetTexParameteriv(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, &minFilter)
+	gl.GetTexParameteriv(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, &magFilter)
+	gl.BindTexture(gl.TEXTURE_2D, uint32(previous))
+	if minFilter != gl.NEAREST || magFilter != gl.NEAREST {
+		t.Fatal("climate texture blurs tile edges")
+	}
 	w.climateView.lens = 2
 	capture("climate-moisture")
 	w.climateView.lens = 0
@@ -184,6 +305,16 @@ func testClimatePainting(t *testing.T, w *Workspace, io imgui.IO, render func(),
 		t.Fatal("mountain inspection changed the preview layer")
 	}
 	capture("climate-mountain-rule")
+	old = planet.Clone(w.project.State)
+	w.climateView.painting, w.climateView.brush = true, brush.Path
+	io.SetMouseButtonDown(0, true)
+	render()
+	io.SetMouseButtonDown(0, false)
+	render()
+	if !reflect.DeepEqual(old, w.project.State) {
+		t.Fatal("map brush put a surface biome in mountain cave climate")
+	}
+	w.climateView.painting = false
 	io.SetMousePosition(imgui.Vec2{X: -1000, Y: -1000})
 	w.project.State.Size = 256
 	w.climateView.focused, w.climateView.lens, w.fit = false, 1, true

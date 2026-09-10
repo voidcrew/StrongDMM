@@ -1,5 +1,5 @@
 VOIDWORKS - WINDOWS X64
-Version: 0.5.15-beta.2 - Planet Workshop beta
+Version: 0.5.15-beta.3 - Planet Workshop beta
 
 START
 1. Extract the whole ZIP into its own writable folder, beside your stable editor.

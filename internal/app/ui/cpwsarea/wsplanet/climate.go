@@ -11,7 +11,6 @@ import (
 	"sdmm/internal/app/window"
 	"sdmm/internal/imguiext/style"
 	"sdmm/internal/planet"
-	"sdmm/internal/platform"
 )
 
 type climateView struct {
@@ -24,6 +23,8 @@ type climateView struct {
 	counts                        map[planet.ClimateCell]int
 	lastPaint                     planet.ClimateCell
 	lastPaintValid                bool
+	strokeMap, lastMapValid       bool
+	lastMap                       image.Point
 	overlayKey                    climateOverlayKey
 	// Screen bounds also let native acceptance exercise actual pointer strokes.
 	gridMin, cellSize imgui.Vec2
@@ -34,6 +35,7 @@ type climateOverlayKey struct {
 	cell    planet.ClimateCell
 	lens    int
 	focused bool
+	caves   bool
 	changes uint64
 }
 
@@ -91,6 +93,7 @@ func (w *Workspace) beginClimateStroke() bool {
 	}
 	v.stroke = true
 	v.lastPaintValid = false
+	v.lastMapValid = false
 	return true
 }
 
@@ -105,6 +108,7 @@ func (w *Workspace) paintClimate(cell planet.ClimateCell) {
 	w.project.State.Biomes[b.Path] = b
 	w.climateGrid(cell.Caves)[cell.Row][cell.Col] = b.Path
 	w.row, w.col = cell.Row, cell.Col
+	w.climateView.layer = cell.Caves
 	w.climateView.focused = true
 }
 
@@ -125,6 +129,7 @@ func (w *Workspace) dragClimate(cell planet.ClimateCell) {
 func (w *Workspace) finishClimateStroke() {
 	if w.climateView.stroke {
 		w.climateView.stroke = false
+		w.climateView.lastMapValid = false
 		w.recordNamed("Paint climate")
 	}
 }
@@ -161,7 +166,7 @@ func (w *Workspace) climate() {
 		}
 	}
 	workshop.Title("Where biomes grow")
-	workshop.Muted("Explore a climate cell to find its terrain. Choose a biome, then paint across the grid.")
+	workshop.Muted("Explore the planet's climate. Choose a biome brush beside the viewer to change where it grows.")
 	s := window.PointSize()
 	pos, available := imgui.CursorPos(), imgui.ContentRegionAvail()
 	gridPos, gridSize, mapPos, mapSize := pos, available, pos, available
@@ -171,7 +176,7 @@ func (w *Workspace) climate() {
 		mapSize.X -= gridSize.X + 12*s
 	} else {
 		// Each pane has its own space: scrolling the rules never hides the map.
-		mapSize.Y = max(230*s, available.Y*.52)
+		mapSize.Y = max(330*s, available.Y*.70)
 		gridPos.Y += mapSize.Y + 8*s
 		gridSize.Y = max(80*s, available.Y-mapSize.Y-8*s)
 	}
@@ -199,6 +204,7 @@ func climateToggle(label string, active bool) bool {
 
 func (w *Workspace) climateControls() {
 	v := &w.climateView
+	workshop.Section("CLIMATE RULES", style.Teal)
 	for i, name := range []string{"Surface", "Caves"} {
 		if i > 0 {
 			imgui.SameLine()
@@ -209,31 +215,7 @@ func (w *Workspace) climateControls() {
 			w.row, w.col = 0, 0
 		}
 	}
-	imgui.SameLine()
-	if climateToggle("Inspect", !v.painting) {
-		v.painting = false
-	}
-	imgui.SameLine()
-	if climateToggle("Paint", v.painting) {
-		v.painting = true
-	}
 	b := w.climateBrush()
-	label := b.Name
-	if b.Path == "" {
-		label = "Choose a biome"
-	}
-	if combo("Biome brush", label) {
-		for _, choice := range w.project.BiomeChoices(v.layer) {
-			pos := imgui.CursorScreenPos()
-			if imgui.SelectableV("    "+choice.Name+"##brush-"+choice.Path, v.brush == choice.Path, 0, imgui.Vec2{Y: 26 * window.PointSize()}) {
-				if w.commitName() {
-					v.brush, v.painting = choice.Path, true
-				}
-			}
-			w.sprite(w.biomeGround(choice), pos, 22*window.PointSize())
-		}
-		imgui.EndCombo()
-	}
 	grid := w.climateGrid(v.layer)
 	if len(grid) == 0 {
 		workshop.Muted("This planet has no rules for this layer.")
@@ -353,11 +335,12 @@ func (w *Workspace) climateTiles() {
 				v.hover, v.hoverValid = cell, true
 				if imgui.IsMouseClicked(imgui.MouseButtonLeft) {
 					if v.painting {
+						v.strokeMap = false
 						w.dragClimate(cell)
 					} else {
 						w.focusClimate(cell)
 					}
-				} else if v.painting && v.stroke && imgui.IsMouseDown(imgui.MouseButtonLeft) {
+				} else if v.painting && v.stroke && !v.strokeMap && imgui.IsMouseDown(imgui.MouseButtonLeft) {
 					w.dragClimate(cell)
 				}
 				if imgui.IsMouseClicked(imgui.MouseButtonRight) {
@@ -390,6 +373,7 @@ func (w *Workspace) climateTiles() {
 
 func (w *Workspace) climateMap() {
 	v := &w.climateView
+	w.climateBrushControls()
 	imgui.SetNextItemWidth(max(100*window.PointSize(), imgui.ContentRegionAvail().X-120*window.PointSize()))
 	labels := []string{"Terrain", "Heat", "Moisture", "Last stroke"}
 	if imgui.BeginCombo("##climate-lens", labels[v.lens]) {
@@ -413,9 +397,9 @@ func (w *Workspace) climateMap() {
 		return
 	}
 	if v.lens == 1 {
-		workshop.Muted("Blue: colder  /  Gold: hotter")
+		w.climateLegend()
 	} else if v.lens == 2 {
-		workshop.Muted("Sand: drier  /  Blue: wetter")
+		w.climateLegend()
 	} else if v.lens == 3 {
 		workshop.Muted(fmt.Sprintf("%d tiles changed by the last stroke", w.climateCountChanges()))
 	} else {
@@ -430,7 +414,7 @@ func (w *Workspace) climateMap() {
 		workshop.Wrapped(climateLabel(cell) + " -> " + w.project.State.Biomes[w.climatePath(cell)].Name)
 		count, total := v.counts[cell], len(w.preview.Cells)
 		b := w.climateBrush()
-		if v.painting && v.hoverValid && !v.mapHover && b.Path != "" && (!cell.Caves || b.Cave) {
+		if v.painting && v.hoverValid && b.Path != "" && (!cell.Caves || b.Cave) {
 			change := count
 			if w.climatePath(cell) == b.Path {
 				change = 0
@@ -440,24 +424,116 @@ func (w *Workspace) climateMap() {
 			workshop.Muted(fmt.Sprintf("%d matching tiles / %s of this preview", count, climatePercent(count, total)))
 		}
 	} else {
-		workshop.Muted("Hover a grid cell to reveal its terrain. Click the map to select its rule.")
+		workshop.Muted("Hover to reveal matching terrain. Right-click the map or grid to pick a biome brush.")
 	}
+}
+
+func (w *Workspace) climateBrushControls() {
+	v := &w.climateView
+	if climateToggle("Inspect", !v.painting) {
+		v.painting = false
+	}
+	imgui.SameLine()
+	if climateToggle("Paint", v.painting) {
+		v.painting = true
+	}
+	imgui.SameLine()
+	imgui.Text("Biome brush")
+	b := w.climateBrush()
+	label := b.Name
+	if b.Path == "" {
+		label = "Choose a biome"
+	}
+	imgui.SetNextItemWidth(-1)
+	if imgui.BeginCombo("##viewer-biome-brush", label) {
+		for _, choice := range w.project.BiomeChoices(v.layer) {
+			pos := imgui.CursorScreenPos()
+			if imgui.SelectableV("    "+choice.Name+"##brush-"+choice.Path, v.brush == choice.Path, 0, imgui.Vec2{Y: 26 * window.PointSize()}) && w.commitName() {
+				v.brush, v.painting = choice.Path, true
+			}
+			w.sprite(w.biomeGround(choice), pos, 22*window.PointSize())
+		}
+		imgui.EndCombo()
+	}
+	if v.painting {
+		workshop.Muted("Drag on the map or grid. Painting changes all tiles with the same climate rule.")
+	} else {
+		workshop.Muted("Click terrain to inspect its climate rule. Right-click to pick its biome.")
+	}
+}
+
+// These bands use the generator's actual climate cutoffs. An opaque palette
+// keeps terrain textures and lighting from muddying their boundaries.
+var heatColors = []uint32{0x3656b9, 0x27b7db, 0xa4ddd4, 0xffef9c, 0xf89a42, 0xdb424f}
+var caveHeatColors = []uint32{0x3656b9, 0x27b7db, 0xffef9c, 0xdb424f}
+var moistureColors = []uint32{0xd9974f, 0xe9ca8a, 0x91d6c4, 0x3399cf, 0x354caf}
+
+func climateBandColor(c planet.Cell, lens int, caves bool) imgui.Vec4 {
+	band := planet.ClimateAt(c.Heat, c.Moisture, caves)
+	if lens == 2 {
+		return style.RGB(moistureColors[band.Col])
+	}
+	if caves {
+		return style.RGB(caveHeatColors[band.Row])
+	}
+	return style.RGB(heatColors[band.Row])
+}
+
+func (w *Workspace) climateLegend() {
+	labels, colors := planet.HeatNames, heatColors
+	ranges := []string{"0-20%", "20-40%", "40-60%", "60-65%", "65-80%", "80-100%"}
+	if w.climateView.layer {
+		labels, colors = planet.CaveNames, caveHeatColors
+		ranges = []string{"0-25%", "25-50%", "50-75%", "75-100%"}
+	}
+	if w.climateView.lens == 2 {
+		labels, colors = planet.MoistureNames, moistureColors
+		ranges = []string{"0-20%", "20-40%", "40-60%", "60-80%", "80-100%"}
+	}
+	s, start := window.PointSize(), imgui.CursorScreenPos()
+	width := imgui.ContentRegionAvail().X / float32(len(labels))
+	draw := imgui.WindowDrawList()
+	for i, name := range labels {
+		pos := imgui.Vec2{X: start.X + float32(i)*width, Y: start.Y}
+		draw.AddRectFilled(pos, imgui.Vec2{X: pos.X + width - 2*s, Y: pos.Y + 7*s}, imgui.PackedColorFromVec4(style.RGB(colors[i])))
+		draw.AddText(imgui.Vec2{X: pos.X, Y: pos.Y + 10*s}, imgui.PackedColorFromVec4(style.Muted), workshop.Ellipsis(name, width-3*s))
+		imgui.SetCursorScreenPos(pos)
+		imgui.Dummy(imgui.Vec2{X: width, Y: 29 * s})
+		if imgui.IsItemHovered() {
+			imgui.BeginTooltip()
+			imgui.Text(name + " / " + ranges[i])
+			imgui.EndTooltip()
+		}
+	}
+	imgui.SetCursorScreenPos(imgui.Vec2{X: start.X, Y: start.Y + 33*s})
 }
 
 func (w *Workspace) climateMapInput() {
 	v := &w.climateView
 	v.mapHover = false
 	if !w.control.Active() || w.control.Moving() {
+		v.lastMapValid = false
 		return
 	}
 	x, y := int(math.Floor(float64(w.mouseWorld.X/32))), int(math.Floor(float64(w.mouseWorld.Y/32)))
 	if x < 0 || y < 0 || x >= w.preview.Map.MaxX || y >= w.preview.Map.MaxY {
+		v.lastMapValid = false
 		return
 	}
 	cell := w.preview.Cells[y*w.preview.Map.MaxX+x]
 	v.hover, v.hoverValid, v.mapHover = cell.Climate, true, true
 	if imgui.IsMouseClicked(imgui.MouseButtonLeft) {
-		w.focusClimate(cell.Climate)
+		if v.painting {
+			v.strokeMap, v.lastMapValid = true, false
+			w.dragClimateMap(image.Pt(x, y))
+		} else {
+			w.focusClimate(cell.Climate)
+		}
+	} else if v.painting && v.stroke && v.strokeMap && imgui.IsMouseDown(imgui.MouseButtonLeft) {
+		w.dragClimateMap(image.Pt(x, y))
+	}
+	if imgui.IsMouseClicked(imgui.MouseButtonRight) && w.commitName() {
+		v.brush, v.painting, v.layer = w.climatePath(cell.Climate), true, cell.Climate.Caves
 	}
 	imgui.BeginTooltip()
 	imgui.Text(climateLabel(cell.Climate) + " -> " + w.project.State.Biomes[w.climatePath(cell.Climate)].Name)
@@ -468,7 +544,28 @@ func (w *Workspace) climateMapInput() {
 	if cell.River {
 		imgui.Text("A river replaces the ground here.")
 	}
+	if v.painting && cell.Climate.Caves && !w.climateBrush().Cave {
+		imgui.Text("Choose a cave biome to paint this terrain.")
+	}
 	imgui.EndTooltip()
+}
+
+func (w *Workspace) dragClimateMap(point image.Point) {
+	v := &w.climateView
+	// Interpolate through map tiles, whose climate cells need not be adjacent.
+	// Leaving the canvas breaks the path so reentry never paints across a gap.
+	if v.stroke && v.lastMapValid {
+		start := v.lastMap
+		dx, dy := point.X-start.X, point.Y-start.Y
+		steps := max(int(math.Abs(float64(dx))), int(math.Abs(float64(dy))))
+		for i := 1; i < steps; i++ {
+			x := start.X + int(math.Round(float64(dx*i)/float64(steps)))
+			y := start.Y + int(math.Round(float64(dy*i)/float64(steps)))
+			w.paintClimate(w.preview.Cells[y*w.preview.Map.MaxX+x].Climate)
+		}
+	}
+	w.paintClimate(w.preview.Cells[point.Y*w.preview.Map.MaxX+point.X].Climate)
+	v.lastMap, v.lastMapValid = point, v.stroke
 }
 
 func (w *Workspace) climateOverlay() {
@@ -485,7 +582,7 @@ func (w *Workspace) climateOverlay() {
 	draw.PushClipRectV(lo, hi, true)
 	defer draw.PopClipRect()
 	width, height := w.preview.Map.MaxX, w.preview.Map.MaxY
-	key := climateOverlayKey{preview: w.preview, cell: cell, lens: v.lens, focused: focused}
+	key := climateOverlayKey{preview: w.preview, cell: cell, lens: v.lens, focused: focused, caves: v.layer}
 	for address, old := range v.before {
 		if w.climatePath(address) != old {
 			bit := address.Row*5 + address.Col
@@ -504,15 +601,13 @@ func (w *Workspace) climateOverlay() {
 			return imgui.Vec4{W: .73}
 		}
 		if v.lens == 1 || v.lens == 2 {
-			a, b, amount := style.RGB(0x447bb0), style.RGB(0xf0b356), float32(c.Heat)
-			if v.lens == 2 {
-				a, b, amount = style.RGB(0xc3a171), style.RGB(0x367daf), float32(c.Moisture)
-			}
-			alpha := float32(.85)
+			shade := climateBandColor(c, v.lens, v.layer)
 			if focused && c.Climate != cell {
-				alpha = .4
+				shade.X *= .45
+				shade.Y *= .45
+				shade.Z *= .45
 			}
-			return imgui.Vec4{X: a.X + (b.X-a.X)*amount, Y: a.Y + (b.Y-a.Y)*amount, Z: a.Z + (b.Z-a.Z)*amount, W: alpha}
+			return shade
 		}
 		if c.Climate == cell {
 			return imgui.Vec4{X: .3, Y: .9, Z: .8, W: .2}
@@ -528,7 +623,16 @@ func (w *Workspace) climateOverlay() {
 			pixels.Pix[i*4], pixels.Pix[i*4+1], pixels.Pix[i*4+2], pixels.Pix[i*4+3] = byte(shade.X*255), byte(shade.Y*255), byte(shade.Z*255), byte(shade.W*255)
 		}
 		gl.DeleteTextures(1, &w.climateTexture)
-		w.climateTexture = platform.CreateTexture(pixels)
+		var previous int32
+		gl.GetIntegerv(gl.TEXTURE_BINDING_2D, &previous)
+		gl.GenTextures(1, &w.climateTexture)
+		gl.BindTexture(gl.TEXTURE_2D, w.climateTexture)
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+		gl.TexParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+		gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, int32(width), int32(height), 0, gl.RGBA, gl.UNSIGNED_BYTE, gl.Ptr(pixels.Pix))
+		gl.BindTexture(gl.TEXTURE_2D, uint32(previous))
 		v.overlayKey = key
 	}
 	topLeft := imgui.Vec2{X: lo.X + camera.ShiftX*camera.Scale, Y: hi.Y - (float32(height*32)+camera.ShiftY)*camera.Scale}
