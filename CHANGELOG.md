@@ -1,3 +1,11 @@
+# Voidworks 0.5.15-beta.4
+
+* Climate balance: heat, cave heat and moisture bands have authored shares of the map (game generator `heat_shares`, `cave_heat_shares`, `humidity_shares`), with a two-axis handle, fine-tune sliders and legend shares. Shown once the loaded game code declares the fields.
+* File > Save and Ctrl+S save the planet on screen, including pending edits and a named New planet form, and report failures in a dialog. Save All and closing save every open draft.
+* Generated planet files are named after the planet; earlier `workshop_` files stay readable.
+* Generated `.dme` includes use backslashes and are placed beside related files for planets, ships and ruins.
+* Drag biomes in the list to reorder them. Seeds moved to an advanced box.
+
 # Voidworks 0.5.15-beta.1
 
 * Planet Workshop beta now uses the Voidworks name, icon, profile migration, and release channels.
