@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"sdmm/internal/dmapi/dminclude"
 	"sdmm/internal/dmapi/dmmap/dmmdata"
 	"sdmm/internal/dmapi/dmmap/dmmdata/dmmprefab"
 	"sdmm/internal/dmapi/dmvars"
@@ -373,28 +374,9 @@ func (p *Project) changesOne() ([]ship.FileChange, error) {
 	return changes, nil
 }
 
-// Include after the project's existing definitions, preserving its line endings.
+// Register beside related sources, preserving the project's existing order.
 func include(before []byte, relative string) ([]byte, error) {
-	s := string(before)
-	pattern := regexp.MustCompile(`(?m)^\s*#include\s+"([^"]+)"`)
-	for _, m := range pattern.FindAllStringSubmatch(s, -1) {
-		if strings.EqualFold(strings.ReplaceAll(m[1], "\\", "/"), relative) {
-			return before, nil
-		}
-	}
-	newline := "\n"
-	if strings.Contains(s, "\r\n") {
-		newline = "\r\n"
-	}
-	line := "#include \"" + strings.ReplaceAll(relative, "/", "\\") + "\"" + newline
-	marker := regexp.MustCompile(`(?m)^// END_INCLUDE[^\r\n]*`).FindStringIndex(s)
-	if marker != nil {
-		return []byte(s[:marker[0]] + line + s[marker[0]:]), nil
-	}
-	if !strings.HasSuffix(s, "\n") {
-		s += newline
-	}
-	return []byte(s + line), nil
+	return dminclude.Add(before, relative), nil
 }
 
 func (p *Project) Save() error {

@@ -9,6 +9,7 @@ import (
 	"sort"
 	"strings"
 
+	"sdmm/internal/dmapi/dminclude"
 	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/util"
 )
@@ -264,18 +265,7 @@ func (p *Project) AssignArea(theme Theme, file, path string, lo, hi util.Point) 
 
 func addInclude(content []byte, root, file string) []byte {
 	rel, _ := filepath.Rel(root, file)
-	line := `#include "` + filepath.ToSlash(rel) + `"`
-	if strings.Contains(strings.ReplaceAll(string(content), "\\", "/"), line) {
-		return content
-	}
-	newline := "\n"
-	if bytes.Contains(content, []byte("\r\n")) {
-		newline = "\r\n"
-	}
-	if i := bytes.Index(content, []byte("// END_INCLUDE")); i >= 0 {
-		return append(append(append([]byte{}, content[:i]...), []byte(line+newline)...), content[i:]...)
-	}
-	return append(append([]byte{}, content...), []byte(newline+line+newline)...)
+	return dminclude.Add(content, filepath.ToSlash(rel))
 }
 
 func renderRoomAreas(areas []RoomArea) []byte {

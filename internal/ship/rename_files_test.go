@@ -142,6 +142,7 @@ func TestSaveFleetWithRenamedShipDoesNotRestoreOldIncludes(t *testing.T) {
 		t.Fatal(err)
 	}
 	data, _ := os.ReadFile(env.RootFile)
+	data = bytes.ReplaceAll(data, []byte(`\`), []byte("/")) // Registrations use BYOND's backslashes.
 	if bytes.Contains(data, []byte("/first.dm")) {
 		t.Fatal("fleet save restored the old include")
 	}

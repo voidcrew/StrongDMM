@@ -520,21 +520,8 @@ func (p *Project) Changes() ([]FileChange, error) {
 			return nil, err
 		}
 		include := p.files[p.Dme.RootFile].Before
-		newline := "\n"
-		if bytes.Contains(include, []byte("\r\n")) {
-			newline = "\r\n"
-		}
 		for _, path := range paths[1:3] {
-			rel, _ := filepath.Rel(p.Catalog.Root, path)
-			line := `#include "` + filepath.ToSlash(rel) + `"`
-			if !strings.Contains(strings.ReplaceAll(string(include), "\\", "/"), line) {
-				marker := []byte("// END_INCLUDE")
-				if i := bytes.Index(include, marker); i >= 0 {
-					include = append(append(append([]byte{}, include[:i]...), []byte(line+newline)...), include[i:]...)
-				} else {
-					include = append(include, []byte(newline+line+newline)...)
-				}
-			}
+			include = addInclude(include, p.Catalog.Root, path)
 		}
 		for i, data := range [][]byte{p.settingsBytes(), hull, modules, include} {
 			c := p.files[paths[i]]
@@ -645,20 +632,17 @@ func SaveProjects(projects []*Project) error {
 					return fmt.Errorf("conflicting save destination %s", c.Path)
 				}
 				merged := string(prior.After)
-				newline := "\n"
-				if strings.Contains(merged, "\r\n") {
-					newline = "\r\n"
-				}
 				for _, line := range strings.Split(string(c.After), "\n") {
 					line = strings.TrimSpace(line)
 					if !strings.HasPrefix(line, "#include ") || strings.Contains(merged, line) {
 						continue
 					}
-					at := strings.Index(merged, "// END_INCLUDE")
-					if at >= 0 {
-						merged = merged[:at] + line + newline + merged[at:]
-					} else {
-						merged += newline + line + newline
+					if parts := strings.SplitN(line, "\"", 3); len(parts) == 3 {
+						file, err := Inside(root, strings.ReplaceAll(parts[1], "\\", "/"))
+						if err != nil {
+							return err
+						}
+						merged = string(addInclude([]byte(merged), root, file))
 					}
 				}
 				prior.After = []byte(merged)
