@@ -126,6 +126,9 @@ func (ws *WsShip) Process() {
 	context := "Fleet library"
 	if ws.project != nil && ws.stage != stepChoose {
 		context = ws.project.Hull.Name
+		if t := ws.currentTheme(); t.Name != "" {
+			context += " - " + t.Name
+		}
 	}
 	if ws.wizard {
 		context = "New ship / Create a starting canvas"
@@ -314,9 +317,15 @@ func (ws *WsShip) buildControls() {
 		ws.authorControls()
 		return
 	}
+	// A confirmation that is no longer on screen was abandoned. Rooms and
+	// variants share the pending key, so both panels draw before it expires.
+	ws.pendingShown = false
 	ws.roomsControls()
 	space()
 	ws.variantsControls()
+	if !ws.pendingShown {
+		ws.pendingDelete = ""
+	}
 	if ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
 		if d := ws.project.Documents[ws.assembly.Sources[ws.source].File]; d != nil && len(d.Unknown) > 0 {
 			hint(fmt.Sprintf("%d types on this map are not in the loaded environment. They show as placeholders and are kept on save.", len(d.Unknown)))
@@ -400,7 +409,7 @@ func (ws *WsShip) canvasHeader() {
 		if tools.IsSelected(tools.TNRoomShape) {
 			imgui.Text("Select the room's tiles on the hull")
 		} else {
-			imgui.Text("Editing: " + ws.editingLabel())
+			ws.editingText()
 		}
 	case grabTask:
 		imgui.Text("Select tiles in the part being edited")
@@ -416,7 +425,7 @@ func (ws *WsShip) canvasHeader() {
 			ws.editRoom(ws.hoverRoom)
 		}
 	case ws.assembly != nil && ws.source < len(ws.assembly.Sources):
-		imgui.Text("Editing: " + ws.editingLabel())
+		ws.editingText()
 	}
 	if ws.usesShapeTool() && tools.IsSelected(tools.TNRoomShape) {
 		hint("Click or drag to add tiles  |  Click a tile again to remove it  |  Shift+drag adds a box  |  Alt+drag removes a box")
@@ -434,6 +443,51 @@ func (ws *WsShip) canvasHeader() {
 		hint(instruction)
 	}
 	imgui.Separator()
+}
+
+// editingText names the part being edited, prefixed with its variant and
+// marked when the room's map is shared with the ship's other variants.
+func (ws *WsShip) editingText() {
+	label := "Editing: " + ws.editingLabel()
+	if t := ws.currentTheme(); t.Name != "" {
+		label = t.Name + "  ·  " + label
+	}
+	suffix, about := ws.editingShare()
+	if suffix != "" {
+		label += "  " + suffix
+	}
+	imgui.Text(label)
+	if about != "" {
+		tooltip(about)
+	}
+}
+
+// editingShare reports whether the edited option uses the shared room or this
+// variant's own copy. The answer compares maps, so it is kept per rebuild.
+func (ws *WsShip) editingShare() (string, string) {
+	if ws.share.ready {
+		return ws.share.suffix, ws.share.about
+	}
+	ws.share.ready = true
+	slot := ws.editingSlot()
+	if ws.project == nil || slot == "" || len(ws.project.Hull.Themes) < 2 {
+		return "", ""
+	}
+	m, ok := ws.module(ws.selected[slot])
+	if !ok {
+		return "", ""
+	}
+	forked, _, err := ws.project.ModuleThemeStatus(m.ID, ws.currentTheme().ID)
+	if err != nil {
+		return "", ""
+	}
+	switch {
+	case forked:
+		ws.share.suffix, ws.share.about = "(this variant)", "Only this variant uses this room."
+	case len(m.Themes) > 1:
+		ws.share.suffix, ws.share.about = "(shared)", "Changes here affect every variant using this room."
+	}
+	return ws.share.suffix, ws.share.about
 }
 
 // editingLabel names the part being edited the way the shipyard does.

@@ -231,6 +231,7 @@ func (ws *WsShip) beginTask(task buildTask) {
 	ws.customID, ws.emptyModule = false, false
 	if task == taskTheme || task == taskModule {
 		ws.itemCosts = ship.PartCosts{}
+		ws.copyRooms = false
 	}
 	if task == taskRoom || task == taskDocking || task == taskReshape {
 		lo, hi, selected := tools.SelectionBounds()
@@ -625,7 +626,7 @@ func (ws *WsShip) copyControls() {
 	label := "Create ship variant"
 	if ws.task == taskTheme {
 		heading("NEW SHIP VARIANT")
-		hint("Copy this ship layout and its rooms, then edit the copy independently.")
+		hint("Another hull of this ship, with its own rooms, crew and price.")
 		textField("Variant name", "e.g. Salvager", &ws.itemName)
 	} else {
 		heading("NEW ROOM OPTION")
@@ -636,6 +637,17 @@ func (ws *WsShip) copyControls() {
 		label = "Create room option"
 	}
 	descriptionField(&ws.itemDescription)
+	if ws.task == taskTheme {
+		imgui.Text("Rooms")
+		if imgui.RadioButton("Share with the ship", !ws.copyRooms) {
+			ws.copyRooms = false
+		}
+		hint("Recommended. Edits to shared rooms show in every variant that shares them.")
+		if imgui.RadioButton("Copy every room", ws.copyRooms) {
+			ws.copyRooms = true
+		}
+		hint("This variant gets its own copy of each room file.")
+	}
 	ws.itemIdentifier()
 	nameErr := ws.project.ModuleNameError(ws.itemName)
 	if ws.task == taskTheme {
@@ -661,20 +673,7 @@ func (ws *WsShip) copyControls() {
 	imgui.BeginDisabledV(!valid)
 	if actionButton(label, true) {
 		if ws.task == taskTheme {
-			ws.change("Create ship variant", func() error {
-				if err := ws.project.AddTheme(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), false); err != nil {
-					return err
-				}
-				if err := ws.project.SetDescription("theme/"+ws.itemID, ws.itemDescription); err != nil {
-					return err
-				}
-				return ws.project.SetPartCosts("theme/"+ws.itemID, ws.itemCosts)
-			})
-			if ws.message == "" {
-				ws.theme = len(ws.project.Hull.Themes) - 1
-				ws.defaults()
-				ws.rebuild()
-			}
+			ws.createVariant()
 		} else if ws.assembly != nil && ws.source > 0 && ws.source < len(ws.assembly.Sources) {
 			slot := ws.assembly.Sources[ws.source].Slot
 			for _, m := range ws.project.Hull.Modules {
@@ -702,6 +701,25 @@ func (ws *WsShip) copyControls() {
 	}
 	imgui.EndDisabled()
 }
+
+// createVariant adds the variant the form describes and opens it for editing.
+func (ws *WsShip) createVariant() {
+	ws.change("Create ship variant", func() error {
+		if err := ws.project.AddTheme(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), ws.copyRooms); err != nil {
+			return err
+		}
+		if err := ws.project.SetDescription("theme/"+ws.itemID, ws.itemDescription); err != nil {
+			return err
+		}
+		return ws.project.SetPartCosts("theme/"+ws.itemID, ws.itemCosts)
+	})
+	if ws.message == "" {
+		ws.theme = len(ws.project.Hull.Themes) - 1
+		ws.defaults()
+		ws.rebuild()
+	}
+}
+
 func (ws *WsShip) settingsControls() {
 	heading("SHIP DETAILS")
 	s := &ws.settings

@@ -43,6 +43,7 @@ type WsShip struct {
 	customID                         bool
 	areaPath, areaIcon               string
 	emptyModule                      bool
+	copyRooms                        bool // a new variant copies every room instead of sharing
 	shipFilter                       string
 	shipKind                         int // 0 every ship, 1 modular only, 2 fixed layouts only
 	removalBackup                    string
@@ -60,6 +61,8 @@ type WsShip struct {
 	pendingShown                     bool
 	fixedConfirmed                   map[string]bool // hull types whose modular conversion was confirmed
 	optionInfos                      map[string]optionInfo
+	variantInfos                     map[string]variantInfo
+	share                            editShare
 }
 
 func New(app App, busy ...func(string) bool) *WsShip {
@@ -231,7 +234,7 @@ func (ws *WsShip) rebuild() {
 		return nil
 	}
 	ws.catalog.Hulls[ws.hull] = p.Hull
-	ws.optionInfos = nil
+	ws.optionInfos, ws.variantInfos, ws.share = nil, nil, editShare{}
 	ws.sanitizeSelection()
 	a, err := p.Assemble(ws.currentTheme(), ws.selected)
 	if err != nil {
@@ -505,6 +508,10 @@ func (ws *WsShip) change(label string, action func() error) {
 		p.Restore(state)
 		ws.hull = h
 		ws.theme = t
+		// Variants can be gone on the other side of an undo.
+		if n := len(p.Hull.Themes); ws.theme >= n {
+			ws.theme = max(0, n-1)
+		}
 		ws.selected = copySelection(sel)
 		ws.source = 0
 		ws.catalog.Hulls[h] = p.Hull

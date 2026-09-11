@@ -89,13 +89,6 @@ func (ws *WsShip) editRoom(slot string) {
 func (ws *WsShip) roomsControls() {
 	h := ws.project.Hull
 	heading("ROOMS")
-	ws.pendingShown = false
-	defer func() {
-		// A confirmation that is no longer on screen was abandoned.
-		if !ws.pendingShown {
-			ws.pendingDelete = ""
-		}
-	}()
 	if workshop.Row("room-hull", "Hull", "Floors, walls, permanent equipment", "", ws.source == 0, style.Teal, 0) && ws.source != 0 {
 		ws.flush()
 		ws.source = 0
@@ -314,29 +307,6 @@ func (ws *WsShip) deleteOption(slot, id string) {
 		}
 		ws.source = 0
 		ws.rebuild()
-	}
-}
-
-func (ws *WsShip) variantsControls() {
-	h := ws.project.Hull
-	heading("VARIANTS")
-	if len(h.Themes) > 0 && combo("Ship variant", ws.currentTheme().Name) {
-		for i, t := range h.Themes {
-			if imgui.SelectableV(t.Name, i == ws.theme, 0, imgui.Vec2{}) {
-				ws.flush()
-				ws.theme = i
-				ws.defaults()
-				ws.rebuild()
-			}
-		}
-		imgui.EndCombo()
-	}
-	if len(h.Themes) > 0 && actionButton("Variant name & description...", false) {
-		theme := ws.currentTheme()
-		ws.beginRename(taskRenameTheme, theme.ID, theme.Name)
-	}
-	if ws.project.Settings != nil && actionButton("Copy ship as a new variant...", false) {
-		ws.beginTask(taskTheme)
 	}
 }
 
