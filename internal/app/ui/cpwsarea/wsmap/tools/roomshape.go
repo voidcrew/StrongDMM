@@ -48,9 +48,9 @@ type ToolRoomShape struct {
 
 func newRoomShape() *ToolRoomShape { return &ToolRoomShape{tiles: map[util.Point]bool{}} }
 
-func (*ToolRoomShape) Name() string   { return TNRoomShape }
-func (t *ToolRoomShape) Stale() bool  { return !t.dragging }
-func (t *ToolRoomShape) OnDeselect()  { t.dragging = false }
+func (*ToolRoomShape) Name() string  { return TNRoomShape }
+func (t *ToolRoomShape) Stale() bool { return !t.dragging }
+func (t *ToolRoomShape) OnDeselect() { t.dragging = false }
 func (t *ToolRoomShape) Tiles() []util.Point {
 	tiles := make([]util.Point, 0, len(t.tiles))
 	for tile, in := range t.tiles {

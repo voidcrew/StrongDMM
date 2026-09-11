@@ -484,7 +484,9 @@ func (ws *WsShip) applyRegion() {
 		}
 		return
 	}
-	ws.change("Make upgrade room", func() error { return ws.project.AddSlot(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), origin, shape) })
+	ws.change("Make upgrade room", func() error {
+		return ws.project.AddSlot(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), origin, shape)
+	})
 	if ws.message == "" {
 		ws.defaults()
 		ws.rebuild()

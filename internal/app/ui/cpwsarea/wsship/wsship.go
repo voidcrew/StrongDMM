@@ -151,6 +151,7 @@ func (ws *WsShip) OnFocusChange(f bool) {
 	}
 }
 func (ws *WsShip) Dispose() {
+	ws.endShape()
 	if ws.pane != nil {
 		ws.pane.OnDeactivate()
 	}
@@ -296,6 +297,7 @@ func (ws *WsShip) rebuild() {
 			offset = util.Point{}
 		}
 		pane.SetEditContext(&pmap.EditContext{View: view, Offset: offset, StackID: ws.CommandStackId(), Editable: editable, Refresh: ws.refresh, BeforeHistory: func() {
+			ws.endShape()
 			ws.stage = stepBuild
 			ws.wizard = false
 			ws.task = taskPaint
@@ -498,6 +500,7 @@ func (ws *WsShip) change(label string, action func() error) {
 	}
 	after := p.Capture()
 	restore := func(state ship.State) {
+		ws.endShape()
 		ws.stage, ws.wizard, ws.task = stepBuild, false, taskPaint
 		p.Restore(state)
 		ws.hull = h
