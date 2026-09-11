@@ -1,3 +1,10 @@
+# Voidworks 0.5.16-beta.1
+
+* Ship Workshop: one Rooms list replaces the "Part to edit" combo, the collapsed room-options header and the Upgrade rooms task. Pick the hull or a room to edit it; expand a room to switch, rename, price, staff, make default or delete its options, and add new ones. Rooms can be reshaped, hidden (hull only) or deleted; deleting a room moves its default option's furniture back into the hull. Every step is undoable.
+* Upgrade rooms can have any shape. Making or reshaping a room uses a tile selection: click to toggle a tile, drag to paint, Shift+drag to add a box, Alt+drag to remove one, or import the current Grab rectangle. The shape is stored as a `footprint` mask on the hull's upgrade slot marker; the game needs the matching `footprint` variable on `/obj/modular_map_root/ship_upgrade`, and older game code keeps rooms rectangular.
+* The canvas outlines every room, highlights the one being edited, and offers Edit when the cursor is over a different room's tiles. Double-click a room with Grab to edit it.
+* Fixed-layout ships confirm before their first room turns them modular. Map checks are counted in the Build panel, room labels match the in-game purchase screen, and new options note that they are free until priced.
+
 # Voidworks 0.5.15
 
 * Planet Workshop is now part of the stable editor. Open a planet or create a new one, then edit its biomes and contents with a seeded preview. Planet settings covers terrain, rivers, environment and ruins where the game supports them, and Ruin Workshop offers View on planet for planet ruins.
