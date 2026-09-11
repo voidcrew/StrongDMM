@@ -97,7 +97,7 @@ func TestNewShipAuthoringRoundTrip(t *testing.T) {
 	if err = p.AddModule(0, module, "cargo_empty", "Empty", true); err != nil {
 		t.Fatal(err)
 	}
-	if err = p.AddTheme(0, "pirate", "Pirate"); err != nil {
+	if err = p.AddTheme(0, "pirate", "Pirate", true); err != nil {
 		t.Fatal(err)
 	}
 	pirate, err := p.Assemble(p.Hull.Themes[1], selection)

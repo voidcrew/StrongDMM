@@ -85,7 +85,7 @@ func TestRoomAreasPreserveMapsAndRoundTrip(t *testing.T) {
 	if !bytes.Equal(hullBefore, RawData(a.Sources[0].Live).EncodeTGM()) {
 		t.Fatal("assigning a module area changed hull")
 	}
-	if err = p.AddTheme(0, "salvager", "Salvager"); err != nil {
+	if err = p.AddTheme(0, "salvager", "Salvager", true); err != nil {
 		t.Fatal(err)
 	}
 	if err = p.Save(); err != nil {

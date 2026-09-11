@@ -37,10 +37,10 @@ func TestCreationRejectsDuplicateDisplayNames(t *testing.T) {
 			t.Fatalf("accepted duplicate option %q", name)
 		}
 	}
-	if err = p.AddTheme(0, "salvager", "Salvager"); err != nil {
+	if err = p.AddTheme(0, "salvager", "Salvager", true); err != nil {
 		t.Fatal(err)
 	}
-	if err = p.AddTheme(0, "salvager_two", " SALVAGER "); err == nil {
+	if err = p.AddTheme(0, "salvager_two", " SALVAGER ", true); err == nil {
 		t.Fatal("accepted duplicate theme")
 	}
 	if _, err = p.AddArea(p.Hull.Themes[0], "bridge", "Main Bridge", "bridge"); err != nil {

@@ -273,7 +273,7 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 		}
 	}
 	ws.app.CommandStorage().Redo()
-	ws.change("Clone theme", func() error { return project.AddTheme(0, "pirate", "Pirate") })
+	ws.change("Clone theme", func() error { return project.AddTheme(0, "pirate", "Pirate", true) })
 	if ws.message != "" {
 		t.Fatal(ws.message)
 	}

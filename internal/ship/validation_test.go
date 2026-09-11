@@ -35,7 +35,7 @@ func TestThemeCloneRejectsInvalidSelection(t *testing.T) {
 	}
 	before := p.settingsBytes()
 	for _, index := range []int{-1, len(p.Hull.Themes)} {
-		if e = p.AddTheme(index, "other", "Other"); e == nil {
+		if e = p.AddTheme(index, "other", "Other", true); e == nil {
 			t.Fatal("invalid theme accepted")
 		}
 	}

@@ -68,6 +68,7 @@ type Project struct {
 	costSources         map[string][]byte
 	costEdited          map[string]bool
 	renamedMaps         map[string]bool
+	deletedMaps         map[string]bool // variant copies dropped back to a shared room
 	renamedSources      map[string]bool
 }
 
@@ -249,23 +250,39 @@ func (p *Project) reserveAnchors(m *dmmap.Dmm) {
 }
 
 func (p *Project) moduleFile(m Module, theme string) (string, error) {
-	themed, err := Inside(p.Catalog.Root, filepath.Join(p.Catalog.ModuleDir, strings.TrimSuffix(m.File, ".dmm")+"_"+theme+".dmm"))
-	if err != nil {
-		return "", err
-	}
-	if theme != "" && p.Documents[themed] != nil && p.Documents[themed].Active {
-		return themed, nil
-	}
 	base, err := Inside(p.Catalog.Root, filepath.Join(p.Catalog.ModuleDir, m.File))
 	if err != nil {
 		return "", err
 	}
-	if p.Documents[base] != nil && p.Documents[base].Active {
-		if _, err := os.Stat(themed); theme == "" || os.IsNotExist(err) {
+	shared := func() (string, error) {
+		if d := p.Documents[base]; d != nil && d.Active {
 			return base, nil
 		}
+		if _, err := os.Stat(base); err != nil {
+			return "", fmt.Errorf("%s: neither a themed map nor its base is available: %w", m.Name, err)
+		}
+		return base, nil
 	}
-	return p.Catalog.ModuleFile(m, theme)
+	if theme == "" {
+		return shared()
+	}
+	themed, err := Inside(p.Catalog.Root, filepath.Join(p.Catalog.ModuleDir, strings.TrimSuffix(m.File, ".dmm")+"_"+theme+".dmm"))
+	if err != nil {
+		return "", err
+	}
+	if d := p.Documents[themed]; d != nil {
+		if d.Active {
+			return themed, nil
+		}
+		// A copy retired this session leaves the variant on the shared room.
+		return shared()
+	}
+	if info, err := os.Stat(themed); err == nil && !info.IsDir() {
+		return themed, nil
+	} else if err != nil && !os.IsNotExist(err) {
+		return "", err
+	}
+	return shared()
 }
 
 // ModuleSource includes unsaved room options and variants in the current project.
@@ -360,6 +377,12 @@ func (p *Project) addMap(file string, data *dmmdata.DmmData) error {
 	} else {
 		p.Documents[file] = &Document{Map: m, Active: true, Unknown: sortedPaths(unknown)}
 	}
+	// Undoing the op that created this map, even after a save, must take the
+	// file with it, so track it beside the maps renames move around.
+	if p.renamedMaps == nil {
+		p.renamedMaps = map[string]bool{}
+	}
+	p.renamedMaps[file] = true
 	return nil
 }
 
@@ -540,7 +563,7 @@ func (p *Project) Changes() ([]FileChange, error) {
 	var changes []FileChange
 	referenced := p.referencedMaps()
 	for path, d := range p.Documents {
-		if p.renamedMaps[path] && !referenced[path] {
+		if p.renamedMaps[path] && !referenced[path] || p.deletedMaps[path] && !d.Active {
 			if d.Existed {
 				changes = append(changes, FileChange{Path: path, Before: d.Before, Existed: true, Delete: true})
 			}

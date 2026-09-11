@@ -662,7 +662,7 @@ func (ws *WsShip) copyControls() {
 	if actionButton(label, true) {
 		if ws.task == taskTheme {
 			ws.change("Create ship variant", func() error {
-				if err := ws.project.AddTheme(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName)); err != nil {
+				if err := ws.project.AddTheme(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), false); err != nil {
 					return err
 				}
 				if err := ws.project.SetDescription("theme/"+ws.itemID, ws.itemDescription); err != nil {

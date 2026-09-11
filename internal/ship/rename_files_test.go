@@ -18,7 +18,7 @@ func TestRenameShipFilesSaveReopenAndUndo(t *testing.T) {
 	if err = p.addRect(0, "cargo", "Cargo", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if err = p.AddTheme(0, "medical", "Medical"); err != nil {
+	if err = p.AddTheme(0, "medical", "Medical", true); err != nil {
 		t.Fatal(err)
 	}
 	if err = p.SetPartCosts("ship", PartCosts{"science": 7, "trade": 3}); err != nil {

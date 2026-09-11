@@ -27,7 +27,7 @@ func loadedRoomProject(t *testing.T, themed bool) (*Project, string) {
 	if err = p.addRect(0, "original", "Original Room", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if err = p.AddTheme(0, "other", "Other Variant"); err != nil {
+	if err = p.AddTheme(0, "other", "Other Variant", true); err != nil {
 		t.Fatal(err)
 	}
 	paths := p.outputPaths()

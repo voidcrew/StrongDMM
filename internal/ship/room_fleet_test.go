@@ -122,3 +122,72 @@ func TestFleetShipsAssemble(t *testing.T) {
 	}
 	t.Logf("assembled %d fleet ships; %d maps keep unknown types", len(catalog.Hulls), withUnknown)
 }
+
+// Read-only compatibility check: every handwritten fleet variant can be found
+// and rewritten where it is declared, including inherited availability lists.
+func TestFleetVariantRegistrationSources(t *testing.T) {
+	file := os.Getenv("SHIP_RENDER_TEST_DME")
+	if file == "" {
+		t.Skip("set SHIP_RENDER_TEST_DME for fleet source checks")
+	}
+	env, err := dmenv.New(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := Discover(env)
+	if err != nil {
+		t.Fatal(err)
+	}
+	variants, inherited := 0, 0
+	for _, hull := range catalog.Hulls {
+		project, err := OpenProject(catalog, env, hull)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if project.Settings != nil || len(hull.Themes) == 0 {
+			continue
+		}
+		if err = project.prepareRooms(nil); err != nil {
+			t.Fatalf("%s: %v", hull.Name, err)
+		}
+		if _, err = project.themeRegistrationFile(); err != nil {
+			t.Fatalf("%s: %v", hull.Name, err)
+		}
+		if err = project.prepareAvailableThemes(); err != nil {
+			t.Fatalf("%s: %v", hull.Name, err)
+		}
+		if err = project.prepareModuleThemes(); err != nil {
+			t.Fatalf("%s: %v", hull.Name, err)
+		}
+		for _, m := range hull.Modules {
+			target := project.rooms.moduleThemes[m.ID]
+			if target.shared != target.own {
+				inherited++
+			}
+			if _, err = rewriteLiteralList(project.rooms.sources[target.shared.file].Before, target.shared.typePath, "for_theme", dmList(m.Themes)); err != nil {
+				t.Fatalf("%s / %s: %v", hull.Name, m.Name, err)
+			}
+		}
+		for _, theme := range hull.Themes {
+			if err = project.prepareThemeDefinition(theme.ID); err != nil {
+				t.Fatalf("%s / %s: %v", hull.Name, theme.Name, err)
+			}
+			target := project.rooms.themeTargets[theme.ID]
+			if _, err = rewriteFlag(project.rooms.sources[target.file].Before, target.typePath, "is_default", theme.Default); err != nil {
+				t.Fatalf("%s / %s: %v", hull.Name, theme.Name, err)
+			}
+			_, removed, err := removeDefinitions(project.rooms.sources[target.file].Before, []string{target.typePath})
+			if err != nil || !removed[target.typePath] {
+				t.Fatalf("%s / %s cannot be removed: %v", hull.Name, theme.Name, err)
+			}
+			variants++
+		}
+		if project.Modified() {
+			t.Fatalf("%s: reading variant definitions marked the ship dirty", hull.Name)
+		}
+	}
+	if variants == 0 {
+		t.Fatal("no fleet variants checked")
+	}
+	t.Logf("checked %d fleet variants; %d room options inherit a shared availability list", variants, inherited)
+}

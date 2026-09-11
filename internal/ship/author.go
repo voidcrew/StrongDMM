@@ -3,7 +3,6 @@ package ship
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -309,91 +308,6 @@ func (p *Project) AddModule(themeIndex int, base Module, id, name string, empty 
 	return nil
 }
 
-func (p *Project) AddTheme(baseIndex int, id, name string) error {
-	if err := p.ThemeNameError(name); err != nil {
-		return err
-	}
-	if p.Settings == nil {
-		return fmt.Errorf("theme creation requires an authored ship project")
-	}
-	if err := ValidID(id); err != nil {
-		return err
-	}
-	for _, t := range p.Hull.Themes {
-		if t.ID == id {
-			return fmt.Errorf("theme ID already exists")
-		}
-	}
-	base, err := p.roomTheme(baseIndex)
-	if err != nil {
-		return err
-	}
-	theme := Theme{ID: id, Name: name, Suffix: p.fileID() + "_" + id, Slots: append([]string{}, p.Hull.SlotsFor(base)...)}
-	file, err := p.Catalog.HullFile(p.Hull, base)
-	if err != nil {
-		return err
-	}
-	hull, err := p.document(file)
-	if err != nil {
-		return err
-	}
-	target, err := p.Catalog.HullFile(p.Hull, theme)
-	if err != nil {
-		return err
-	}
-	type clone struct {
-		file string
-		data *dmmdata.DmmData
-	}
-	clones := []clone{{target, RawData(hull.Map)}}
-	for _, m := range p.Hull.Modules {
-		if !m.Available(base.ID) {
-			continue
-		}
-		file, err := p.moduleFile(m, base.ID)
-		if err != nil {
-			return err
-		}
-		d, err := p.document(file)
-		if err != nil {
-			return err
-		}
-		target, err := Inside(p.Catalog.Root, filepath.Join(p.Catalog.ModuleDir, strings.TrimSuffix(m.File, ".dmm")+"_"+id+".dmm"))
-		if err != nil {
-			return err
-		}
-		clones = append(clones, clone{target, RawData(d.Map)})
-	}
-	added := []string{}
-	for _, c := range clones {
-		if err = p.addMap(c.file, c.data); err != nil {
-			for _, file := range added {
-				delete(p.Documents, file)
-			}
-			return err
-		}
-		added = append(added, c.file)
-	}
-	for i, m := range p.Hull.Modules {
-		if m.Available(base.ID) {
-			p.Hull.Modules[i].Themes = append(append([]string{}, m.Themes...), id)
-		}
-	}
-	p.Hull.Themes = append(p.Hull.Themes, theme)
-	if p.Crew != nil {
-		if jobs, ok := p.Crew.Rosters["theme/"+base.ID]; ok {
-			jobs = CloneCrewJobs(jobs)
-			for i := range jobs {
-				jobs[i].ID = ""
-			}
-			if err := p.SetCrewJobs("theme/"+id, jobs); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
 // State stores authoring changes as a single history entry across every file.
 type State struct {
 	PartCosts map[string]PartCosts
@@ -447,6 +361,11 @@ func (p *Project) Restore(state State) {
 	}
 	referenced := p.referencedMaps()
 	for file := range p.renamedMaps {
+		// A copy dropped back to a shared room is still referenced by its
+		// option, so only the captured state decides whether it is live.
+		if p.deletedMaps[file] {
+			continue
+		}
 		if d := p.Documents[file]; d != nil {
 			d.Active = referenced[file]
 		}

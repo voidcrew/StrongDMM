@@ -281,6 +281,11 @@ func (p *Project) referencedMaps() map[string]bool {
 }
 
 func (p *Project) hasMapRenames() bool {
+	for file := range p.deletedMaps {
+		if d := p.Documents[file]; d != nil && d.Existed && !d.Active {
+			return true
+		}
+	}
 	if len(p.renamedMaps) == 0 {
 		return false
 	}

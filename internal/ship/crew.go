@@ -52,6 +52,9 @@ func (p *Project) CrewScopes() []CrewScope {
 	}
 	for _, t := range p.Hull.Themes {
 		path := "/datum/ship_theme/" + id + "_" + t.ID
+		if p.Settings == nil {
+			path = roomThemeType(id, t.ID)
+		}
 		if existing := themes[t.ID]; existing != "" {
 			path = existing
 		}
@@ -537,7 +540,7 @@ func (p *Project) crewChanges(changes []FileChange) ([]FileChange, error) {
 			if p.Dme.Objects[s.Type] != nil {
 				file, e = p.roomTypeFile(s.Type)
 			} else if p.rooms != nil {
-				file = p.rooms.code
+				file = p.generatedSourceFile(key)
 			} else {
 				e = fmt.Errorf("cannot locate crew source")
 			}

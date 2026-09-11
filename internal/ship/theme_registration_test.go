@@ -23,7 +23,7 @@ func TestVariantOnlyCrewRegistrationAndLegacyUpgrade(t *testing.T) {
 	if err = project.SetCrewJobs("theme/standard", jobs); err != nil {
 		t.Fatal(err)
 	}
-	if err = project.AddTheme(0, "medical", "Medical"); err != nil {
+	if err = project.AddTheme(0, "medical", "Medical", true); err != nil {
 		t.Fatal(err)
 	}
 	if err = project.Save(); err != nil {

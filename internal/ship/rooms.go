@@ -20,6 +20,12 @@ type roomEditing struct {
 	mapFields    map[string]nameTarget
 	removals     map[string]nameTarget // module ID -> definition cut out on save
 	defaults     map[string]nameTarget // module ID -> is_default flag to rewrite
+	themeTargets map[string]nameTarget // theme ID -> definition to flag or cut out
+	themeList    nameTarget            // the hull's available_themes list
+	themeOrder   []string              // that list as the source spells it
+	themeJobs    map[string]string     // theme ID -> crew copied for a new variant
+	themeFile    string                // where new variant registrations are written
+	moduleThemes map[string]moduleThemeTarget
 	code         string
 }
 
@@ -212,6 +218,10 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 		contents[path] = append([]byte{}, source.Before...)
 	}
 	for themeID, typePath := range p.rooms.targets {
+		// A removed variant's whole block goes; nothing is left to rewrite in it.
+		if themeID != "" && p.themeIndex(themeID) < 0 {
+			continue
+		}
 		before, after := roomSlots(p.rooms.base, themeID), roomSlots(p.Hull, themeID)
 		if reflect.DeepEqual(before, after) {
 			continue
@@ -220,7 +230,12 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 		if err != nil {
 			return nil, err
 		}
-		contents[file], err = rewriteRoomSlots(contents[file], typePath, before, after)
+		// A variant back on the hull's rooms drops its own list entirely.
+		if after == nil {
+			contents[file], err = removeCostAssignment(contents[file], typePath, "upgrade_slot_ids")
+		} else {
+			contents[file], err = rewriteRoomSlots(contents[file], typePath, before, after)
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -318,7 +333,11 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 			fmt.Fprintf(&definitions, "\tdesc = %s\n", dmQuote(*module.Description))
 		}
 	}
+	generated := len(contents[p.rooms.code])
 	contents[p.rooms.code] = append(contents[p.rooms.code], definitions.String()...)
+	if err := p.themeChanges(contents); err != nil {
+		return nil, err
+	}
 	for path, content := range contents {
 		c := p.files[path]
 		if (!c.Existed && len(content) == 0) || bytes.Equal(c.Before, content) {
@@ -327,7 +346,7 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 		c.After = content
 		changes = append(changes, c)
 	}
-	if definitions.Len() > 0 {
+	if len(contents[p.rooms.code]) > generated {
 		c := p.files[p.Dme.RootFile]
 		c.After = addInclude(c.Before, p.Catalog.Root, p.rooms.code)
 		if !bytes.Equal(c.Before, c.After) {

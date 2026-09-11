@@ -358,7 +358,7 @@ func (p *Project) costChanges(changes []FileChange) ([]FileChange, error) {
 		}
 		file := original.file
 		if file == "" && p.rooms != nil {
-			file = p.rooms.code
+			file = p.generatedSourceFile(s.ID)
 		}
 		if file == "" {
 			return nil, fmt.Errorf("cannot locate costs for %s", s.Name)
