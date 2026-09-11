@@ -151,13 +151,15 @@ func httpClient() *http.Client {
 			if len(via) >= 5 {
 				return fmt.Errorf("too many download redirects")
 			}
+			// GitHub answers a renamed repository with an api.github.com redirect,
+			// so release checks must follow it as well as package downloads.
 			switch req.URL.Host {
-			case "github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com":
+			case "github.com", "api.github.com", "release-assets.githubusercontent.com", "objects.githubusercontent.com":
 				if req.URL.Scheme == "https" && req.URL.User == nil {
 					return nil
 				}
 			}
-			return fmt.Errorf("download redirected outside GitHub")
+			return fmt.Errorf("download redirected outside GitHub (%s)", req.URL.Host)
 		},
 	}
 }

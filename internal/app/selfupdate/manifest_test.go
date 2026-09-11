@@ -71,6 +71,8 @@ func TestDownloadRedirectPolicy(t *testing.T) {
 	}{
 		{"https://release-assets.githubusercontent.com/path", true},
 		{"https://objects.githubusercontent.com/path", true},
+		{"https://api.github.com/repositories/1360753474/releases?per_page=100&page=1", true},
+		{"http://api.github.com/repositories/1360753474/releases", false},
 		{"http://github.com/path", false}, {"https://example.com/payload", false},
 		{"https://github.com.evil.example/payload", false}, {"https://user@github.com/path", false},
 	} {
