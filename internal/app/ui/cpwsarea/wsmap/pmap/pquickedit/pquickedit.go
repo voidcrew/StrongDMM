@@ -227,7 +227,11 @@ func (p *Panel) sanitizeInstanceVar(instance *dmminstance.Instance, varName, def
 }
 
 func (p *Panel) initialVarValue(path, varName string) string {
-	return p.app.LoadedEnvironment().Objects[path].Vars.ValueV(varName, dmvars.NullValue)
+	// Ship Workshop keeps atoms whose types the environment does not define.
+	if obj := p.app.LoadedEnvironment().Objects[path]; obj != nil {
+		return obj.Vars.ValueV(varName, dmvars.NullValue)
+	}
+	return dmvars.NullValue
 }
 
 func (p *Panel) getIconMaxDirs(vars *dmvars.Variables) int32 {

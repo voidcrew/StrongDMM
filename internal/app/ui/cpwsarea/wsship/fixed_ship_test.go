@@ -73,9 +73,14 @@ func exerciseFixedShipConversion(t *testing.T, ws *WsShip, render func()) {
 	ws.catalog = catalog
 	ws.projects = map[string]*ship.Project{}
 	ws.setStage(stepChoose)
+	ws.shipKind = 2
 	for i := 0; i < 3; i++ {
 		render()
 	}
+	if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
+		captureFrame(t, filepath.Join(dst, "fleet-fixed-layouts.png"), 1400, 960)
+	}
+	ws.shipKind = 0
 	ws.hull = -1
 	for i, h := range catalog.Hulls {
 		if h.Type == ship.HullType+"/fixed_fixture" {

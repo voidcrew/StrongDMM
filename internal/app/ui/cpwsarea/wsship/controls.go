@@ -224,15 +224,42 @@ func (ws *WsShip) chooseShip() {
 	}
 	heading("SHIP LIBRARY")
 	textField("Find a ship", "Search the fleet...", &ws.shipFilter)
-	hint("Right-click a ship for removal.")
 	if ws.catalog == nil {
 		return
 	}
+	modular, fixed := 0, 0
+	for _, h := range ws.catalog.Hulls {
+		if h.Fixed {
+			fixed++
+		} else {
+			modular++
+		}
+	}
+	imgui.Text("Show")
+	imgui.SameLine()
+	for kind, label := range []string{fmt.Sprintf("All (%d)", modular+fixed), fmt.Sprintf("Modular (%d)", modular), fmt.Sprintf("Fixed layout (%d)", fixed)} {
+		if kind > 0 {
+			imgui.SameLine()
+		}
+		if imgui.RadioButton(label, ws.shipKind == kind) {
+			ws.shipKind = kind
+		}
+		switch kind {
+		case 1:
+			tooltip("Ships with upgrade slots: they are sold in the shipyard and can start rounds.")
+		case 2:
+			tooltip("Ships without upgrade slots. Make an upgrade room on one to turn it modular.")
+		}
+	}
+	hint("Right-click a ship for removal.")
 	space()
 	imgui.BeginChild("ship-list")
 	count := 0
 	for i, h := range ws.catalog.Hulls {
 		if !strings.Contains(strings.ToLower(h.Name), strings.ToLower(strings.TrimSpace(ws.shipFilter))) {
+			continue
+		}
+		if (ws.shipKind == 1 && h.Fixed) || (ws.shipKind == 2 && !h.Fixed) {
 			continue
 		}
 		count++
@@ -260,9 +287,10 @@ func (ws *WsShip) chooseShip() {
 	}
 	if count == 0 {
 		title("No ships found")
-		hint("Try another name or clear the search to see the fleet.")
-		if imgui.Button("Clear search") {
+		hint("Try another name, or show all ships to see the whole fleet.")
+		if imgui.Button("Show all ships") {
 			ws.shipFilter = ""
+			ws.shipKind = 0
 		}
 	}
 	imgui.EndChild()
@@ -305,6 +333,10 @@ func (ws *WsShip) buildControls() {
 			hint("Your edits affect the hull: floors, walls and permanent equipment.")
 		} else {
 			hint("Your edits affect the " + ws.assembly.Sources[ws.source].Name + " room option.")
+		}
+		if d := ws.project.Documents[ws.assembly.Sources[ws.source].File]; d != nil && len(d.Unknown) > 0 {
+			hint(fmt.Sprintf("%d types on this map are not in the loaded environment. They show as placeholders and are kept on save.", len(d.Unknown)))
+			tooltip(strings.Join(d.Unknown, "\n"))
 		}
 	}
 	space()

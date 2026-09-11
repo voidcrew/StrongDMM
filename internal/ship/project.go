@@ -27,6 +27,7 @@ type Document struct {
 	Initial     *dmmdata.DmmData
 	Before      []byte
 	Existed     bool
+	Unknown     []string // type paths the environment does not define
 	fingerprint [32]byte
 }
 
@@ -185,14 +186,48 @@ func (p *Project) document(file string) (*Document, error) {
 		return nil, err
 	}
 	m, unknown := dmmap.New(p.Dme, data, "")
-	if len(unknown) > 0 {
-		return nil, fmt.Errorf("%s has %d unknown types; reload the environment before editing", file, len(unknown))
-	}
+	// Like an ordinary map tab, a ship still opens when the environment lacks
+	// some of its types. Unlike one, those atoms are kept and saved unchanged.
+	keepUnknownPrefabs(m, data, unknown)
 	p.reserveAnchors(m)
 	p.protect(m)
-	d := &Document{Map: m, Initial: data, Before: before, Existed: true, Active: true, fingerprint: fingerprint(m)}
+	d := &Document{Map: m, Initial: data, Before: before, Existed: true, Active: true, Unknown: sortedPaths(unknown), fingerprint: fingerprint(m)}
 	p.Documents[file] = d
 	return d, nil
+}
+
+func sortedPaths(prefabs map[string]*dmmprefab.Prefab) []string {
+	var paths []string
+	for path := range prefabs {
+		paths = append(paths, path)
+	}
+	sort.Strings(paths)
+	return paths
+}
+
+// keepUnknownPrefabs restores the atoms dmmap.New dropped, in their mapped order.
+func keepUnknownPrefabs(m *dmmap.Dmm, data *dmmdata.DmmData, unknown map[string]*dmmprefab.Prefab) {
+	if len(unknown) == 0 {
+		return
+	}
+	for _, tile := range m.Tiles {
+		prefabs := data.Dictionary[data.Grid[tile.Coord]]
+		affected := false
+		for _, prefab := range prefabs {
+			if unknown[prefab.Path()] != nil {
+				affected = true
+				break
+			}
+		}
+		if !affected {
+			continue
+		}
+		stored := make(dmmdata.Prefabs, 0, len(prefabs))
+		for _, prefab := range prefabs {
+			stored = append(stored, dmmap.PrefabStorage.Put(prefab))
+		}
+		tile.InstancesSet(stored)
+	}
 }
 
 func (p *Project) protect(m *dmmap.Dmm) {
@@ -284,6 +319,11 @@ func (p *Project) Assemble(theme Theme, selected map[string]string) (*Assembly, 
 			a.Issues = append(a.Issues, Issue{Message: "Missing hull marker: " + slot})
 		}
 	}
+	for _, s := range sources {
+		if d := p.Documents[s.File]; d != nil && len(d.Unknown) > 0 {
+			a.Issues = append(a.Issues, Issue{Message: fmt.Sprintf("%s uses %d types the loaded environment does not define (kept on save): %s", s.Name, len(d.Unknown), strings.Join(d.Unknown, ", "))})
+		}
+	}
 	a.CheckHull()
 	a.CheckAccess(p.Dme)
 	return a, nil
@@ -300,16 +340,15 @@ func (p *Project) addMap(file string, data *dmmdata.DmmData) error {
 	}
 	data.Filepath = file
 	m, unknown := dmmap.New(p.Dme, data, "")
-	if len(unknown) > 0 {
-		return fmt.Errorf("new map references %d unknown types", len(unknown))
-	}
+	keepUnknownPrefabs(m, data, unknown)
 	p.reserveAnchors(m)
 	p.protect(m)
 	if prior := p.Documents[file]; prior != nil {
 		*prior.Map = *m
 		prior.Active = true
+		prior.Unknown = sortedPaths(unknown)
 	} else {
-		p.Documents[file] = &Document{Map: m, Active: true}
+		p.Documents[file] = &Document{Map: m, Active: true, Unknown: sortedPaths(unknown)}
 	}
 	return nil
 }

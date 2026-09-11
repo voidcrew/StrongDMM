@@ -44,6 +44,7 @@ type WsShip struct {
 	areaPath, areaIcon               string
 	emptyModule                      bool
 	shipFilter                       string
+	shipKind                         int // 0 every ship, 1 modular only, 2 fixed layouts only
 	removalBackup                    string
 	settings                         settingsForm
 	dockOutward                      int

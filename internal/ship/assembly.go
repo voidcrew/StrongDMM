@@ -228,9 +228,6 @@ func (a *Assembly) Display(dme *dmenv.Dme) (*dmmap.Dmm, error) {
 			key := dmmdata.Key(fmt.Sprintf("preview%d_%d", x, y))
 			data.Grid[coord] = key
 			for _, atom := range a.Cells[coord] {
-				if dme.Objects[atom.Prefab.Path()] == nil {
-					return nil, fmt.Errorf("unknown map type %s in %s", atom.Prefab.Path(), a.Sources[atom.Source].File)
-				}
 				data.Dictionary[key] = append(data.Dictionary[key], atom.Prefab)
 			}
 		}
@@ -239,11 +236,13 @@ func (a *Assembly) Display(dme *dmenv.Dme) (*dmmap.Dmm, error) {
 	for coord, atoms := range a.Cells {
 		tile := dmm.GetTile(coord)
 		var instances dmmap.Instances
-		for i, atom := range atoms {
+		for _, atom := range atoms {
 			if atom.Instance != nil {
 				instances = append(instances, atom.Instance.CopyAt(coord))
 			} else {
-				instances = append(instances, tile.Instances()[i])
+				// Unknown types are not in the freshly built map; make their
+				// instances directly so the preview still shows every atom.
+				instances = append(instances, dmminstance.New(coord, dmmap.PrefabStorage.Put(atom.Prefab)))
 			}
 		}
 		tile.Set(instances)

@@ -1,6 +1,8 @@
 # Voidworks 0.5.15-beta.5
 
 * Ship Workshop lists every fleet ship, including fixed layouts without upgrade slots. Select a room on a fixed ship and make it an upgrade room to turn the ship modular: the save enables `has_upgrade_slots` and adds the slot list beside the ship's existing jobs and prices.
+* The fleet library can show all ships, modular ships or fixed layouts.
+* Ships whose maps reference types missing from the loaded environment now open in Ship Workshop, like ordinary map tabs. Those atoms show as placeholders, are listed in the build panel and review checks, and are kept on save instead of being discarded.
 * The updater follows GitHub's repository-rename redirects on api.github.com.
 
 # Voidworks 0.5.15-beta.4
