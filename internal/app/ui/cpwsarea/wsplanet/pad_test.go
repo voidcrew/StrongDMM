@@ -7,8 +7,9 @@ import (
 	"sdmm/internal/planet"
 )
 
-// Dragging the climate handle toward hot and wet reshapes every band scale in
-// one undo step, and releasing it leaves the handle where it was dropped.
+// Dragging the climate handle toward wet and hot (right and down, like the
+// grid) reshapes every band scale in one undo step, and releasing it leaves the
+// handle where it was dropped.
 func testClimatePad(t *testing.T, w *Workspace, io imgui.IO, render func(), capture func(string)) {
 	t.Helper()
 	saved := planet.Clone(w.project.State)
@@ -27,19 +28,24 @@ func testClimatePad(t *testing.T, w *Workspace, io imgui.IO, render func(), capt
 	if w.padSize <= 0 {
 		t.Fatal("climate pad was not laid out")
 	}
+	// x is the moisture bias (wetter to the right); y is the heat bias (hotter
+	// downward), the same orientation as the climate grid's columns and rows.
 	at := func(x, y float32) imgui.Vec2 {
-		return imgui.Vec2{X: w.padMin.X + (x+1)/2*w.padSize, Y: w.padMin.Y + (1-y)/2*w.padSize}
+		return imgui.Vec2{X: w.padMin.X + (x+1)/2*w.padSize, Y: w.padMin.Y + (y+1)/2*w.padSize}
 	}
 	io.SetMousePosition(at(0, 0))
 	render()
 	io.SetMouseButtonDown(0, true)
 	render()
-	io.SetMousePosition(at(.75, .5))
+	io.SetMousePosition(at(.5, .75))
 	render()
 	render()
 	g := w.project.State.Definition.Settings
 	if g.Heat[5] <= g.Heat[0] || g.CaveHeat[3] <= g.CaveHeat[0] || g.Moisture[4] <= g.Moisture[0] {
 		t.Fatal("dragging the handle did not reshape the bands", g)
+	}
+	if wetBias := planet.ShareBias(g.Moisture[:], planet.DefaultMoistureShares[:]); wetBias < .45 || wetBias > .55 {
+		t.Fatal("the pad's horizontal axis is not moisture", wetBias)
 	}
 	io.SetMouseButtonDown(0, false)
 	render()

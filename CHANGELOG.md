@@ -1,3 +1,7 @@
+# Voidworks 0.5.15-beta.6
+
+* The climate balance handle is laid out like the Climate grid: moisture runs across (wetter to the right) and heat runs down (hotter at the bottom), so pushing the handle toward a corner favours that corner of the grid.
+
 # Voidworks 0.5.15-beta.5
 
 * Ship Workshop lists every fleet ship, including fixed layouts without upgrade slots. Select a room on a fixed ship and make it an upgrade room to turn the ship modular: the save enables `has_upgrade_slots` and adds the slot list beside the ship's existing jobs and prices.

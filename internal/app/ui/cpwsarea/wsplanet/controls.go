@@ -233,7 +233,7 @@ func (w *Workspace) terrain() {
 	if !w.catalog.ClimateShares {
 		workshop.Muted("Climate balance needs a planet generator with heat_shares, cave_heat_shares and humidity_shares. Update the game code to unlock it.")
 	} else if imgui.CollapsingHeaderV("Climate balance", imgui.TreeNodeFlagsDefaultOpen) {
-		workshop.Muted("Drag the handle: right makes hot bands cover more of the map, up makes wet bands cover more. A band at 0% never appears. The Climate view's heat and moisture lenses show the result.")
+		workshop.Muted("Drag the handle toward the climate cells you want more of, laid out like the Climate grid: right makes wet bands cover more of the map, down makes hot bands cover more. A band at 0% never appears. The Climate view's heat and moisture lenses show the result.")
 		w.climatePad(g)
 		if imgui.CollapsingHeader("Fine-tune bands") {
 			workshop.Muted("Each band's share of the map. Drag one and the others rebalance. Moving the handle afterwards reshapes them again.")
@@ -310,6 +310,10 @@ func (w *Workspace) terrain() {
 // climatePad is a two-axis handle over the heat and moisture scales. Its
 // position is read back from the shares' centre of mass, so it agrees with the
 // sliders, and a drag reshapes every scale around the generator's defaults.
+// It is laid out like the climate grid: moisture runs across (drier on the
+// left, wetter on the right) and heat runs down (colder at the top, hotter at
+// the bottom), so pushing the handle toward a corner favours that corner's
+// climate cells.
 func (w *Workspace) climatePad(g *planet.Generator) {
 	s := window.PointSize()
 	avail := imgui.ContentRegionAvail().X
@@ -320,24 +324,26 @@ func (w *Workspace) climatePad(g *planet.Generator) {
 	imgui.InvisibleButton("##climate-pad", imgui.Vec2{X: size, Y: size})
 	w.padMin, w.padSize = origin, size
 	heat, wet := g.HeatShares(), g.MoistureShares()
-	x := float32(planet.ShareBias(heat[:], planet.DefaultHeatShares[:]))
-	y := float32(planet.ShareBias(wet[:], planet.DefaultMoistureShares[:]))
+	// x is the moisture bias (wetter to the right); y is the heat bias (hotter
+	// downward), matching the grid's columns and rows.
+	x := float32(planet.ShareBias(wet[:], planet.DefaultMoistureShares[:]))
+	y := float32(planet.ShareBias(heat[:], planet.DefaultHeatShares[:]))
 	if imgui.IsItemActive() {
 		m := imgui.MousePos()
 		x = max(-1, min(1, (m.X-origin.X)/size*2-1))
-		y = max(-1, min(1, 1-(m.Y-origin.Y)/size*2))
-		copy(g.Heat[:], planet.BiasedShares(planet.DefaultHeatShares[:], float64(x)))
-		copy(g.CaveHeat[:], planet.BiasedShares(planet.DefaultCaveHeatShares[:], float64(x)))
-		copy(g.Moisture[:], planet.BiasedShares(planet.DefaultMoistureShares[:], float64(y)))
+		y = max(-1, min(1, (m.Y-origin.Y)/size*2-1))
+		copy(g.Moisture[:], planet.BiasedShares(planet.DefaultMoistureShares[:], float64(x)))
+		copy(g.Heat[:], planet.BiasedShares(planet.DefaultHeatShares[:], float64(y)))
+		copy(g.CaveHeat[:], planet.BiasedShares(planet.DefaultCaveHeatShares[:], float64(y)))
 	}
 	draw := imgui.WindowDrawList()
 	end := imgui.Vec2{X: origin.X + size, Y: origin.Y + size}
 	draw.AddRectFilledV(origin, end, imgui.PackedColorFromVec4(style.Raised), 6*s, 0)
-	// Tints: cold on the left, hot on the right, wet across the top.
+	// Tints: cold across the top, hot across the bottom, wet on the right.
 	cold, hot, damp := imgui.Vec4{X: .2, Y: .45, Z: .85, W: .25}, imgui.Vec4{X: .85, Y: .3, Z: .25, W: .25}, imgui.Vec4{X: .3, Y: .8, Z: .75, W: .18}
-	draw.AddRectFilledV(origin, imgui.Vec2{X: origin.X + size/2, Y: end.Y}, imgui.PackedColorFromVec4(cold), 6*s, imgui.DrawFlagsRoundCornersLeft)
-	draw.AddRectFilledV(imgui.Vec2{X: origin.X + size/2, Y: origin.Y}, end, imgui.PackedColorFromVec4(hot), 6*s, imgui.DrawFlagsRoundCornersRight)
-	draw.AddRectFilledV(origin, imgui.Vec2{X: end.X, Y: origin.Y + size/2}, imgui.PackedColorFromVec4(damp), 6*s, imgui.DrawFlagsRoundCornersTop)
+	draw.AddRectFilledV(origin, imgui.Vec2{X: end.X, Y: origin.Y + size/2}, imgui.PackedColorFromVec4(cold), 6*s, imgui.DrawFlagsRoundCornersTop)
+	draw.AddRectFilledV(imgui.Vec2{X: origin.X, Y: origin.Y + size/2}, end, imgui.PackedColorFromVec4(hot), 6*s, imgui.DrawFlagsRoundCornersBottom)
+	draw.AddRectFilledV(imgui.Vec2{X: origin.X + size/2, Y: origin.Y}, end, imgui.PackedColorFromVec4(damp), 6*s, imgui.DrawFlagsRoundCornersRight)
 	grid := imgui.PackedColorFromVec4(imgui.Vec4{X: 1, Y: 1, Z: 1, W: .12})
 	for i := 1; i < 4; i++ {
 		t := float32(i) / 4
@@ -345,15 +351,15 @@ func (w *Workspace) climatePad(g *planet.Generator) {
 		draw.AddLine(imgui.Vec2{X: origin.X, Y: origin.Y + size*t}, imgui.Vec2{X: end.X, Y: origin.Y + size*t}, grid)
 	}
 	muted := imgui.PackedColorFromVec4(style.Muted)
-	draw.AddText(imgui.Vec2{X: origin.X + 6*s, Y: end.Y - imgui.TextLineHeight() - 4*s}, muted, "Colder")
-	draw.AddText(imgui.Vec2{X: end.X - imgui.CalcTextSize("Hotter", false, -1).X - 6*s, Y: end.Y - imgui.TextLineHeight() - 4*s}, muted, "Hotter")
-	draw.AddText(imgui.Vec2{X: origin.X + 6*s, Y: origin.Y + 4*s}, muted, "Wetter")
-	draw.AddText(imgui.Vec2{X: origin.X + 6*s, Y: end.Y - 2*imgui.TextLineHeight() - 8*s}, muted, "Drier")
-	knob := imgui.Vec2{X: origin.X + (x+1)/2*size, Y: origin.Y + (1-y)/2*size}
+	draw.AddText(imgui.Vec2{X: origin.X + 6*s, Y: origin.Y + 4*s}, muted, "Colder")
+	draw.AddText(imgui.Vec2{X: origin.X + 6*s, Y: end.Y - imgui.TextLineHeight() - 4*s}, muted, "Hotter")
+	draw.AddText(imgui.Vec2{X: origin.X + 6*s, Y: origin.Y + imgui.TextLineHeight() + 8*s}, muted, "Drier")
+	draw.AddText(imgui.Vec2{X: end.X - imgui.CalcTextSize("Wetter", false, -1).X - 6*s, Y: origin.Y + 4*s}, muted, "Wetter")
+	knob := imgui.Vec2{X: origin.X + (x+1)/2*size, Y: origin.Y + (y+1)/2*size}
 	draw.AddCircleFilled(knob, 9*s, imgui.PackedColorFromVec4(style.Teal))
 	draw.AddCircle(knob, 9*s, imgui.PackedColorFromVec4(style.Text))
 	imgui.SetCursorScreenPos(imgui.Vec2{X: origin.X, Y: end.Y + 6*s})
-	workshop.Muted(fmt.Sprintf("Heat %+.0f%%   Moisture %+.0f%%", x*100, y*100))
+	workshop.Muted(fmt.Sprintf("Moisture %+.0f%%   Heat %+.0f%%   (laid out like the grid)", x*100, y*100))
 }
 
 // One row per band: the slider shows its share and the label names the band.
