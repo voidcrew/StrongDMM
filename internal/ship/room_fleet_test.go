@@ -21,8 +21,11 @@ func TestFleetRoomRegistrationSources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	checked := 0
+	checked, fixed := 0, 0
 	for _, hull := range catalog.Hulls {
+		if hull.Fixed {
+			fixed++
+		}
 		project, err := OpenProject(catalog, env, hull)
 		if err != nil {
 			t.Fatal(err)
@@ -57,5 +60,5 @@ func TestFleetRoomRegistrationSources(t *testing.T) {
 	if checked == 0 {
 		t.Fatal("no loaded ship room definitions checked")
 	}
-	t.Logf("checked %d fleet room-list definitions without writing them", checked)
+	t.Logf("checked %d fleet room-list definitions (%d fixed ships) without writing them", checked, fixed)
 }

@@ -1,3 +1,8 @@
+# Voidworks 0.5.15-beta.5
+
+* Ship Workshop lists every fleet ship, including fixed layouts without upgrade slots. Select a room on a fixed ship and make it an upgrade room to turn the ship modular: the save enables `has_upgrade_slots` and adds the slot list beside the ship's existing jobs and prices.
+* The updater follows GitHub's repository-rename redirects on api.github.com.
+
 # Voidworks 0.5.15-beta.4
 
 * Climate balance: heat, cave heat and moisture bands have authored shares of the map (game generator `heat_shares`, `cave_heat_shares`, `humidity_shares`), with a two-axis handle, fine-tune sliders and legend shares. Shown once the loaded game code declares the fields.

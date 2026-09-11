@@ -3,6 +3,7 @@ package ship
 import (
 	"bytes"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -192,5 +193,110 @@ func TestLoadedShipWithoutThemesCanAddRooms(t *testing.T) {
 	code, _ := os.ReadFile(p.rooms.code)
 	if !bytes.Contains(code, []byte("for_theme = null")) {
 		t.Fatal("unthemed option has a theme restriction")
+	}
+}
+
+// A fleet ship without upgrade slots, registered by hand with its own jobs.
+func fixedShipProject(t *testing.T, flag string) (*Project, string) {
+	t.Helper()
+	c, env := authorEnvironment(t)
+	p, err := NewProject(c, env, "fixed_ship", "Fixed Ship", 20, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = p.Deck(p.Hull.Themes[0], util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 16, Y: 16, Z: 1}); err != nil {
+		t.Fatal(err)
+	}
+	paths := p.outputPaths()
+	if err = p.Save(); err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range paths[:1] {
+		if err = os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	}
+	definition := "/datum/map_template/shuttle/voidcrew/fixed_ship\n\tname = \"Fixed Ship\"\n\tsuffix = \"fixed_ship\"\n" + flag +
+		"\tpart_requirements = list(PART_CLASS_SCIENCE = 1)\n\tjob_slots = list(\n\t\tlist(name = \"Captain\", officer = TRUE, outfit = /datum/outfit/job/captain, category = JOB_CAT_COMMAND, slots = 1),\n\t)\n\n" +
+		"/obj/docking_port/mobile/voidcrew/fixed_ship\n\tname = \"Fixed Ship\"\n\tarea_type = /area/shuttle/voidcrew/fixed_ship\n\n/area/shuttle/voidcrew/fixed_ship\n\tname = \"Fixed Ship\"\n"
+	if err = os.WriteFile(paths[1], []byte(definition), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(paths[2], nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	h := Hull{Type: p.Hull.Type, Name: "Fixed Ship", Prefix: p.Hull.Prefix, Port: p.Hull.Port, Suffix: "fixed_ship", Fixed: true}
+	vars := dmvars.MutableVariables{}
+	vars.Put("name", `"Fixed Ship"`)
+	vars.Put("suffix", `"fixed_ship"`)
+	env.Objects[h.Type] = &dmenv.Object{Path: h.Type, Vars: vars.ToImmutable(), Location: sdmmparser.Location{File: paths[1]}}
+	c.Hulls = []Hull{h}
+	p, err = OpenProject(c, env, h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if p.Settings != nil || p.Modified() || !p.Hull.Fixed {
+		t.Fatal("fixed ship was converted or marked dirty on open")
+	}
+	return p, paths[1]
+}
+
+func TestFixedShipBecomesModularWithItsFirstRoom(t *testing.T) {
+	for _, flag := range []string{"", "\thas_upgrade_slots = FALSE\n"} {
+		p, source := fixedShipProject(t, flag)
+		original, _ := os.ReadFile(source)
+		if a, err := p.Assemble(Theme{}, nil); err != nil || len(a.Sources) != 1 {
+			t.Fatalf("fixed ship did not assemble as a bare hull: %v", err)
+		}
+		before := p.Capture()
+		lo, hi := util.Point{X: 5, Y: 5, Z: 1}, util.Point{X: 7, Y: 7, Z: 1}
+		if err := p.AddSlot(0, "bay", "Bay", lo, hi); err != nil {
+			t.Fatal(err)
+		}
+		if p.Hull.Fixed || !Contains(p.Hull.Slots, "bay") || !p.Modified() {
+			t.Fatal("first room did not make the ship modular")
+		}
+		after := p.Capture()
+		p.Restore(before)
+		if !p.Hull.Fixed || p.Modified() {
+			t.Fatal("undo did not restore the fixed layout")
+		}
+		p.Restore(after)
+		if err := p.Save(); err != nil {
+			t.Fatal(err)
+		}
+		saved, _ := os.ReadFile(source)
+		text := string(saved)
+		if !strings.Contains(text, "\thas_upgrade_slots = TRUE\n") || strings.Contains(text, "has_upgrade_slots = FALSE") {
+			t.Fatalf("saved definition does not enable upgrade slots:\n%s", text)
+		}
+		if !strings.Contains(text, "\tupgrade_slot_ids = list(\"bay\")\n") || !strings.Contains(text, "PART_CLASS_SCIENCE = 1") || !strings.Contains(text, "outfit = /datum/outfit/job/captain") {
+			t.Fatalf("saved definition lost the slot list or custom values:\n%s", text)
+		}
+		if strings.Count(text, "has_upgrade_slots") != 1 || strings.Count(text, "upgrade_slot_ids") != 1 {
+			t.Fatalf("duplicate modular definitions:\n%s", text)
+		}
+		if bytes.Equal(original, saved) {
+			t.Fatal("definition unchanged")
+		}
+		code, _ := os.ReadFile(filepath.Join(p.Catalog.Root, "voidcrew/modules/ship_upgrades/workshop/fixed_ship.dm"))
+		if !strings.Contains(string(code), "/datum/ship_upgrade_module/workshop_fixed_ship_bay_basic") || !strings.Contains(string(code), "for_ship = "+p.Hull.Type) {
+			t.Fatalf("room registration missing:\n%s", code)
+		}
+		include, _ := os.ReadFile(p.Dme.RootFile)
+		if !strings.Contains(string(include), "workshop\\fixed_ship.dm") && !strings.Contains(string(include), "workshop/fixed_ship.dm") {
+			t.Fatalf("room registration is not included:\n%s", include)
+		}
+		if p.Modified() {
+			t.Fatal("save left the ship dirty")
+		}
+		// Undo after saving restores the original fixed definition.
+		p.Restore(before)
+		if err := p.Save(); err != nil {
+			t.Fatal(err)
+		}
+		if restored, _ := os.ReadFile(source); !bytes.Equal(restored, original) {
+			t.Fatalf("undo after save did not restore the fixed definition:\n%s", restored)
+		}
 	}
 }

@@ -309,6 +309,9 @@ func (ws *WsShip) authorControls() {
 func (ws *WsShip) regionControls() {
 	heading("MAKE AN UPGRADE ROOM")
 	hint("Turn a furnished room into a swappable upgrade. Its walls and floor stay in the hull.")
+	if ws.project != nil && ws.project.Hull.Fixed {
+		hint("This ship is not modular yet. Its first upgrade room enables upgrade slots, so it can be sold in the shipyard and start rounds like the other modular ships.")
+	}
 	lo, hi, ready := tools.SelectionBounds()
 	if ready {
 		imgui.Text(fmt.Sprintf("Selected: %d x %d tiles", hi.X-lo.X+1, hi.Y-lo.Y+1))

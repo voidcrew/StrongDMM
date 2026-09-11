@@ -78,11 +78,11 @@ func dmSourceMask(data []byte, maskStrings bool) []byte {
 
 var dmTypeLine = regexp.MustCompile(`(?m)^/[^\r\n]*`)
 var roomSlotsAssignment = regexp.MustCompile(`(?m)^[\t ]+upgrade_slot_ids[\t ]*=[\t ]*`)
+var modularFlagAssignment = regexp.MustCompile(`(?m)^[\t ]+has_upgrade_slots[\t ]*=[\t ]*`)
 
-// Rewrite one literal slot list in its actual type block. Everything outside
-// the expression, including jobs, prices, inheritance and procedures, is kept.
-func rewriteRoomSlots(data []byte, typePath string, expected, slots []string) ([]byte, error) {
-	mask := dmSourceMask(data, true)
+// dmTypeBlock finds the one definition block of typePath in masked source,
+// returning the offsets just after its type line and before the next one.
+func dmTypeBlock(data, mask []byte, typePath, what string) (int, int, error) {
 	start, end, matches := -1, len(data), 0
 	for _, loc := range dmTypeLine.FindAllIndex(mask, -1) {
 		if strings.TrimSpace(string(mask[loc[0]:loc[1]])) == typePath {
@@ -93,12 +93,44 @@ func rewriteRoomSlots(data []byte, typePath string, expected, slots []string) ([
 		}
 	}
 	if matches != 1 || end < start {
-		return nil, fmt.Errorf("cannot uniquely locate the room list in %s", typePath)
+		return 0, 0, fmt.Errorf("cannot uniquely locate the %s in %s", what, typePath)
+	}
+	if regexp.MustCompile(`(?m)^[\t ]*#`).Match(mask[start:end]) {
+		return 0, 0, fmt.Errorf("%s has conditional definitions; use a literal %s", typePath, what)
+	}
+	return start, end, nil
+}
+
+// insertDefinitionLine adds one indented assignment as the first line of a
+// type block that starts at offset start.
+func insertDefinitionLine(data []byte, start int, line string) []byte {
+	newline := "\n"
+	if bytes.Contains(data, []byte("\r\n")) {
+		newline = "\r\n"
+	}
+	insert := start
+	if insert < len(data) && data[insert] == '\r' {
+		insert++
+	}
+	if insert < len(data) && data[insert] == '\n' {
+		insert++
+	}
+	assignment := "\t" + line + newline
+	if insert == start {
+		assignment = newline + assignment
+	}
+	return append(append(append([]byte{}, data[:insert]...), []byte(assignment)...), data[insert:]...)
+}
+
+// Rewrite one literal slot list in its actual type block. Everything outside
+// the expression, including jobs, prices, inheritance and procedures, is kept.
+func rewriteRoomSlots(data []byte, typePath string, expected, slots []string) ([]byte, error) {
+	mask := dmSourceMask(data, true)
+	start, end, err := dmTypeBlock(data, mask, typePath, "upgrade_slot_ids list")
+	if err != nil {
+		return nil, err
 	}
 	block := mask[start:end]
-	if regexp.MustCompile(`(?m)^[\t ]*#`).Match(block) {
-		return nil, fmt.Errorf("%s has conditional definitions; use a literal upgrade_slot_ids list", typePath)
-	}
 	assignments := roomSlotsAssignment.FindAllIndex(block, -1)
 	if len(assignments) > 1 {
 		return nil, fmt.Errorf("multiple room lists in %s", typePath)
@@ -107,22 +139,7 @@ func rewriteRoomSlots(data []byte, typePath string, expected, slots []string) ([
 		if reflect.DeepEqual(expected, slots) {
 			return append([]byte{}, data...), nil
 		}
-		newline := "\n"
-		if bytes.Contains(data, []byte("\r\n")) {
-			newline = "\r\n"
-		}
-		insert := start
-		if insert < len(data) && data[insert] == '\r' {
-			insert++
-		}
-		if insert < len(data) && data[insert] == '\n' {
-			insert++
-		}
-		assignment := "\tupgrade_slot_ids = " + dmList(slots) + newline
-		if insert == start {
-			assignment = newline + assignment
-		}
-		return append(append(append([]byte{}, data[:insert]...), []byte(assignment)...), data[insert:]...), nil
+		return insertDefinitionLine(data, start, "upgrade_slot_ids = "+dmList(slots)), nil
 	}
 	valueStart := start + assignments[0][1]
 	valueEnd := valueStart
@@ -163,4 +180,39 @@ func rewriteRoomSlots(data []byte, typePath string, expected, slots []string) ([
 		return append([]byte{}, data...), nil
 	}
 	return append(append(append([]byte{}, data[:valueStart]...), []byte(dmList(slots))...), data[valueEnd:]...), nil
+}
+
+// Enable upgrade slots on a fixed ship's own definition. An inherited or FALSE
+// value gains an explicit TRUE beside the slot list; TRUE is left untouched.
+func rewriteModularFlag(data []byte, typePath string) ([]byte, error) {
+	mask := dmSourceMask(data, true)
+	start, end, err := dmTypeBlock(data, mask, typePath, "has_upgrade_slots value")
+	if err != nil {
+		return nil, err
+	}
+	assignments := modularFlagAssignment.FindAllIndex(mask[start:end], -1)
+	if len(assignments) > 1 {
+		return nil, fmt.Errorf("multiple has_upgrade_slots values in %s", typePath)
+	}
+	if len(assignments) == 0 {
+		return insertDefinitionLine(data, start, "has_upgrade_slots = TRUE"), nil
+	}
+	valueStart := start + assignments[0][1]
+	valueEnd, lineEnd := valueStart, valueStart
+	for lineEnd < end && mask[lineEnd] != '\n' && mask[lineEnd] != '\r' {
+		lineEnd++
+	}
+	for valueEnd < lineEnd && mask[valueEnd] != ' ' && mask[valueEnd] != '\t' {
+		valueEnd++
+	}
+	// Comments are masked already, so anything left after the value is code.
+	if strings.TrimSpace(string(mask[valueEnd:lineEnd])) == "" {
+		switch string(mask[valueStart:valueEnd]) {
+		case "TRUE", "1":
+			return append([]byte{}, data...), nil
+		case "FALSE", "0":
+			return append(append(append([]byte{}, data[:valueStart]...), []byte("TRUE")...), data[valueEnd:]...), nil
+		}
+	}
+	return nil, fmt.Errorf("%s uses an expression for has_upgrade_slots; use TRUE or FALSE", typePath)
 }

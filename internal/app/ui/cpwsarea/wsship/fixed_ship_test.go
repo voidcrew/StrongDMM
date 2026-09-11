@@ -1,0 +1,161 @@
+package wsship
+
+import (
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+
+	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
+	"sdmm/internal/dmapi/dmenv"
+	"sdmm/internal/dmapi/dminclude"
+	"sdmm/internal/ship"
+	"sdmm/internal/util"
+)
+
+// A handwritten ship without upgrade slots, registered beside the authored
+// fixture, is converted through the same selection, room and save path.
+func exerciseFixedShipConversion(t *testing.T, ws *WsShip, render func()) {
+	t.Helper()
+	root := ws.catalog.Root
+	hull, err := os.ReadFile(filepath.Join(root, "_maps/voidcrew/ships/ship_workshop_fixture.dmm"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err = os.WriteFile(filepath.Join(root, "_maps/voidcrew/ships/ship_fixed_fixture.dmm"), hull, 0600); err != nil {
+		t.Fatal(err)
+	}
+	registration := filepath.Join(root, "voidcrew/mapping/shuttles/fixed_fixture.dm")
+	definition := "/datum/map_template/shuttle/voidcrew/fixed_fixture\n\tname = \"Fixed Fixture\"\n\tsuffix = \"fixed_fixture\"\n\tshort_name = \"Fixed\"\n\tpart_requirements = list(PART_CLASS_SCIENCE = 2)\n\tjob_slots = list(\n\t\tlist(name = \"Skipper\", officer = TRUE, outfit = /datum/outfit/job/captain, category = JOB_CAT_COMMAND, slots = 1),\n\t)\n"
+	if err = os.WriteFile(registration, []byte(definition), 0600); err != nil {
+		t.Fatal(err)
+	}
+	dmeFile := ws.app.LoadedEnvironment().RootFile
+	includes, err := os.ReadFile(dmeFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Later exercises continue with the authored fixture, so put the workspace
+	// back once the fixed ship has been converted.
+	savedCatalog, savedProjects, savedDme := ws.catalog, ws.projects, ws.app.(*previewApp).dme
+	savedHull, savedTheme := ws.hull, ws.theme
+	defer func() {
+		ws.flush()
+		ws.OnFocusChange(false)
+		// The fixture's projects tracked the environment file before this
+		// registration was included; give them back the file they know.
+		if err := os.WriteFile(dmeFile, includes, 0600); err != nil {
+			t.Fatal(err)
+		}
+		ws.catalog, ws.projects = savedCatalog, savedProjects
+		ws.app.(*previewApp).dme = savedDme
+		ws.hull, ws.theme = savedHull, savedTheme
+		ws.defaults()
+		ws.rebuild()
+		ws.setStage(stepBuild)
+		ws.OnFocusChange(true)
+		if ws.message != "" {
+			t.Fatal(ws.message)
+		}
+	}()
+	if err = os.WriteFile(dmeFile, dminclude.Add(includes, "voidcrew/mapping/shuttles/fixed_fixture.dm"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	environment, err := dmenv.New(dmeFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	catalog, err := ship.Discover(environment)
+	if err != nil {
+		t.Fatal(err)
+	}
+	ws.app.(*previewApp).dme = environment
+	ws.catalog = catalog
+	ws.projects = map[string]*ship.Project{}
+	ws.setStage(stepChoose)
+	for i := 0; i < 3; i++ {
+		render()
+	}
+	ws.hull = -1
+	for i, h := range catalog.Hulls {
+		if h.Type == ship.HullType+"/fixed_fixture" {
+			ws.hull = i
+			if !h.Fixed || len(h.Slots) != 0 || len(h.Modules) != 0 {
+				t.Fatalf("fixed ship was not discovered as fixed: %+v", h)
+			}
+		}
+	}
+	if ws.hull < 0 {
+		t.Fatal("fixed ship missing from the fleet library")
+	}
+	ws.theme = 0
+	ws.isolated = false
+	ws.defaults()
+	ws.rebuild()
+	ws.setStage(stepBuild)
+	ws.OnFocusChange(true)
+	if ws.message != "" || ws.assembly == nil || len(ws.assembly.Sources) != 1 {
+		t.Fatalf("fixed ship did not open as a bare hull: %s", ws.message)
+	}
+	lo, hi := util.Point{X: 5, Y: 5, Z: 1}, util.Point{X: 7, Y: 7, Z: 1}
+	if !tools.SetGrabSelection(lo, hi) {
+		t.Fatal("could not select a room on the fixed ship")
+	}
+	ws.beginTask(taskRoom)
+	ws.itemName = "Fixed Bay"
+	for i := 0; i < 3; i++ {
+		render()
+	}
+	if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
+		captureFrame(t, filepath.Join(dst, "fixed-ship-first-room.png"), 1400, 960)
+	}
+	ws.applyRegion()
+	project := ws.project
+	if ws.message != "" || ws.source == 0 || project.Hull.Fixed {
+		t.Fatalf("fixed ship could not create its first room: %s", ws.message)
+	}
+	ws.app.CommandStorage().Undo()
+	if !project.Hull.Fixed || len(project.Hull.Slots) != 0 {
+		t.Fatal("undo did not restore the fixed layout")
+	}
+	ws.app.CommandStorage().Redo()
+	if project.Hull.Fixed || !ship.Contains(project.Hull.Slots, "fixed_bay") {
+		t.Fatal("redo did not restore the conversion")
+	}
+	if !ws.Save() {
+		t.Fatal(ws.message)
+	}
+	saved, _ := os.ReadFile(registration)
+	text := string(saved)
+	if !strings.Contains(text, "\thas_upgrade_slots = TRUE\n") || !strings.Contains(text, "\tupgrade_slot_ids = list(\"fixed_bay\")\n") || !strings.Contains(text, "PART_CLASS_SCIENCE = 2") || !strings.Contains(text, "name = \"Skipper\"") {
+		t.Fatalf("conversion did not keep the definition and enable slots:\n%s", text)
+	}
+	fresh, err := dmenv.New(dmeFile)
+	if err != nil {
+		t.Fatal("converted ship definitions did not parse:", err)
+	}
+	if fresh.Objects[ship.HullType+"/fixed_fixture"].Vars.IntV("has_upgrade_slots", 0) == 0 {
+		t.Fatal("game does not see the converted ship as modular")
+	}
+	rediscovered, err := ship.Discover(fresh)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range rediscovered.Hulls {
+		if h.Type != ship.HullType+"/fixed_fixture" {
+			continue
+		}
+		if h.Fixed || !ship.Contains(h.Slots, "fixed_bay") || len(h.Modules) != 1 || h.Modules[0].Slot != "fixed_bay" {
+			t.Fatalf("converted ship was not rediscovered as modular: %+v", h)
+		}
+		reopened, err := ship.OpenProject(rediscovered, fresh, h)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if a, err := reopened.Assemble(ship.Theme{}, map[string]string{"fixed_bay": h.Modules[0].ID}); err != nil || len(a.Sources) != 2 {
+			t.Fatalf("converted room did not reopen: %v", err)
+		}
+		return
+	}
+	t.Fatal("converted ship disappeared after rediscovery")
+}

@@ -38,6 +38,10 @@ type Hull struct {
 	Slots                            []string
 	Themes                           []Theme
 	Modules                          []Module
+	// Fixed ships have no upgrade slots yet. Their first upgrade room makes
+	// them modular, which the game requires before selling them or rolling
+	// them into the roundstart fleet.
+	Fixed bool `json:",omitempty"`
 }
 
 type Catalog struct {
@@ -270,18 +274,27 @@ func Discover(dme *dmenv.Dme) (*Catalog, error) {
 		}
 		obj := dme.Objects[path]
 		v := obj.Vars
-		if v.IntV("has_upgrade_slots", 0) == 0 || v.ValueV("abstract", "") == path || v.IntV("player_hidden", 0) != 0 {
+		if v.ValueV("abstract", "") == path || v.IntV("player_hidden", 0) != 0 {
 			continue
 		}
-		// List registered base hulls once, rather than every inherited theme subtype.
-		if modules[path] == nil && themes[path] == nil {
+		// List registered base hulls once, rather than every inherited theme
+		// subtype. Ships without registered rooms, including fixed layouts that
+		// are not modular yet, are listed from their own top-level definition.
+		registered := modules[path] != nil || themes[path] != nil
+		if !registered && (strings.Contains(strings.TrimPrefix(path, HullType+"/"), "/") || text(v, "suffix") == "") {
+			continue
+		}
+		// Rooms registered for a hull that never enabled slots are not loaded
+		// by the game; keep such a definition out of the library as before.
+		fixed := v.IntV("has_upgrade_slots", 0) == 0
+		if fixed && registered {
 			continue
 		}
 		slots, err := stringList(v.ValueV("upgrade_slot_ids", "null"))
 		if err != nil {
 			return nil, fmt.Errorf("%s slots: %w", path, err)
 		}
-		h := Hull{Type: path, Name: text(v, "name"), Prefix: text(v, "prefix"), Port: text(v, "port_id"), Suffix: text(v, "suffix"), Slots: slots, Themes: themes[path], Modules: modules[path]}
+		h := Hull{Type: path, Name: text(v, "name"), Prefix: text(v, "prefix"), Port: text(v, "port_id"), Suffix: text(v, "suffix"), Slots: slots, Themes: themes[path], Modules: modules[path], Fixed: fixed}
 		sort.SliceStable(h.Themes, func(i, j int) bool {
 			if h.Themes[i].Default != h.Themes[j].Default {
 				return h.Themes[i].Default

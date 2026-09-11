@@ -182,6 +182,12 @@ func (p *Project) prepareRooms(theme *Theme) error {
 	if _, err = rewriteRoomSlots(p.rooms.sources[file].Before, typePath, before, before); err != nil {
 		return err
 	}
+	// A fixed ship also needs has_upgrade_slots enabled on its own definition.
+	if p.rooms.base.Fixed && theme.ID == "" {
+		if _, err = rewriteModularFlag(p.rooms.sources[file].Before, typePath); err != nil {
+			return err
+		}
+	}
 	p.rooms.targets[theme.ID] = typePath
 	return nil
 }
@@ -215,6 +221,12 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 		contents[file], err = rewriteRoomSlots(contents[file], typePath, before, after)
 		if err != nil {
 			return nil, err
+		}
+		if themeID == "" && p.rooms.base.Fixed && !p.Hull.Fixed {
+			contents[file], err = rewriteModularFlag(contents[file], typePath)
+			if err != nil {
+				return nil, err
+			}
 		}
 	}
 	for scope, target := range p.rooms.names {

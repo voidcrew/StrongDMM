@@ -40,3 +40,41 @@ func TestRewriteInheritedAndUnsupportedRoomLists(t *testing.T) {
 		}
 	}
 }
+
+func TestRewriteModularFlag(t *testing.T) {
+	const typePath = "/datum/map_template/shuttle/voidcrew/sample"
+	for _, newline := range []string{"\n", "\r\n"} {
+		inherited := strings.ReplaceAll("// has_upgrade_slots = FALSE in a comment\n"+typePath+"\n\tname = \"Sample\"\n\tsuffix = \"sample\"\n\n"+typePath+"/other\n\thas_upgrade_slots = FALSE\n", "\n", newline)
+		got, err := rewriteModularFlag([]byte(inherited), typePath)
+		want := strings.ReplaceAll("// has_upgrade_slots = FALSE in a comment\n"+typePath+"\n\thas_upgrade_slots = TRUE\n\tname = \"Sample\"\n\tsuffix = \"sample\"\n\n"+typePath+"/other\n\thas_upgrade_slots = FALSE\n", "\n", newline)
+		if err != nil || string(got) != want {
+			t.Fatalf("inherited flag: %v %s", err, got)
+		}
+		disabled := strings.ReplaceAll(typePath+"\n\tname = \"Sample\"\n\thas_upgrade_slots = FALSE // fixed layout\n", "\n", newline)
+		got, err = rewriteModularFlag([]byte(disabled), typePath)
+		want = strings.ReplaceAll(typePath+"\n\tname = \"Sample\"\n\thas_upgrade_slots = TRUE // fixed layout\n", "\n", newline)
+		if err != nil || string(got) != want {
+			t.Fatalf("disabled flag: %v %s", err, got)
+		}
+		enabled := strings.ReplaceAll(typePath+"\n\thas_upgrade_slots = TRUE\n", "\n", newline)
+		if got, err = rewriteModularFlag([]byte(enabled), typePath); err != nil || string(got) != enabled {
+			t.Fatalf("enabled flag changed: %v %s", err, got)
+		}
+	}
+	// The slot list and the flag are inserted together at the top of a block.
+	both, err := rewriteRoomSlots([]byte(typePath+"\n\tname = \"Sample\"\n"), typePath, nil, []string{"bay"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if both, err = rewriteModularFlag(both, typePath); err != nil || string(both) != typePath+"\n\thas_upgrade_slots = TRUE\n\tupgrade_slot_ids = list(\"bay\")\n\tname = \"Sample\"\n" {
+		t.Fatalf("combined insertion: %v %s", err, both)
+	}
+	for _, value := range []string{"SHIP_SLOTS", "!FALSE"} {
+		if _, err := rewriteModularFlag([]byte(typePath+"\n\thas_upgrade_slots = "+value+"\n"), typePath); err == nil {
+			t.Fatal("accepted unsupported flag value:", value)
+		}
+	}
+	if _, err := rewriteModularFlag([]byte(typePath+"\n\thas_upgrade_slots = FALSE\n"+typePath+"\n"), typePath); err == nil {
+		t.Fatal("accepted a duplicated definition block")
+	}
+}

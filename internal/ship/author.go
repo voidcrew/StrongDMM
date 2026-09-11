@@ -192,6 +192,8 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 		}
 	}
 	p.Hull.Modules = append(p.Hull.Modules, module)
+	// The first upgrade room turns a fixed ship into a modular one.
+	p.Hull.Fixed = false
 	p.reserveAnchors(hull.Map)
 	p.reserveAnchors(dst)
 	p.protect(hull.Map)

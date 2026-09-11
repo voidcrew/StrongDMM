@@ -237,6 +237,9 @@ func (ws *WsShip) chooseShip() {
 		}
 		count++
 		detail := fmt.Sprintf("%d room options   /   %d variants", len(h.Modules), len(h.Themes))
+		if h.Fixed {
+			detail = "Fixed layout   /   not modular yet"
+		}
 		if workshop.Row(h.Type, h.Name, detail, "Open  >", ws.project != nil && i == ws.hull, style.Teal, 0) {
 			ws.flush()
 			ws.hull, ws.theme = i, 0
@@ -320,8 +323,15 @@ func (ws *WsShip) buildControls() {
 		ws.beginTask(taskDocking)
 	}
 	tooltip("Select an entrance with Grab (3), then place or move this ship's mobile docking port there.")
-	if workshop.Row("open-room", "Upgrade rooms", "", ">", false, style.Amber, 0) {
+	roomDetail := ""
+	if ws.project.Hull.Fixed {
+		roomDetail = "Make this ship modular"
+	}
+	if workshop.Row("open-room", "Upgrade rooms", roomDetail, ">", false, style.Amber, 0) {
 		ws.beginTask(taskRoom)
+	}
+	if ws.project.Hull.Fixed {
+		tooltip("This ship has a fixed layout. Select a room with Grab (3) and make it an upgrade room to turn the ship modular.")
 	}
 	space()
 	heading("CONFIGURATION")
