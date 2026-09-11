@@ -17,6 +17,41 @@ type EditContext struct {
 	BeforeHistory func()
 	Filter        func(string) bool
 	Editable      map[uint64]*dmminstance.Instance
+	// Overlay draws the owner's own shapes each frame in view coordinates.
+	Overlay func(OverlayPainter)
+}
+
+// OverlayPainter pushes overlays addressed by view tiles (1-based, already
+// including any context offset), so an owner can mark tiles outside the part
+// being edited.
+type OverlayPainter struct{ p *PaneMap }
+
+func (o OverlayPainter) Tile(coord util.Point, fill util.Color) {
+	size := float32(dmmap.WorldIconSize)
+	x, y := float32(coord.X-1)*size, float32(coord.Y-1)*size
+	o.p.canvasOverlay.PushArea(canvas.OverlayArea{Bounds_: util.Bounds{X1: x, Y1: y, X2: x + size, Y2: y + size}, FillColor_: fill})
+}
+
+// Edges outlines only the named sides of a tile.
+func (o OverlayPainter) Edges(coord util.Point, sides util.Sides, color util.Color) {
+	size := float32(dmmap.WorldIconSize)
+	x, y := float32(coord.X-1)*size, float32(coord.Y-1)*size
+	var borders []util.Bounds
+	if sides.North {
+		borders = append(borders, util.Bounds{X1: x, Y1: y + size, X2: x + size, Y2: y + size})
+	}
+	if sides.East {
+		borders = append(borders, util.Bounds{X1: x + size, Y1: y, X2: x + size, Y2: y + size})
+	}
+	if sides.South {
+		borders = append(borders, util.Bounds{X1: x, Y1: y, X2: x + size, Y2: y})
+	}
+	if sides.West {
+		borders = append(borders, util.Bounds{X1: x, Y1: y, X2: x, Y2: y + size})
+	}
+	if len(borders) > 0 {
+		o.p.canvasOverlay.PushAreaBorder(canvas.OverlayAreaBorder{Borders_: borders, Color_: color})
+	}
 }
 
 func (p *PaneMap) SetEditContext(context *EditContext) {

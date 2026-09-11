@@ -55,6 +55,11 @@ type WsShip struct {
 	crewVisual                       crewVisual
 	costs                            costEditor
 	itemCosts                        ship.PartCosts
+	reshapeSlot, hoverRoom           string
+	pendingDelete                    string // "slot/x" or "module/x" awaiting its second click
+	pendingShown                     bool
+	fixedConfirmed                   map[string]bool // hull types whose modular conversion was confirmed
+	optionInfos                      map[string]optionInfo
 }
 
 func New(app App, busy ...func(string) bool) *WsShip {
@@ -132,7 +137,7 @@ func (ws *WsShip) Focused() bool {
 }
 func (ws *WsShip) OnFocusChange(f bool) {
 	ws.focused = f
-	if !f && tools.IsSelected(tools.TNRegion) {
+	if !f && (tools.IsSelected(tools.TNRegion) || tools.IsSelected(tools.TNRoomShape)) {
 		tools.SetSelected(tools.TNAdd)
 	}
 	if ws.pane != nil && !ws.wizard && ws.stage == stepBuild && ws.task != taskCrew && ws.task != taskCosts {
@@ -225,6 +230,8 @@ func (ws *WsShip) rebuild() {
 		return nil
 	}
 	ws.catalog.Hulls[ws.hull] = p.Hull
+	ws.optionInfos = nil
+	ws.sanitizeSelection()
 	a, err := p.Assemble(ws.currentTheme(), ws.selected)
 	if err != nil {
 		ws.message = err.Error()
@@ -298,13 +305,49 @@ func (ws *WsShip) rebuild() {
 			ws.source = index
 			ws.rebuild()
 			ws.OnFocusChange(true)
-		}, Filter: ws.visible})
+		}, Filter: ws.visible, Overlay: ws.paintRooms})
 	}
 	ws.activate(ws.panes[a.Sources[ws.source].File])
 	ws.pane.RenderContext()
 	ws.message = ""
 }
 func (ws *WsShip) refresh() { ws.rebuild() }
+
+// sanitizeSelection drops displayed options that no longer exist, falling
+// back to the slot's default so removals and their redo still assemble.
+func (ws *WsShip) sanitizeSelection() {
+	if ws.project == nil {
+		return
+	}
+	theme := ws.currentTheme().ID
+	for slot, id := range ws.selected {
+		if id == "" {
+			continue
+		}
+		var fallback *ship.Module
+		ok := false
+		for i := range ws.project.Hull.Modules {
+			m := &ws.project.Hull.Modules[i]
+			if m.Slot != slot || !m.Available(theme) {
+				continue
+			}
+			if m.ID == id {
+				ok = true
+				break
+			}
+			if m.Default || fallback == nil {
+				fallback = m
+			}
+		}
+		if ok {
+			continue
+		}
+		ws.selected[slot] = ""
+		if fallback != nil {
+			ws.selected[slot] = fallback.ID
+		}
+	}
+}
 func copySelection(s map[string]string) map[string]string {
 	r := map[string]string{}
 	for k, v := range s {

@@ -9,7 +9,9 @@ import (
 	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
 	"sdmm/internal/app/window"
 	"sdmm/internal/dmapi/dmmap"
+	"sdmm/internal/imguiext/style"
 	"sdmm/internal/ship"
+	"sdmm/internal/util"
 )
 
 type buildTask int
@@ -27,7 +29,11 @@ const (
 	taskCosts
 	taskRenameTheme
 	taskRenameModule
+	taskReshape
 )
+
+// usesShapeTool reports the tasks that collect room tiles on the hull canvas.
+func (ws *WsShip) usesShapeTool() bool { return ws.task == taskRoom || ws.task == taskReshape }
 
 type settingsForm struct {
 	name, description string
@@ -226,7 +232,7 @@ func (ws *WsShip) beginTask(task buildTask) {
 	if task == taskTheme || task == taskModule {
 		ws.itemCosts = ship.PartCosts{}
 	}
-	if task == taskRoom || task == taskDocking {
+	if task == taskRoom || task == taskDocking || task == taskReshape {
 		lo, hi, selected := tools.SelectionBounds()
 		if selected && ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
 			offset := ws.assembly.Sources[ws.source].Offset
@@ -235,10 +241,14 @@ func (ws *WsShip) beginTask(task buildTask) {
 		}
 		ws.source, ws.isolated = 0, false
 		ws.rebuild()
-		if selected {
-			tools.SetGrabSelection(lo, hi)
+		if task == taskDocking {
+			if selected {
+				tools.SetGrabSelection(lo, hi)
+			}
+			ws.dockOutward = 0
+		} else {
+			ws.beginShape(task, selected, lo, hi)
 		}
-		ws.dockOutward = 0
 	}
 	if task == taskArea {
 		ws.areaPath, ws.areaIcon = "", "station"
@@ -264,7 +274,79 @@ func (ws *WsShip) finishTask() {
 	if !ws.commitDraft() {
 		return
 	}
+	ws.endShape()
 	ws.task = taskPaint
+}
+
+// beginShape arms the room-shape tool on the hull. A Grab rectangle carried
+// into the task becomes the first tiles; reshaping starts from the room's
+// current footprint.
+func (ws *WsShip) beginShape(task buildTask, selected bool, lo, hi util.Point) {
+	tools.SetRoomShapeAccept(ws.acceptShapeTile)
+	tools.ClearRoomShape()
+	tools.SetSelected(tools.TNRoomShape)
+	if task == taskReshape {
+		if ws.assembly != nil {
+			if room, ok := ws.assembly.Rooms[ws.reshapeSlot]; ok {
+				tools.SetRoomShapeTiles(roomTiles(room))
+			}
+		}
+		return
+	}
+	if selected {
+		tools.AddRoomShapeRect(lo, hi)
+	}
+}
+
+// roomTiles lists a room's footprint on the hull, without its marker.
+func roomTiles(room ship.RoomShape) []util.Point {
+	var tiles []util.Point
+	for cell, in := range room.Footprint.Cells {
+		if in {
+			tiles = append(tiles, util.Point{X: room.Origin.X + cell.X - 1, Y: room.Origin.Y + cell.Y - 1, Z: 1})
+		}
+	}
+	return tiles
+}
+
+func (ws *WsShip) endShape() {
+	if !ws.usesShapeTool() {
+		return
+	}
+	tools.ClearRoomShape()
+	tools.SetRoomShapeAccept(nil)
+	if tools.IsSelected(tools.TNRoomShape) {
+		tools.SetSelected(tools.TNAdd)
+	}
+}
+
+// acceptShapeTile keeps room tiles on the hull and out of other rooms.
+func (ws *WsShip) acceptShapeTile(p util.Point) (bool, string) {
+	if ws.assembly == nil || len(ws.assembly.Sources) == 0 || !ws.assembly.Sources[0].Live.HasTile(p) {
+		return false, "That tile is outside the hull."
+	}
+	if slot, ok := ws.assembly.RoomAt(p); ok && !(ws.task == taskReshape && slot == ws.reshapeSlot) {
+		return false, "That tile already belongs to " + ship.SlotDisplayName(slot) + "."
+	}
+	return true, ""
+}
+
+// importGrabSelection adds a Grab rectangle drawn on the part being edited.
+func (ws *WsShip) importGrabSelection() {
+	lo, hi, ok := tools.SelectionBounds()
+	if !ok || ws.assembly == nil || ws.source >= len(ws.assembly.Sources) {
+		return
+	}
+	offset := ws.assembly.Sources[ws.source].Offset
+	lo.X, lo.Y = lo.X+offset.X, lo.Y+offset.Y
+	hi.X, hi.Y = hi.X+offset.X, hi.Y+offset.Y
+	if ws.source != 0 {
+		ws.flush()
+		ws.source = 0
+		ws.rebuild()
+	}
+	tools.SetSelected(tools.TNRoomShape)
+	tools.AddRoomShapeRect(lo, hi)
 }
 
 func (ws *WsShip) authorControls() {
@@ -275,7 +357,7 @@ func (ws *WsShip) authorControls() {
 	switch ws.task {
 	case taskArea:
 		ws.areaControls()
-	case taskRoom:
+	case taskRoom, taskReshape:
 		ws.regionControls()
 	case taskDocking:
 		ws.dockingControls()
@@ -307,19 +389,67 @@ func (ws *WsShip) authorControls() {
 }
 
 func (ws *WsShip) regionControls() {
-	heading("MAKE AN UPGRADE ROOM")
-	hint("Turn a furnished room into a swappable upgrade. Its walls and floor stay in the hull.")
-	if ws.project != nil && ws.project.Hull.Fixed {
-		hint("This ship is not modular yet. Its first upgrade room enables upgrade slots, so it can be sold in the shipyard and start rounds like the other modular ships.")
-	}
-	lo, hi, ready := tools.SelectionBounds()
-	if ready {
-		imgui.Text(fmt.Sprintf("Selected: %d x %d tiles", hi.X-lo.X+1, hi.Y-lo.Y+1))
+	if ws.task == taskReshape {
+		heading("CHANGE ROOM SHAPE")
+		hint(ship.SlotDisplayName(ws.reshapeSlot) + ": tiles leaving the room must be empty in every option.")
 	} else {
-		hint("Use Grab (3) to select the room's tiles.")
+		heading("MAKE AN UPGRADE ROOM")
+		hint("Turn a furnished room into a swappable upgrade. Its walls and floor stay in the hull.")
 	}
-	label := "Make this an upgrade room"
-	valid := ready && ws.source == 0
+	if ws.project != nil && ws.project.Hull.Fixed && ws.task == taskRoom && !ws.fixedConfirmed[ws.project.Hull.Type] {
+		space()
+		imgui.TextWrapped("This turns " + ws.project.Hull.Name + " into a modular ship: its walls stay in the hull, the furniture in the selected tiles moves into the room's first option, and the ship becomes purchasable in the shipyard.")
+		space()
+		if actionButton("Continue", true) {
+			if ws.fixedConfirmed == nil {
+				ws.fixedConfirmed = map[string]bool{}
+			}
+			ws.fixedConfirmed[ws.project.Hull.Type] = true
+		}
+		if actionButton("Cancel", false) {
+			ws.finishTask()
+		}
+		return
+	}
+	if ws.source != 0 && ws.assembly != nil {
+		// Shapes live on the hull; a switch mid-task moved editing elsewhere.
+		ws.flush()
+		ws.source = 0
+		ws.rebuild()
+	}
+	tiles := tools.RoomShapeTiles()
+	shape, _, shapeErr := ship.FootprintFromTiles(tiles)
+	supported := ws.project == nil || ws.project.SupportsFootprints()
+	if len(tiles) == 0 {
+		hint("Click hull tiles to add them to the room.")
+	} else {
+		imgui.Text(fmt.Sprintf("%d tiles selected, %d x %d box", len(tiles), shape.W, shape.H))
+		if !shape.Connected() {
+			imgui.TextColored(style.Amber, "Room is in two pieces")
+		}
+	}
+	hint("Drag to paint  |  Shift+drag adds a box  |  Alt+drag removes a box")
+	if !supported {
+		hint("This project's game code does not support custom room shapes yet. Rooms must be rectangles.")
+	}
+	if reason := tools.RoomShapeRejection(); reason != "" {
+		imgui.TextColored(style.Amber, reason)
+	}
+	if !tools.IsSelected(tools.TNRoomShape) {
+		if _, _, ready := tools.SelectionBounds(); ready {
+			if actionButton("Use Grab selection", false) {
+				ws.importGrabSelection()
+			}
+			tooltip("Adds the Grab rectangle to the room's tiles.")
+		}
+		if actionButton("Select room tiles", false) {
+			tools.SetSelected(tools.TNRoomShape)
+		}
+	} else if len(tiles) > 0 && actionButton("Clear tiles", false) {
+		tools.ClearRoomShape()
+	}
+	valid := shapeErr == nil && (supported || shape.IsFull())
+	label := "Apply new shape"
 	if ws.task == taskRoom {
 		textField("Room name", "e.g. Cargo bay", &ws.itemName)
 		ws.itemIdentifier()
@@ -340,26 +470,31 @@ func (ws *WsShip) regionControls() {
 }
 
 func (ws *WsShip) applyRegion() {
-	lo, hi, ready := tools.SelectionBounds()
-	if !ready || ws.source != 0 || ws.pane == nil || !ws.pane.Dmm().HasTile(lo) || !ws.pane.Dmm().HasTile(hi) {
-		ws.message = "Use Grab (3) to select tiles inside the hull first."
+	shape, origin, err := ship.FootprintFromTiles(tools.RoomShapeTiles())
+	if err != nil || ws.source != 0 || ws.pane == nil {
+		ws.message = "Select the room's tiles on the hull first."
 		return
 	}
-	{
-		ws.change("Make upgrade room", func() error { return ws.project.AddSlot(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), lo, ship.FullFootprint(hi.X-lo.X+1, hi.Y-lo.Y+1)) })
+	if ws.task == taskReshape {
+		slot := ws.reshapeSlot
+		ws.change("Change room shape", func() error { return ws.project.ReshapeSlot(ws.theme, slot, origin, shape) })
 		if ws.message == "" {
-			ws.defaults()
-			ws.rebuild()
-			for i, s := range ws.assembly.Sources {
-				if s.Slot == ws.itemID {
-					ws.source = i
-					break
-				}
-			}
-			ws.rebuild()
+			ws.finishTask()
+			ws.editRoom(slot)
 		}
+		return
 	}
+	ws.change("Make upgrade room", func() error { return ws.project.AddSlot(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), origin, shape) })
 	if ws.message == "" {
+		ws.defaults()
+		ws.rebuild()
+		for i, s := range ws.assembly.Sources {
+			if s.Slot == ws.itemID {
+				ws.source = i
+				break
+			}
+		}
+		ws.rebuild()
 		ws.finishTask()
 	}
 }
@@ -514,6 +649,8 @@ func (ws *WsShip) copyControls() {
 	costErr := ws.itemCosts.Validate()
 	if costErr != nil {
 		hint(costErr.Error())
+	} else if ws.itemCosts.Summary() == "Free" {
+		hint("Free in the shipyard until you set a price.")
 	}
 	valid := nameErr == nil && costErr == nil && ship.ValidID(ws.itemID) == nil && !ws.itemIDUsed(ws.itemID)
 	if strings.TrimSpace(ws.itemName) != "" && nameErr != nil {

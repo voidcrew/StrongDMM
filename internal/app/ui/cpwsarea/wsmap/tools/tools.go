@@ -23,6 +23,8 @@ const (
 	TNDelete  = "Delete"
 	TNReplace = "Replace"
 	TNRegion  = "Select region"
+	// Workshop-only: collects an upgrade room's tiles. Not in the tool bar.
+	TNRoomShape = "Room shape"
 )
 
 func init() {
@@ -86,6 +88,7 @@ var (
 		TNDelete:  newDelete(),
 		TNReplace: newReplace(),
 		TNRegion:  &ToolRegion{},
+		TNRoomShape: newRoomShape(),
 	}
 
 	selectedToolName = TNAdd

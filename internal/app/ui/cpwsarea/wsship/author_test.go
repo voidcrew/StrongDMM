@@ -174,8 +174,14 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 		t.Fatal("could not select room")
 	}
 	ws.beginTask(taskRoom)
-	if gotLo, gotHi, ready := tools.SelectionBounds(); !ready || gotLo != lo || gotHi != hi {
-		t.Fatal("opening room action lost Grab selection")
+	if !tools.IsSelected(tools.TNRoomShape) {
+		t.Fatal("room action did not arm the room-shape tool")
+	}
+	if shape, origin, err := ship.FootprintFromTiles(tools.RoomShapeTiles()); err != nil || origin != lo || shape.W != hi.X-lo.X+1 || shape.H != hi.Y-lo.Y+1 || !shape.IsFull() {
+		t.Fatalf("opening room action lost Grab selection: %v %v %v", shape, origin, err)
+	}
+	if ok, _ := ws.acceptShapeTile(util.Point{X: 200, Y: 200, Z: 1}); ok {
+		t.Fatal("room shape accepted a tile outside the hull")
 	}
 	ws.itemID, ws.itemName = "cargo", "Cargo"
 	capture("grab-create-room")
@@ -332,6 +338,7 @@ func exerciseAuthoring(t *testing.T, ws *WsShip, dme *dmenv.Dme, render func()) 
 	exerciseShipDetails(t, ws, render)
 	exerciseRenaming(t, ws, render)
 	exerciseTransitions(t, ws, render)
+	exerciseRoomsPanel(t, ws, render)
 	exerciseLoadedShipRooms(t, ws, render)
 	exerciseFixedShipConversion(t, ws, render)
 	exerciseCrew(t, ws, render, true)

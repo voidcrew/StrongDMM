@@ -112,6 +112,17 @@ func exerciseFixedShipConversion(t *testing.T, ws *WsShip, render func()) {
 		render()
 	}
 	if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
+		captureFrame(t, filepath.Join(dst, "fixed-ship-confirm.png"), 1400, 960)
+	}
+	// The one-time modular confirmation hides the form until Continue.
+	if ws.itemID != "" || ws.fixedConfirmed[ws.project.Hull.Type] {
+		t.Fatal("fixed ship skipped the modular confirmation")
+	}
+	ws.fixedConfirmed = map[string]bool{ws.project.Hull.Type: true}
+	for i := 0; i < 3; i++ {
+		render()
+	}
+	if dst := os.Getenv("SHIP_RENDER_TEST_OUTPUT"); dst != "" {
 		captureFrame(t, filepath.Join(dst, "fixed-ship-first-room.png"), 1400, 960)
 	}
 	ws.applyRegion()

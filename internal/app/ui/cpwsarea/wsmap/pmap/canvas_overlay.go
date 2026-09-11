@@ -17,6 +17,9 @@ const flickDurationSec = .5
 func (p *PaneMap) processCanvasOverlay() {
 	if p.context != nil {
 		p.PushAreaHover(util.Bounds{X2: float32(p.dmm.MaxX * dmmap.WorldIconSize), Y2: float32(p.dmm.MaxY * dmmap.WorldIconSize)}, overlay.ColorEmpty, util.MakeColor(0.3, 0.8, 0.9, 0.8))
+		if p.context.Overlay != nil {
+			p.context.Overlay(OverlayPainter{p})
+		}
 	}
 	p.processCanvasOverlayTools()
 	p.processCanvasOverlayFlick()
@@ -63,6 +66,12 @@ func (p *PaneMap) processCanvasOverlayTools() {
 		}
 	case tools.TNReplace:
 		colInstance = overlay.ColorToolReplaceInstance
+	case tools.TNRoomShape:
+		colTileFill = overlay.ColorToolAddTileFill
+		colTileBorder = overlay.ColorRoomShapeBorder
+		if tools.Selected().AltBehaviour() {
+			colTileBorder = overlay.ColorToolDeleteInstance
+		}
 	}
 
 	if colInstance != overlay.ColorEmpty {

@@ -12,6 +12,7 @@ import (
 	"sdmm/internal/app/window"
 	"sdmm/internal/imguiext/icon"
 	"sdmm/internal/imguiext/style"
+	"sdmm/internal/ship"
 	"sdmm/internal/shippreview"
 )
 
@@ -107,8 +108,9 @@ func (ws *WsShip) setStage(stage int) {
 	ws.flush()
 	ws.OnFocusChange(false)
 	ws.stage, ws.wizard = stage, false
+	ws.endShape()
 	ws.task = taskPaint
-	if tools.IsSelected(tools.TNRegion) {
+	if tools.IsSelected(tools.TNRegion) || tools.IsSelected(tools.TNRoomShape) {
 		tools.SetSelected(tools.TNAdd)
 	}
 	if stage == stepReview {
@@ -312,28 +314,10 @@ func (ws *WsShip) buildControls() {
 		ws.authorControls()
 		return
 	}
-	heading("MAP EDITING")
-	if ws.assembly != nil && ws.source < len(ws.assembly.Sources) && comboHelp("Part to edit", ws.assembly.Sources[ws.source].Name, "Choose where your map edits go: the hull or a displayed room option. The displayed room options stay the same.") {
-		for i, s := range ws.assembly.Sources {
-			if imgui.SelectableV(s.Name, i == ws.source, 0, imgui.Vec2{}) {
-				ws.flush()
-				ws.source = i
-				ws.rebuild()
-			}
-			if i == 0 {
-				tooltip("Edit the hull, including its floors, walls and permanent equipment.")
-			} else {
-				tooltip("Edit " + s.Name + ". Changes are saved to this room option.")
-			}
-		}
-		imgui.EndCombo()
-	}
+	ws.roomsControls()
+	space()
+	ws.variantsControls()
 	if ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
-		if ws.source == 0 {
-			hint("Your edits affect the hull: floors, walls and permanent equipment.")
-		} else {
-			hint("Your edits affect the " + ws.assembly.Sources[ws.source].Name + " room option.")
-		}
 		if d := ws.project.Documents[ws.assembly.Sources[ws.source].File]; d != nil && len(d.Unknown) > 0 {
 			hint(fmt.Sprintf("%d types on this map are not in the loaded environment. They show as placeholders and are kept on save.", len(d.Unknown)))
 			tooltip(strings.Join(d.Unknown, "\n"))
@@ -355,16 +339,6 @@ func (ws *WsShip) buildControls() {
 		ws.beginTask(taskDocking)
 	}
 	tooltip("Select an entrance with Grab (3), then place or move this ship's mobile docking port there.")
-	roomDetail := ""
-	if ws.project.Hull.Fixed {
-		roomDetail = "Make this ship modular"
-	}
-	if workshop.Row("open-room", "Upgrade rooms", roomDetail, ">", false, style.Amber, 0) {
-		ws.beginTask(taskRoom)
-	}
-	if ws.project.Hull.Fixed {
-		tooltip("This ship has a fixed layout. Select a room with Grab (3) and make it an upgrade room to turn the ship modular.")
-	}
 	space()
 	heading("CONFIGURATION")
 	if workshop.Row("open-costs", "Ship & upgrade prices", "Base ship, variants & room options", ">", false, style.Amber, 0) {
@@ -372,9 +346,6 @@ func (ws *WsShip) buildControls() {
 	}
 	if workshop.DangerButton("Remove ship...") {
 		ws.requestRemoval(ws.project.Hull)
-	}
-	if imgui.CollapsingHeader("Room options & ship variants") {
-		ws.loadoutControls()
 	}
 	if ws.project.Settings != nil && imgui.CollapsingHeader("Ship details & canvas size") {
 		if actionButton("Edit ship details...", false) {
@@ -422,12 +393,34 @@ func (ws *WsShip) canvasHeader() {
 	}
 	tooltip("Show area markers. This is the same setting as View > Areas (Ctrl+1).")
 	imgui.SameLine()
-	if tools.IsSelected(tools.TNGrab) && (ws.task == taskArea || ws.task == taskRoom || ws.task == taskDocking) {
+	ws.trackHoveredRoom()
+	grabTask := tools.IsSelected(tools.TNGrab) && (ws.task == taskArea || ws.task == taskDocking)
+	switch {
+	case ws.usesShapeTool():
+		if tools.IsSelected(tools.TNRoomShape) {
+			imgui.Text("Select the room's tiles on the hull")
+		} else {
+			imgui.Text("Editing: " + ws.editingLabel())
+		}
+	case grabTask:
 		imgui.Text("Select tiles in the part being edited")
-	} else if ws.assembly != nil && ws.source < len(ws.assembly.Sources) {
-		imgui.Text("Editing: " + ws.assembly.Sources[ws.source].Name)
+	case ws.hoverRoom != "" && ws.task == taskPaint:
+		name := ship.SlotDisplayName(ws.hoverRoom)
+		if ws.source == 0 {
+			imgui.Text(name + " - this room's items live in its option, not the hull.")
+		} else {
+			imgui.Text(name + " - a different room.")
+		}
+		imgui.SameLine()
+		if imgui.SmallButton("Edit " + name) {
+			ws.editRoom(ws.hoverRoom)
+		}
+	case ws.assembly != nil && ws.source < len(ws.assembly.Sources):
+		imgui.Text("Editing: " + ws.editingLabel())
 	}
-	if tools.IsSelected(tools.TNGrab) && (ws.task == taskArea || ws.task == taskRoom || ws.task == taskDocking) {
+	if ws.usesShapeTool() && tools.IsSelected(tools.TNRoomShape) {
+		hint("Click or drag to add tiles  |  Click a tile again to remove it  |  Shift+drag adds a box  |  Alt+drag removes a box")
+	} else if grabTask {
 		hint("Grab selection (3) is used by the action in the left panel.")
 	} else {
 		instruction := "Scroll to zoom  |  Middle mouse to pan  |  Ctrl+Z to undo"
@@ -443,64 +436,16 @@ func (ws *WsShip) canvasHeader() {
 	imgui.Separator()
 }
 
-func (ws *WsShip) loadoutControls() {
-	h := ws.project.Hull
-	if len(h.Themes) > 0 && combo("Ship variant", ws.currentTheme().Name) {
-		for i, t := range h.Themes {
-			if imgui.SelectableV(t.Name, i == ws.theme, 0, imgui.Vec2{}) {
-				ws.flush()
-				ws.theme = i
-				ws.defaults()
-				ws.rebuild()
-			}
-		}
-		imgui.EndCombo()
+// editingLabel names the part being edited the way the shipyard does.
+func (ws *WsShip) editingLabel() string {
+	if ws.assembly == nil || ws.source >= len(ws.assembly.Sources) {
+		return ""
 	}
-	if len(h.Themes) > 0 && actionButton("Variant name & description...", false) {
-		theme := ws.currentTheme()
-		ws.beginRename(taskRenameTheme, theme.ID, theme.Name)
+	s := ws.assembly.Sources[ws.source]
+	if s.Slot == "" {
+		return s.Name
 	}
-	for _, slot := range h.SlotsFor(ws.currentTheme()) {
-		imgui.PushID(slot)
-		label := "Empty room"
-		selected := false
-		for _, m := range h.Modules {
-			if m.ID == ws.selected[slot] {
-				label = m.Name
-				selected = true
-			}
-		}
-		if comboHelp("Room: "+slot, label, "Choose which room option is shown here. Choosing it also makes it the part you edit.") {
-			if imgui.Selectable("Empty room") {
-				ws.selectRoomOption(slot, "")
-			}
-			tooltip("Remove the room option from this preview and switch editing to the hull.")
-			for _, m := range h.Modules {
-				if m.Slot != slot || !m.Available(ws.currentTheme().ID) {
-					continue
-				}
-				if imgui.SelectableV(m.Name, ws.selected[slot] == m.ID, 0, imgui.Vec2{}) {
-					ws.selectRoomOption(slot, m.ID)
-				}
-				tooltip("Show and edit " + m.Name + " in this room.")
-			}
-			imgui.EndCombo()
-		}
-		imgui.BeginDisabledV(!selected)
-		if actionButton("Room name & description...", false) {
-			ws.beginRename(taskRenameModule, ws.selected[slot], label)
-		}
-		imgui.EndDisabled()
-		imgui.PopID()
-	}
-	if ws.project.Settings != nil && actionButton("Copy ship as a new variant...", false) {
-		ws.beginTask(taskTheme)
-	}
-	if ws.source > 0 {
-		if actionButton("Create another room option...", false) {
-			ws.beginTask(taskModule)
-		}
-	}
+	return ship.SlotDisplayName(s.Slot) + " - " + s.Name + " option"
 }
 
 func (ws *WsShip) selectRoomOption(slot, id string) {

@@ -1,6 +1,7 @@
 package wsship
 
 import (
+	"sdmm/internal/app/ui/cpwsarea/wsmap/tools"
 	"sdmm/internal/ship"
 	"strings"
 	"testing"
@@ -23,9 +24,10 @@ func TestSuggestedIdentifiers(t *testing.T) {
 }
 
 func TestGuidedActionRejectsMissingSelection(t *testing.T) {
+	tools.ClearRoomShape()
 	ws := &WsShip{task: taskRoom}
 	ws.applyRegion()
-	if ws.message != "Use Grab (3) to select tiles inside the hull first." {
+	if ws.message != "Select the room's tiles on the hull first." {
 		t.Fatal("missing selection did not produce guidance")
 	}
 }
