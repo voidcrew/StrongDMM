@@ -1,3 +1,9 @@
+# Voidworks 0.5.16-beta.2
+
+* Ship Workshop: a Variants list beside Rooms. Each variant shows its default flag, rooms, price and crew; open one to enable or disable rooms for it and to see, per option, whether it uses the shared room file or its own copy. Make an option variant-specific or send it back to the shared room, rename and describe a variant, set its price and crew, make it the default or delete it. Everything is undoable.
+* New variants can share the ship's rooms (only the hull is copied; edits to shared rooms show in every variant) or copy every room. Fleet ships written by hand can now get variants too: the editor writes the theme datum, the hull's available_themes and the options' for_theme lists, and names the hull file after the ship's existing lettering.
+* The canvas header names the variant being edited and marks the room as shared or variant-specific.
+
 # Voidworks 0.5.16-beta.1
 
 * Ship Workshop: one Rooms list replaces the "Part to edit" combo, the collapsed room-options header and the Upgrade rooms task. Pick the hull or a room to edit it; expand a room to switch, rename, price, staff, make default or delete its options, and add new ones. Rooms can be reshaped, hidden (hull only) or deleted; deleting a room moves its default option's furniture back into the hull. Every step is undoable.
