@@ -1,0 +1,47 @@
+name: Discord Release Alert
+on:
+  release:
+    types: [published]
+jobs:
+  notify:
+    name: Notify Discord
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post release to Discord
+        env:
+          WEBHOOK_URL: ${{ secrets.DISCORD_RELEASE_WEBHOOK }}
+          RELEASE_NAME: ${{ github.event.release.name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          RELEASE_URL: ${{ github.event.release.html_url }}
+          RELEASE_BODY: ${{ github.event.release.body }}
+          RELEASE_PRERELEASE: ${{ github.event.release.prerelease }}
+          RELEASE_AUTHOR: ${{ github.event.release.author.login }}
+        run: |
+          if [ -z "$WEBHOOK_URL" ]; then
+            echo "DISCORD_RELEASE_WEBHOOK secret is not set; skipping."
+            exit 0
+          fi
+          if [ "$RELEASE_PRERELEASE" = "true" ]; then
+            channel="Beta"; color=15105570
+          else
+            channel="Stable"; color=5763719
+          fi
+          payload=$(jq -n \
+            --arg content "**New Voidworks $channel release:** $RELEASE_TAG" \
+            --arg title "${RELEASE_NAME:-$RELEASE_TAG}" \
+            --arg url "$RELEASE_URL" \
+            --arg body "$RELEASE_BODY" \
+            --arg footer "$RELEASE_TAG · $channel · published by $RELEASE_AUTHOR" \
+            --argjson color "$color" \
+            '{content: $content,
+              embeds: [{
+                title: $title,
+                url: $url,
+                description: ($body | if length > 3500 then .[0:3500] + "\n…" else . end),
+                color: $color,
+                footer: {text: $footer}
+              }]}')
+          curl --fail --silent --show-error -X POST \
+            -H 'Content-Type: application/json' \
+            -H 'User-Agent: Voidworks-release-alert' \
+            --data "$payload" "$WEBHOOK_URL"
