@@ -346,7 +346,7 @@ func (ws *WsShip) applyRegion() {
 		return
 	}
 	{
-		ws.change("Make upgrade room", func() error { return ws.project.AddSlot(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), lo, hi) })
+		ws.change("Make upgrade room", func() error { return ws.project.AddSlot(ws.theme, ws.itemID, strings.TrimSpace(ws.itemName), lo, ship.FullFootprint(hi.X-lo.X+1, hi.Y-lo.Y+1)) })
 		if ws.message == "" {
 			ws.defaults()
 			ws.rebuild()

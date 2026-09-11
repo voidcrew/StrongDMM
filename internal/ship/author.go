@@ -9,6 +9,7 @@ import (
 
 	"sdmm/internal/dmapi/dmmap"
 	"sdmm/internal/dmapi/dmmap/dmmdata"
+	"sdmm/internal/dmapi/dmmap/dmmdata/dmmprefab"
 	"sdmm/internal/util"
 )
 
@@ -112,7 +113,10 @@ func permanent(path string) bool {
 	return mappingMarker(path)
 }
 
-func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) error {
+// AddSlot turns the hull tiles under shape, placed with module tile 1,1 at
+// origin, into an upgrade room. Tiles outside the shape keep their hull
+// furniture and stay transparent in every option.
+func (p *Project) AddSlot(themeIndex int, id, name string, origin util.Point, shape Footprint) error {
 	if err := p.ModuleNameError(name); err != nil {
 		return err
 	}
@@ -123,6 +127,9 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 		return fmt.Errorf("slot ID already exists")
 	}
 	if err := p.moduleIDError(id + "_basic"); err != nil {
+		return err
+	}
+	if err := p.footprintError(shape); err != nil {
 		return err
 	}
 	theme, err := p.roomTheme(themeIndex)
@@ -137,17 +144,17 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 	if err != nil {
 		return err
 	}
-	if min.Z != 1 || max.Z != 1 || !hull.Map.HasTile(min) || !hull.Map.HasTile(max) || min.X > max.X || min.Y > max.Y {
-		return fmt.Errorf("select a rectangle inside the hull")
+	max := util.Point{X: origin.X + shape.W - 1, Y: origin.Y + shape.H - 1, Z: 1}
+	if origin.Z != 1 || !hull.Map.HasTile(origin) || !hull.Map.HasTile(max) {
+		return fmt.Errorf("select tiles inside the hull")
 	}
-	for _, tile := range hull.Map.Tiles {
-		if tile.Coord.X >= min.X && tile.Coord.X <= max.X && tile.Coord.Y >= min.Y && tile.Coord.Y <= max.Y {
-			for _, i := range tile.Instances() {
-				if mappingMarker(i.Prefab().Path()) {
-					return fmt.Errorf("selection contains an existing slot")
-				}
-			}
-		}
+	rooms, err := p.roomShapes(hull.Map, theme)
+	if err != nil {
+		return err
+	}
+	room := RoomShape{Slot: id, Origin: origin, Marker: origin, Footprint: shape}
+	if err = roomOverlap(room, rooms); err != nil {
+		return err
 	}
 	if err = p.prepareRooms(&theme); err != nil {
 		return err
@@ -157,27 +164,13 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 		return err
 	}
 	module.Default = true
-	data := blankData(max.X-min.X+1, max.Y-min.Y+1)
-	if err = p.addMap(target, data); err != nil {
+	if err = p.addMap(target, blankData(shape.W, shape.H)); err != nil {
 		return err
 	}
 	dst := p.Documents[target].Map
-	for _, tile := range dst.Tiles {
-		source := hull.Map.GetTile(util.Point{X: min.X + tile.Coord.X - 1, Y: min.Y + tile.Coord.Y - 1, Z: 1})
-		moved := dmmap.Instances{}
-		for _, i := range source.Instances() {
-			path := i.Prefab().Path()
-			if !strings.HasPrefix(path, "/area/") && !strings.HasPrefix(path, "/turf/") && !permanent(path) {
-				tile.InstancesAdd(i.Prefab())
-				moved = append(moved, i)
-			}
-		}
-		for _, i := range moved {
-			source.InstancesRemoveByInstance(i)
-		}
-	}
+	moveFurniture(hull.Map, dst, room, room.Footprint.Cells)
 	dst.GetTile(util.Point{X: 1, Y: 1, Z: 1}).InstancesAdd(dmmap.PrefabStorage.Initial(Connector))
-	hull.Map.GetTile(min).InstancesAdd(p.prefab(SlotMarker, map[string]string{"key": strconv.Quote(id)}))
+	hull.Map.GetTile(origin).InstancesAdd(p.markerPrefab(id, shape))
 	if p.Settings == nil && theme.ID != "" {
 		// Existing ships can inherit their slot list. Override only the chosen
 		// theme, leaving the base and every other variant's registration intact.
@@ -198,6 +191,52 @@ func (p *Project) AddSlot(themeIndex int, id, name string, min, max util.Point) 
 	p.reserveAnchors(dst)
 	p.protect(hull.Map)
 	p.protect(dst)
+	return nil
+}
+
+// moveFurniture extracts the hull's movable content under the given module
+// cells into the module map. Turfs, areas and permanent equipment stay.
+func moveFurniture(hull, module *dmmap.Dmm, room RoomShape, cells map[util.Point]bool) {
+	for cell, in := range cells {
+		if !in {
+			continue
+		}
+		tile := module.GetTile(util.Point{X: cell.X, Y: cell.Y, Z: 1})
+		source := hull.GetTile(util.Point{X: room.Origin.X + cell.X - 1, Y: room.Origin.Y + cell.Y - 1, Z: 1})
+		moved := dmmap.Instances{}
+		for _, i := range source.Instances() {
+			path := i.Prefab().Path()
+			if !strings.HasPrefix(path, "/area/") && !strings.HasPrefix(path, "/turf/") && !permanent(path) {
+				tile.InstancesAdd(i.Prefab())
+				moved = append(moved, i)
+			}
+		}
+		for _, i := range moved {
+			source.InstancesRemoveByInstance(i)
+		}
+	}
+}
+
+func (p *Project) markerPrefab(id string, shape Footprint) *dmmprefab.Prefab {
+	values := map[string]string{"key": strconv.Quote(id)}
+	if !shape.IsFull() {
+		values[footprintVar] = strconv.Quote(shape.String())
+	}
+	return p.prefab(SlotMarker, values)
+}
+
+func roomOverlap(room RoomShape, rooms map[string]RoomShape) error {
+	tiles := room.Tiles()
+	for slot, other := range rooms {
+		if slot == room.Slot {
+			continue
+		}
+		for tile := range other.Tiles() {
+			if tiles[tile] {
+				return fmt.Errorf("selection overlaps the %s room", SlotDisplayName(slot))
+			}
+		}
+	}
 	return nil
 }
 
@@ -241,17 +280,24 @@ func (p *Project) AddModule(themeIndex int, base Module, id, name string, empty 
 	if err != nil {
 		return err
 	}
+	shape, err := p.slotShape(theme, base.Slot, d.Map)
+	if err != nil {
+		return err
+	}
 	data := RawData(d.Map)
-	if empty {
-		for k, prefabs := range data.Dictionary {
-			next := dmmdata.Prefabs{dmmap.PrefabStorage.Initial("/turf/template_noop"), dmmap.PrefabStorage.Initial("/area/template_noop")}
-			for _, f := range prefabs {
-				if mappingMarker(f.Path()) {
-					next = append(next, f)
-				}
-			}
-			data.Dictionary[k] = next
+	// Every tile has its own key, so tiles can be blanked one at a time. A copy
+	// never carries content outside the room's shape.
+	for coord, k := range data.Grid {
+		if !empty && shape.Contains(coord) {
+			continue
 		}
+		next := dmmdata.Prefabs{dmmap.PrefabStorage.Initial("/turf/template_noop"), dmmap.PrefabStorage.Initial("/area/template_noop")}
+		for _, f := range data.Dictionary[k] {
+			if mappingMarker(f.Path()) {
+				next = append(next, f)
+			}
+		}
+		data.Dictionary[k] = next
 	}
 	if err = p.addMap(target, data); err != nil {
 		return err

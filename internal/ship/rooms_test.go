@@ -24,7 +24,7 @@ func loadedRoomProject(t *testing.T, themed bool) (*Project, string) {
 	if err = p.Deck(p.Hull.Themes[0], util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 18, Y: 18, Z: 1}); err != nil {
 		t.Fatal(err)
 	}
-	if err = p.AddSlot(0, "original", "Original Room", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
+	if err = p.addRect(0, "original", "Original Room", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if err = p.AddTheme(0, "other", "Other Variant"); err != nil {
@@ -78,7 +78,7 @@ func TestLoadedShipRoomCreationAndSaveUndo(t *testing.T) {
 	doc.Map.GetTile(lo).InstancesAdd(dmmap.PrefabStorage.Initial("/obj/item/test"))
 	doc.Map.GetTile(lo).InstancesAdd(dmmap.PrefabStorage.Initial("/obj/machinery/power/apc"))
 	before := p.Capture()
-	if err := p.AddSlot(0, "new_room", "New Room", lo, hi); err != nil {
+	if err := p.addRect(0, "new_room", "New Room", lo, hi); err != nil {
 		t.Fatal(err)
 	}
 	if Contains(p.Hull.Slots, "new_room") || Contains(p.Hull.SlotsFor(p.Hull.Themes[1]), "new_room") {
@@ -155,10 +155,10 @@ func TestLoadedShipRoomCreationAndSaveUndo(t *testing.T) {
 func TestLoadedShipRoomNamesAndExternalEdits(t *testing.T) {
 	p, sourceFile := loadedRoomProject(t, true)
 	lo, hi := util.Point{X: 10, Y: 7, Z: 1}, util.Point{X: 12, Y: 9, Z: 1}
-	if err := p.AddSlot(0, "added", "Added", lo, hi); err != nil {
+	if err := p.addRect(0, "added", "Added", lo, hi); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.AddSlot(1, "added", "Another Name", lo, hi); err == nil {
+	if err := p.addRect(1, "added", "Another Name", lo, hi); err == nil {
 		t.Fatal("duplicate theme-local slot ID accepted")
 	}
 	if err := p.AddModule(0, p.Hull.Modules[0], "duplicate_name", "  ADDED  ", true); err == nil {
@@ -180,7 +180,7 @@ func TestLoadedShipRoomNamesAndExternalEdits(t *testing.T) {
 func TestLoadedShipWithoutThemesCanAddRooms(t *testing.T) {
 	p, _ := loadedRoomProject(t, false)
 	lo, hi := util.Point{X: 10, Y: 7, Z: 1}, util.Point{X: 12, Y: 9, Z: 1}
-	if err := p.AddSlot(0, "unthemed_room", "Unthemed Room", lo, hi); err != nil {
+	if err := p.addRect(0, "unthemed_room", "Unthemed Room", lo, hi); err != nil {
 		t.Fatal(err)
 	}
 	a, err := p.Assemble(Theme{}, map[string]string{"unthemed_room": "unthemed_room_basic"})
@@ -250,7 +250,7 @@ func TestFixedShipBecomesModularWithItsFirstRoom(t *testing.T) {
 		}
 		before := p.Capture()
 		lo, hi := util.Point{X: 5, Y: 5, Z: 1}, util.Point{X: 7, Y: 7, Z: 1}
-		if err := p.AddSlot(0, "bay", "Bay", lo, hi); err != nil {
+		if err := p.addRect(0, "bay", "Bay", lo, hi); err != nil {
 			t.Fatal(err)
 		}
 		if p.Hull.Fixed || !Contains(p.Hull.Slots, "bay") || !p.Modified() {

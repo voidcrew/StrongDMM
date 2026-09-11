@@ -70,7 +70,7 @@ func TestRoomAreasPreserveMapsAndRoundTrip(t *testing.T) {
 		t.Fatalf("undo kept new areas in the list: %v %+v", err, areas)
 	}
 	p.Restore(after)
-	if err = p.AddSlot(0, "cargo", "Cargo", lo, hi); err != nil {
+	if err = p.addRect(0, "cargo", "Cargo", lo, hi); err != nil {
 		t.Fatal(err)
 	}
 	a, err := p.Assemble(p.Hull.Themes[0], map[string]string{"cargo": "cargo_basic"})

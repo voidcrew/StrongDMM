@@ -18,6 +18,8 @@ type roomEditing struct {
 	names        map[string]nameTarget // component scope -> original name definition
 	descriptions map[string]nameTarget
 	mapFields    map[string]nameTarget
+	removals     map[string]nameTarget // module ID -> definition cut out on save
+	defaults     map[string]nameTarget // module ID -> is_default flag to rewrite
 	code         string
 }
 
@@ -229,6 +231,34 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 			}
 		}
 	}
+	for id, target := range p.rooms.removals {
+		if p.moduleIndex(id) >= 0 {
+			continue
+		}
+		var err error
+		if contents[target.file], _, err = removeDefinitions(contents[target.file], []string{target.typePath}); err != nil {
+			return nil, err
+		}
+	}
+	for id, target := range p.rooms.defaults {
+		i := p.moduleIndex(id)
+		if i < 0 {
+			continue
+		}
+		before := false
+		for _, base := range p.rooms.base.Modules {
+			if base.ID == id {
+				before = base.Default
+			}
+		}
+		if before == p.Hull.Modules[i].Default {
+			continue
+		}
+		var err error
+		if contents[target.file], err = rewriteFlag(contents[target.file], target.typePath, "is_default", p.Hull.Modules[i].Default); err != nil {
+			return nil, err
+		}
+	}
 	for scope, target := range p.rooms.names {
 		name, ok := componentName(p.Hull, scope)
 		before, _ := componentName(p.rooms.base, scope)
@@ -244,7 +274,8 @@ func (p *Project) roomChanges(changes []FileChange) ([]FileChange, error) {
 	for scope, target := range p.rooms.mapFields {
 		field, before := mapField(p.rooms.base, scope)
 		_, after := mapField(p.Hull, scope)
-		if before == after {
+		// A removed option's block is gone; nothing is left to rewrite in it.
+		if _, exists := componentName(p.Hull, scope); before == after || scope != "ship" && !exists {
 			continue
 		}
 		var err error

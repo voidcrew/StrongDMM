@@ -319,6 +319,16 @@ func (p *Project) Assemble(theme Theme, selected map[string]string) (*Assembly, 
 			a.Issues = append(a.Issues, Issue{Message: "Missing hull marker: " + slot})
 		}
 	}
+	// Rooms without a chosen option take their box from the default option.
+	if shapes, err := p.roomShapes(d.Map, theme); err != nil {
+		a.Issues = append(a.Issues, Issue{Message: err.Error()})
+	} else {
+		for slot, room := range shapes {
+			if _, ok := a.Rooms[slot]; !ok {
+				a.Rooms[slot] = room
+			}
+		}
+	}
 	for _, s := range sources {
 		if d := p.Documents[s.File]; d != nil && len(d.Unknown) > 0 {
 			a.Issues = append(a.Issues, Issue{Message: fmt.Sprintf("%s uses %d types the loaded environment does not define (kept on save): %s", s.Name, len(d.Unknown), strings.Join(d.Unknown, ", "))})
@@ -427,8 +437,13 @@ func (p *Project) installTypes() error {
 }
 func (p *Project) prefab(path string, values map[string]string) *dmmprefab.Prefab {
 	vars := dmvars.MutableVariables{}
-	for k, v := range values {
-		vars.Put(k, v)
+	keys := make([]string, 0, len(values))
+	for k := range values {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	for _, k := range keys {
+		vars.Put(k, values[k])
 	}
 	v := vars.ToImmutable()
 	if obj := p.Dme.Objects[path]; obj != nil {

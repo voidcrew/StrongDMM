@@ -167,7 +167,7 @@ func TestLoadedCrewSurvivesLaterRoomEdits(t *testing.T) {
 	if e := p.Save(); e != nil {
 		t.Fatal(e)
 	}
-	if e := p.AddSlot(1, "crew_bay", "Crew Bay", util.Point{X: 10, Y: 10, Z: 1}, util.Point{X: 12, Y: 12, Z: 1}); e != nil {
+	if e := p.addRect(1, "crew_bay", "Crew Bay", util.Point{X: 10, Y: 10, Z: 1}, util.Point{X: 12, Y: 12, Z: 1}); e != nil {
 		t.Fatal(e)
 	}
 	jobs[0].Name = "Mechanic"

@@ -21,7 +21,7 @@ func TestCreationRejectsDuplicateDisplayNames(t *testing.T) {
 		t.Fatal("ship cannot retain its own name", err)
 	}
 	lo, hi := util.Point{X: 2, Y: 2, Z: 1}, util.Point{X: 4, Y: 4, Z: 1}
-	if err = p.AddSlot(0, "cargo", "Cargo Bay", lo, hi); err != nil {
+	if err = p.addRect(0, "cargo", "Cargo Bay", lo, hi); err != nil {
 		t.Fatal(err)
 	}
 	for _, name := range []string{"Hull", " empty ROOM "} {
@@ -30,7 +30,7 @@ func TestCreationRejectsDuplicateDisplayNames(t *testing.T) {
 		}
 	}
 	for _, name := range []string{"Cargo Bay", " cargo bay ", "CARGO   BAY"} {
-		if err = p.AddSlot(0, "another_room", name, util.Point{X: 8, Y: 8, Z: 1}, util.Point{X: 10, Y: 10, Z: 1}); err == nil {
+		if err = p.addRect(0, "another_room", name, util.Point{X: 8, Y: 8, Z: 1}, util.Point{X: 10, Y: 10, Z: 1}); err == nil {
 			t.Fatalf("accepted duplicate room %q", name)
 		}
 		if err = p.AddModule(0, p.Hull.Modules[0], "another_option", name, true); err == nil {

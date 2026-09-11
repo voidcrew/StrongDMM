@@ -53,15 +53,9 @@ func (p *Project) Rename(scope, name string) error {
 			}
 			if _, prepared := p.rooms.names[scope]; !prepared {
 				prefix, id, _ := strings.Cut(scope, "/")
-				prefix = map[string]string{"theme": "/datum/ship_theme/", "module": "/datum/ship_upgrade_module/"}[prefix]
-				typePath := ""
-				for path, obj := range p.Dme.Objects {
-					if strings.HasPrefix(path, prefix) && text(obj.Vars, "id") == id && obj.Vars.ValueV("for_ship", "") == p.Hull.Type {
-						if typePath != "" {
-							return fmt.Errorf("multiple definitions use the ID %s", id)
-						}
-						typePath = path
-					}
+				typePath, err := p.componentType(map[string]string{"theme": "/datum/ship_theme/", "module": "/datum/ship_upgrade_module/"}[prefix], id)
+				if err != nil {
+					return err
 				}
 				file, err := p.roomTypeFile(typePath)
 				if err != nil {

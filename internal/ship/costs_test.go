@@ -43,7 +43,7 @@ func TestAuthoredCostsLegacyMigrationRoundTripAndUndo(t *testing.T) {
 		t.Fatal(err)
 	}
 	p.Settings.Cost = 9
-	if err := p.AddSlot(0, "cargo", "Cargo", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
+	if err := p.addRect(0, "cargo", "Cargo", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if err := p.AddTheme(0, "variant", "Variant"); err != nil {
@@ -168,7 +168,7 @@ func TestHandwrittenCostsPreserveSourceAndMergeRoomEdits(t *testing.T) {
 	if err := p.SetPartCosts(scope, want); err != nil {
 		t.Fatal(err)
 	}
-	if err := p.AddSlot(1, "new_bay", "New Bay", util.Point{X: 8, Y: 8, Z: 1}, util.Point{X: 10, Y: 10, Z: 1}); err != nil {
+	if err := p.addRect(1, "new_bay", "New Bay", util.Point{X: 8, Y: 8, Z: 1}, util.Point{X: 10, Y: 10, Z: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if err := p.SetPartCosts("module/new_bay_basic", PartCosts{"trade": 11}); err != nil {

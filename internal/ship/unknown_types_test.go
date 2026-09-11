@@ -94,7 +94,7 @@ func TestShipMapsWithUnknownTypesOpenAndKeepThem(t *testing.T) {
 		t.Fatal("the edit was not saved")
 	}
 	// Extracting a room that contains the unknown atom keeps it in the room map.
-	if err = p.AddSlot(0, "relic_bay", "Relic Bay", util.Point{X: 3, Y: 4, Z: 1}, util.Point{X: 5, Y: 6, Z: 1}); err != nil {
+	if err = p.addRect(0, "relic_bay", "Relic Bay", util.Point{X: 3, Y: 4, Z: 1}, util.Point{X: 5, Y: 6, Z: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if err = p.Save(); err != nil {

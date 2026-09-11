@@ -37,6 +37,7 @@ type Assembly struct {
 	Sources          []Source
 	Cells            map[util.Point][]Atom
 	Markers          map[string]util.Point
+	Rooms            map[string]RoomShape // slots with a known module box or shape
 	Issues           []Issue
 	MaxX, MaxY, MaxZ int
 }
@@ -125,7 +126,8 @@ func Compose(sources []Source) (*Assembly, error) {
 	if hull.MaxZ != 1 {
 		return nil, fmt.Errorf("ship workspace currently supports single-level hulls")
 	}
-	a := &Assembly{Sources: append([]Source(nil), sources...), Cells: map[util.Point][]Atom{}, Markers: map[string]util.Point{}, MaxX: hull.MaxX, MaxY: hull.MaxY, MaxZ: hull.MaxZ}
+	a := &Assembly{Sources: append([]Source(nil), sources...), Cells: map[util.Point][]Atom{}, Markers: map[string]util.Point{}, Rooms: map[string]RoomShape{}, MaxX: hull.MaxX, MaxY: hull.MaxY, MaxZ: hull.MaxZ}
+	masks := map[string]string{}
 	claimedTurfs := map[util.Point]string{}
 	claimedAreas := map[util.Point]string{}
 	for idx := range a.Sources {
@@ -154,6 +156,7 @@ func Compose(sources []Source) (*Assembly, error) {
 				return nil, fmt.Errorf("%s needs exactly one connector; found %d", src.Name, len(connectors))
 			}
 			src.Offset = util.Point{X: marker.X - connectors[0].X, Y: marker.Y - connectors[0].Y}
+			a.Rooms[src.Slot] = a.roomShape(src.Slot, marker, util.Point{X: src.Offset.X + 1, Y: src.Offset.Y + 1, Z: 1}, masks[src.Slot], src.Data.MaxX, src.Data.MaxY)
 		}
 		for _, local := range coords {
 			coord := util.Point{X: local.X + src.Offset.X, Y: local.Y + src.Offset.Y, Z: local.Z}
@@ -174,6 +177,7 @@ func Compose(sources []Source) (*Assembly, error) {
 						return nil, fmt.Errorf("duplicate hull marker %s", slot)
 					}
 					a.Markers[slot] = coord
+					masks[slot] = text(prefab.Vars(), footprintVar)
 				}
 				if mappingMarker(path) || path == "/turf/template_noop" || path == "/area/template_noop" {
 					continue
@@ -215,7 +219,35 @@ func Compose(sources []Source) (*Assembly, error) {
 			}
 		}
 	}
+	// A shaped room describes its own box even before an option is chosen.
+	for slot, marker := range a.Markers {
+		if _, ok := a.Rooms[slot]; ok || masks[slot] == "" {
+			continue
+		}
+		f, err := parseMask(masks[slot])
+		if err != nil {
+			a.Issues = append(a.Issues, Issue{Message: SlotDisplayName(slot) + ": " + err.Error(), Coord: marker})
+			continue
+		}
+		a.Rooms[slot] = RoomShape{Slot: slot, Origin: marker, Marker: marker, Footprint: f}
+	}
 	return a, nil
+}
+
+// roomShape reads a marker's mask against its module box, falling back to the
+// full rectangle when the shape does not fit.
+func (a *Assembly) roomShape(slot string, marker, origin util.Point, mask string, w, h int) RoomShape {
+	room := RoomShape{Slot: slot, Origin: origin, Marker: marker, Footprint: FullFootprint(w, h)}
+	if mask == "" {
+		return room
+	}
+	f, err := ParseFootprint(mask, w, h)
+	if err != nil {
+		a.Issues = append(a.Issues, Issue{Message: SlotDisplayName(slot) + ": " + err.Error(), Coord: marker})
+		return room
+	}
+	room.Footprint = f
+	return room
 }
 
 // Display converts ownership-tagged cells into a render-only DMM. The original

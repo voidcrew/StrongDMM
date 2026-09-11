@@ -47,7 +47,7 @@ func TestRemoveAuthoredShipAndRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := p.AddSlot(0, "room", "Room", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
+	if err := p.addRect(0, "room", "Room", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
 		t.Fatal(err)
 	}
 	if err := p.Save(); err != nil {
@@ -121,7 +121,7 @@ func TestRemoveSavedBlankShipAndUndoneModules(t *testing.T) {
 		}
 		initial := p.Capture()
 		if withRoom {
-			if err := p.AddSlot(0, "room", "Room", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
+			if err := p.addRect(0, "room", "Room", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); err != nil {
 				t.Fatal(err)
 			}
 		}

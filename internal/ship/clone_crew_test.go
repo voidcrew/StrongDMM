@@ -12,7 +12,7 @@ func TestRoomCloneKeepsIndependentCrew(t *testing.T) {
 		t.Fatal(e)
 	}
 	crewTestTypes(p)
-	if e = p.AddSlot(0, "lab", "Lab", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); e != nil {
+	if e = p.addRect(0, "lab", "Lab", util.Point{X: 3, Y: 3, Z: 1}, util.Point{X: 5, Y: 5, Z: 1}); e != nil {
 		t.Fatal(e)
 	}
 	jobs := []CrewJob{{Name: "Scientist", Slots: 2, Category: "Science", Outfit: "/datum/outfit/job/assistant", Equipment: map[string]string{"head": ""}}}

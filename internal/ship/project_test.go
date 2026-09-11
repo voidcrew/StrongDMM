@@ -54,7 +54,7 @@ func TestNewShipAuthoringRoundTrip(t *testing.T) {
 	hull.GetTile(lo).InstancesAdd(dmmap.PrefabStorage.Initial("/obj/item/test"))
 	hull.GetTile(lo).InstancesAdd(dmmap.PrefabStorage.Initial("/obj/machinery/power/apc"))
 	before := p.Capture()
-	if err = p.AddSlot(0, "cargo", "Cargo", lo, hi); err != nil {
+	if err = p.addRect(0, "cargo", "Cargo", lo, hi); err != nil {
 		t.Fatal(err)
 	}
 	module := p.Hull.Modules[0]

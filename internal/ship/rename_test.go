@@ -116,7 +116,7 @@ func TestRenameComponentsSaveAndUndo(t *testing.T) {
 				t.Fatal("redo after Save did not restore the renamed source")
 			}
 			// New room options on loaded ships use generated registrations, too.
-			if err = p.AddSlot(0, "new_room", "New Room", util.Point{X: 10, Y: 7, Z: 1}, util.Point{X: 12, Y: 9, Z: 1}); err != nil {
+			if err = p.addRect(0, "new_room", "New Room", util.Point{X: 10, Y: 7, Z: 1}, util.Point{X: 12, Y: 9, Z: 1}); err != nil {
 				t.Fatal(err)
 			}
 			if err = p.Rename("module/new_room_basic", "New Infirmary"); err != nil {
