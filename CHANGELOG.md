@@ -1,25 +1,12 @@
-# Voidworks 0.5.15-beta.6
+# Voidworks 0.5.15
 
-* The climate balance handle is laid out like the Climate grid: moisture runs across (wetter to the right) and heat runs down (hotter at the bottom), so pushing the handle toward a corner favours that corner of the grid.
-
-# Voidworks 0.5.15-beta.5
-
-* Ship Workshop lists every fleet ship, including fixed layouts without upgrade slots. Select a room on a fixed ship and make it an upgrade room to turn the ship modular: the save enables `has_upgrade_slots` and adds the slot list beside the ship's existing jobs and prices.
-* The fleet library can show all ships, modular ships or fixed layouts.
+* Planet Workshop is now part of the stable editor. Open a planet or create a new one, then edit its biomes and contents with a seeded preview. Planet settings covers terrain, rivers, environment and ruins where the game supports them, and Ruin Workshop offers View on planet for planet ruins.
+* Climate: paint climate rules on the preview, with heat, moisture and last-stroke lenses, coverage percentages and one undo per stroke. Climate balance gives the heat, cave heat and moisture bands authored shares of the map (generator `heat_shares`, `cave_heat_shares`, `humidity_shares`) with a two-axis handle laid out like the Climate grid, fine-tune sliders and legend shares. The controls appear once the loaded game code declares the fields.
+* Ship Workshop lists every fleet ship, including fixed layouts without upgrade slots, with an All / Modular / Fixed layout filter. Select a room on a fixed ship and make it an upgrade room to turn the ship modular: the save enables `has_upgrade_slots` and adds the slot list beside the ship's existing jobs and prices.
 * Ships whose maps reference types missing from the loaded environment now open in Ship Workshop, like ordinary map tabs. Those atoms show as placeholders, are listed in the build panel and review checks, and are kept on save instead of being discarded.
-* The updater follows GitHub's repository-rename redirects on api.github.com.
-
-# Voidworks 0.5.15-beta.4
-
-* Climate balance: heat, cave heat and moisture bands have authored shares of the map (game generator `heat_shares`, `cave_heat_shares`, `humidity_shares`), with a two-axis handle, fine-tune sliders and legend shares. Shown once the loaded game code declares the fields.
-* File > Save and Ctrl+S save the planet on screen, including pending edits and a named New planet form, and report failures in a dialog. Save All and closing save every open draft.
-* Generated planet files are named after the planet; earlier `workshop_` files stay readable.
-* Generated `.dme` includes use backslashes and are placed beside related files for planets, ships and ruins.
+* File > Save and Ctrl+S save the planet on screen and report failures in a dialog; Save All and closing save every open draft. Generated planet files are named after the planet, and generated `.dme` includes use backslashes beside related files for planets, ships and ruins.
 * Drag biomes in the list to reorder them. Seeds moved to an advanced box.
-
-# Voidworks 0.5.15-beta.1
-
-* Planet Workshop beta now uses the Voidworks name, icon, profile migration, and release channels.
+* The updater follows GitHub's repository-rename redirects on api.github.com.
 
 # Voidworks 0.5.14
 

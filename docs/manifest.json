@@ -1,8 +1,8 @@
 {
   "name": "Voidworks",
-  "version": "0.5.15-beta.1",
+  "version": "0.5.15",
   "forceUpdate": false,
-  "description": "Voidworks Planet Workshop beta",
+  "description": "Voidworks with Planet Workshop and fixed-to-modular ship conversion",
   "downloadLinks": {
     "windows": "https://github.com/voidcrew/Voidworks/releases/download/%VERSION%/Voidworks-%VERSION%-windows-x64.zip"
   }
