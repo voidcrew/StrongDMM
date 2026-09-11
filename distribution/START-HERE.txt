@@ -1,5 +1,5 @@
 VOIDWORKS - WINDOWS X64
-Version: 0.5.15-beta.4 - Planet Workshop beta
+Version: 0.5.15-beta.5 - Planet Workshop beta
 
 START
 1. Extract the whole ZIP into its own writable folder, beside your stable editor.
@@ -55,6 +55,10 @@ Preview never saves these appearances into your map.
 
 SHIP WORKSHOP
 1. Choose a ship: open an existing ship or choose Create a new ship.
+   The library lists every fleet ship; filter it by All, Modular or Fixed
+   layout. A fixed-layout ship has no upgrade slots yet: select a room on it
+   and choose Make an upgrade room to turn it modular. Saving enables its
+   upgrade slots and keeps its existing jobs, prices and other definitions.
    For a new ship, enter its name, pick a canvas size, and start building.
    File identifiers and the docking port are created automatically.
 2. Build: choose the Part to edit, then place pieces on the assembled map.
@@ -115,6 +119,9 @@ includes. Created room areas use a separate generated .dm file, .areas.json
 metadata and a .dme include. Hand-authored ship registrations are preserved.
 Save all changes saves every changed ship in this workshop session.
 Files edited elsewhere after opening are checked before replacement.
+Maps that reference types missing from the loaded environment still open;
+those atoms show as placeholders, are listed in Build and Review, and are
+kept on save.
 Close ordinary map tabs before opening those same sources in Ship Workshop.
 
 CURRENT LIMITS
