@@ -142,7 +142,7 @@ func (ws *WsShip) newShip() {
 			ws.newID = suggestedID(ws.newName, ws.shipIDUsed)
 		}
 		space()
-		if imgui.CollapsingHeader("Advanced: file identifier") {
+		if imgui.CollapsingHeader("Advanced") {
 			if textField("File identifier", "lowercase_letters", &ws.newID) {
 				ws.customID = true
 			}
@@ -568,7 +568,7 @@ func (ws *WsShip) areaControls() {
 		}
 		imgui.EndCombo()
 	}
-	if imgui.CollapsingHeader("Advanced: area type") {
+	if imgui.CollapsingHeader("Advanced") {
 		if textField("File identifier", "lowercase_letters", &ws.itemID) {
 			ws.customID = true
 		}
@@ -613,7 +613,7 @@ func (ws *WsShip) itemIdentifier() {
 	if !ws.customID {
 		ws.itemID = suggestedID(ws.itemName, ws.itemIDUsed)
 	}
-	if imgui.CollapsingHeader("Advanced: file identifier") {
+	if imgui.CollapsingHeader("Advanced") {
 		if textField("File identifier", "lowercase_letters", &ws.itemID) {
 			ws.customID = true
 		}
@@ -653,7 +653,7 @@ func (ws *WsShip) copyControls() {
 	if ws.task == taskTheme {
 		nameErr = ws.project.ThemeNameError(ws.itemName)
 	}
-	if imgui.CollapsingHeader("Part costs / " + ws.itemCosts.Summary() + "###new-part-costs") {
+	if imgui.CollapsingHeader("Part costs###new-part-costs") {
 		for _, class := range ship.PartClasses {
 			value := int32(ws.itemCosts[class.ID])
 			numberField(class.Name, &value)
